@@ -1,0 +1,8 @@
+{
+  "name": "Remix: Remix: Gestão de Partidas de Futebol",
+  "description": "Portal de gestão de partidas de futebol, cobrindo cadastro de jogadores com aprovação, calendário de jogos, confirmação de presença por posição, controle de membros mensalistas/diaristas e gerenciamento de pagamentos.",
+  "requestFramePermissions": [],
+  "majorCapabilities": [
+    "MAJOR_CAPABILITY_SERVER_SIDE_GEMINI_API"
+  ]
+}
