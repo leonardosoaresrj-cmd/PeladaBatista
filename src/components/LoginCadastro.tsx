@@ -239,50 +239,17 @@ export default function LoginCadastro({ jogadores, onLoginSuccess, onRegistrar }
                     <p className="text-xs text-emerald-200 leading-relaxed">
                       O sistema localizou seu cadastro e enviou as credenciais para o e-mail: <strong className="text-white font-medium">{recoveryEmail.toLowerCase().trim()}</strong>.
                     </p>
-                    
-                    {/* Visualização de teste para sandbox - extremamente prestativo se não houver envio real via SMTP */}
-                    <div className="bg-emerald-900/40 p-3 rounded-lg border border-teal-500/20 text-center">
-                      <p className="text-[9px] uppercase font-bold text-emerald-400 tracking-wider">PIN Recuperado (Ambiente Seguro)</p>
-                      <p className="text-2xl font-mono font-extrabold tracking-widest text-teal-300 mt-1">{recoveredPin}</p>
-                      <button
-                        type="button"
-                        onClick={() => {
-                          navigator.clipboard.writeText(recoveredPin);
-                        }}
-                        className="text-[9px] text-emerald-200 hover:text-white transition-colors uppercase font-mono mt-1.5 tracking-wider font-semibold cursor-pointer block mx-auto hover:underline"
-                      >
-                        Copiar PIN para colar no Login
-                      </button>
-                    </div>
-
-                    {/* Simulação Visual de recebimento do E-mail */}
-                    <div className="border border-white/5 rounded-lg overflow-hidden bg-emerald-950/80 text-left text-[11px] leading-relaxed relative">
-                      <div className="bg-emerald-900/50 px-2.5 py-1.5 border-b border-white/5 font-mono text-[9px] text-emerald-450 flex justify-between">
-                        <span>Correio: noreply@peladasabado.org</span>
-                        <span>Assunto: PIN recuperado</span>
-                      </div>
-                      <div className="p-3 space-y-1.5 text-emerald-100">
-                        <p className="font-semibold text-white">Prezado Atleta,</p>
-                        <p>Como solicitado, informamos que a sua senha de acesso ao portal é:</p>
-                        <div className="bg-emerald-900/30 px-2.5 py-1 border border-white/10 rounded text-center font-mono font-bold text-sm text-teal-300 tracking-wider">
-                          PIN: {recoveredPin}
-                        </div>
-                        <p className="text-[10px] text-emerald-400/70 italic mt-2">Dica: Por favor, guarde essa informação de forma segura.</p>
-                      </div>
-                    </div>
 
                     <button
                       type="button"
                       onClick={() => {
-                        setLoginEmail(recoveryEmail);
-                        setLoginPin(recoveredPin);
                         setIsRecoveryMode(false);
                         setRecoverySuccess(false);
                         setRecoveryError('');
                       }}
-                      className="w-full bg-white hover:bg-emerald-100 text-black font-bold py-2 rounded-lg text-sm transition-colors text-center shadow-md cursor-pointer uppercase tracking-wider text-[11px] hover:scale-[1.01]"
+                      className="w-full bg-white hover:bg-emerald-100 text-black font-bold py-2.5 rounded-lg text-sm transition-all shadow-md cursor-pointer uppercase tracking-wider text-[11px] hover:scale-[1.01]"
                     >
-                      Preencher PIN e Entrar no Portal
+                      Voltar para o Login
                     </button>
                   </div>
                 ) : (
