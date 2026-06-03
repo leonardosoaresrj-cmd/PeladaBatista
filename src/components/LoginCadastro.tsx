@@ -6,7 +6,7 @@
 import React, { useState } from 'react';
 import { Jogador, PosicaoJogador, MembroStatus } from '../types';
 import { AVATAR_PRESETS } from '../data';
-import { KeyRound, Mail, User, Calendar, Shield, Users, Check, AlertCircle } from 'lucide-react';
+import { KeyRound, Mail, User, Calendar, Shield, Users, Check, AlertCircle, ArrowLeft, Send, Loader2 } from 'lucide-react';
 
 interface LoginCadastroProps {
   jogadores: Jogador[];
@@ -39,6 +39,39 @@ export default function LoginCadastro({ jogadores, onLoginSuccess, onRegistrar }
   const [pin, setPin] = useState('');
   const [singupSuccess, setSingupSuccess] = useState(false);
   const [signupError, setSignupError] = useState('');
+
+  // Password Recovery State
+  const [isRecoveryMode, setIsRecoveryMode] = useState(false);
+  const [recoveryEmail, setRecoveryEmail] = useState('');
+  const [recoverySuccess, setRecoverySuccess] = useState(false);
+  const [recoveryError, setRecoveryError] = useState('');
+  const [recoveredPin, setRecoveredPin] = useState('');
+  const [isSending, setIsSending] = useState(false);
+
+  const handleRecoverySubmit = (e: React.FormEvent) => {
+    e.preventDefault();
+    setRecoveryError('');
+    setRecoverySuccess(false);
+
+    if (!recoveryEmail.trim()) {
+      setRecoveryError('Por favor, informe seu e-mail cadastrado.');
+      return;
+    }
+
+    const found = jogadores.find(j => j.email.toLowerCase().trim() === recoveryEmail.toLowerCase().trim());
+    if (!found) {
+      setRecoveryError('O e-mail informado não consta no elenco de cadastrados do portal.');
+      return;
+    }
+
+    setIsSending(true);
+    // Simular o tempo de resposta do servidor de correio
+    setTimeout(() => {
+      setIsSending(false);
+      setRecoveredPin(found.senha);
+      setRecoverySuccess(true);
+    }, 1200);
+  };
 
   const handleFileChange = (e: React.ChangeEvent<HTMLInputElement>) => {
     const file = e.target.files?.[0];
@@ -175,91 +208,201 @@ export default function LoginCadastro({ jogadores, onLoginSuccess, onRegistrar }
 
         <div className="p-6">
           {isLogin ? (
-            /* FORMULÁRIO DE LOGIN */
-            <form onSubmit={handleLoginSubmit} className="space-y-4">
-              {loginError && (
-                <div className="flex items-start gap-2 bg-rose-950/50 border border-rose-500/20 text-rose-200 text-xs px-3 py-2.5 rounded-lg animate-pulse">
-                  <AlertCircle className="w-4 h-4 text-rose-400 shrink-0 mt-0.5" />
-                  <span>{loginError}</span>
-                </div>
-              )}
-
-              <div>
-                <label className="block text-[10px] font-bold uppercase text-emerald-400 tracking-wider mb-1.5">Email Cadastrado</label>
-                <div className="relative">
-                  <Mail className="absolute left-3 top-2.5 w-4 h-4 text-emerald-450" />
-                  <input
-                    id="input-login-email"
-                    type="email"
-                    required
-                    placeholder="exemplo@email.com"
-                    value={loginEmail}
-                    onChange={(e) => setLoginEmail(e.target.value)}
-                    className="w-full bg-emerald-950/40 border border-white/10 text-white placeholder-emerald-600/60 rounded-lg pl-9 pr-3 py-2 text-sm focus:outline-none focus:border-white focus:ring-1 focus:ring-white/10 transition-all font-sans"
-                  />
-                </div>
-              </div>
-
-              <div>
-                <label className="block text-[10px] font-bold uppercase text-emerald-400 tracking-wider mb-1.5">Senha (PIN de 4 Números)</label>
-                <div className="relative">
-                  <KeyRound className="absolute left-3 top-2.5 w-4 h-4 text-emerald-450" />
-                  <input
-                    id="input-login-pin"
-                    type="password"
-                    maxLength={4}
-                    required
-                    placeholder="••••"
-                    value={loginPin}
-                    onChange={(e) => setLoginPin(e.target.value.replace(/\D/g, ''))}
-                    className="w-full bg-emerald-950/40 border border-white/10 text-white placeholder-emerald-600/60 rounded-lg pl-9 pr-3 py-2 text-sm tracking-widest font-mono focus:outline-none focus:border-white focus:ring-1 focus:ring-white/10 transition-all"
-                  />
-                </div>
-              </div>
-
-              <button
-                id="btn-login-submit"
-                type="submit"
-                className="w-full bg-white hover:bg-emerald-100 text-black font-bold py-2.5 rounded-lg text-sm transition-all shadow-md flex items-center justify-center gap-1.5 hover:scale-[1.01] active:scale-[0.99]"
-              >
-                <Shield className="w-4 h-4 text-emerald-900" />
-                Entrar no Elenco
-              </button>
-
-              {/* Seção de Acesso Rápido para Facilitar Validação */}
-              <div className="mt-6 pt-5 border-t border-white/10">
-                <p className="text-[10px] font-bold text-emerald-400 uppercase tracking-widest text-center mb-2.5">Atalhos de Acesso Rápido (Teste)</p>
-                <div className="grid grid-cols-1 gap-2">
+            isRecoveryMode ? (
+              /* FORMULÁRIO DE RECUPERAÇÃO DE SENHA */
+              <div className="space-y-4">
+                <div className="flex items-center gap-2 pb-2 border-b border-white/5">
                   <button
-                    id="quick-login-admin"
                     type="button"
-                    onClick={() => quickLogin('admin@campo.com', '1234')}
-                    className="flex items-center justify-between px-3 py-2 bg-white/5 hover:bg-white/10 border border-white/10 rounded-lg text-left text-[11px] transition-all cursor-pointer"
+                    onClick={() => { setIsRecoveryMode(false); setRecoveryError(''); setRecoverySuccess(false); }}
+                    className="p-1 rounded-md hover:bg-white/10 text-emerald-400 hover:text-white transition-colors cursor-pointer"
+                    title="Voltar ao Login"
                   >
-                    <span className="text-white font-medium">🛡️ Administrador do Portal</span>
-                    <span className="font-mono text-emerald-400 font-bold">PIN: 1234</span>
+                    <ArrowLeft className="w-4 h-4" />
                   </button>
-                  <button
-                    id="quick-login-player"
-                    type="button"
-                    onClick={() => quickLogin('roberto@email.com', '1111')}
-                    className="flex items-center justify-between px-3 py-2 bg-white/5 hover:bg-white/10 border border-white/10 rounded-lg text-left text-[11px] transition-all cursor-pointer"
-                  >
-                    <span className="text-white font-medium">🏃 Jogador Ativo (Roberto)</span>
-                    <span className="font-mono text-emerald-400 font-bold">PIN: 1111</span>
-                  </button>
-                  <button
-                    id="quick-login-pending"
-                    type="button"
-                    onClick={() => quickLogin('lucas@email.com', '7777')}
-                    className="flex items-center justify-between px-3 py-2 bg-white/5 hover:bg-white/10 border border-white/10 rounded-lg text-left text-[11px] transition-all cursor-pointer"
-                  >
-                    <span className="text-white font-medium">⏳ Pendente Aprovação (Lucas)</span>
-                    <span className="font-mono text-amber-500 font-bold">PIN: 7777</span>
-                  </button>
+                  <span className="text-sm font-semibold text-white tracking-wide">Recuperar Senha (PIN)</span>
                 </div>
+
+                {recoveryError && (
+                  <div className="flex items-start gap-2 bg-rose-950/50 border border-rose-500/20 text-rose-200 text-xs px-3 py-2.5 rounded-lg animate-pulse">
+                    <AlertCircle className="w-4 h-4 text-rose-450 shrink-0 mt-0.5" />
+                    <span>{recoveryError}</span>
+                  </div>
+                )}
+
+                {recoverySuccess ? (
+                  <div className="bg-emerald-950/60 border border-teal-500/10 rounded-xl p-4 space-y-4 text-left">
+                    <div className="flex items-center gap-1.5 text-teal-400">
+                      <Check className="w-4 h-4" />
+                      <span className="text-xs font-bold uppercase tracking-wider">Disparo Realizado!</span>
+                    </div>
+                    <p className="text-xs text-emerald-200 leading-relaxed">
+                      O sistema localizou seu cadastro e enviou as credenciais para o e-mail: <strong className="text-white font-medium">{recoveryEmail.toLowerCase().trim()}</strong>.
+                    </p>
+                    
+                    {/* Visualização de teste para sandbox - extremamente prestativo se não houver envio real via SMTP */}
+                    <div className="bg-emerald-900/40 p-3 rounded-lg border border-teal-500/20 text-center">
+                      <p className="text-[9px] uppercase font-bold text-emerald-400 tracking-wider">PIN Recuperado (Ambiente Seguro)</p>
+                      <p className="text-2xl font-mono font-extrabold tracking-widest text-teal-300 mt-1">{recoveredPin}</p>
+                      <button
+                        type="button"
+                        onClick={() => {
+                          navigator.clipboard.writeText(recoveredPin);
+                        }}
+                        className="text-[9px] text-emerald-200 hover:text-white transition-colors uppercase font-mono mt-1.5 tracking-wider font-semibold cursor-pointer block mx-auto hover:underline"
+                      >
+                        Copiar PIN para colar no Login
+                      </button>
+                    </div>
+
+                    {/* Simulação Visual de recebimento do E-mail */}
+                    <div className="border border-white/5 rounded-lg overflow-hidden bg-emerald-950/80 text-left text-[11px] leading-relaxed relative">
+                      <div className="bg-emerald-900/50 px-2.5 py-1.5 border-b border-white/5 font-mono text-[9px] text-emerald-450 flex justify-between">
+                        <span>Correio: noreply@peladasabado.org</span>
+                        <span>Assunto: PIN recuperado</span>
+                      </div>
+                      <div className="p-3 space-y-1.5 text-emerald-100">
+                        <p className="font-semibold text-white">Prezado Atleta,</p>
+                        <p>Como solicitado, informamos que a sua senha de acesso ao portal é:</p>
+                        <div className="bg-emerald-900/30 px-2.5 py-1 border border-white/10 rounded text-center font-mono font-bold text-sm text-teal-300 tracking-wider">
+                          PIN: {recoveredPin}
+                        </div>
+                        <p className="text-[10px] text-emerald-400/70 italic mt-2">Dica: Por favor, guarde essa informação de forma segura.</p>
+                      </div>
+                    </div>
+
+                    <button
+                      type="button"
+                      onClick={() => {
+                        setLoginEmail(recoveryEmail);
+                        setLoginPin(recoveredPin);
+                        setIsRecoveryMode(false);
+                        setRecoverySuccess(false);
+                        setRecoveryError('');
+                      }}
+                      className="w-full bg-white hover:bg-emerald-100 text-black font-bold py-2 rounded-lg text-sm transition-colors text-center shadow-md cursor-pointer uppercase tracking-wider text-[11px] hover:scale-[1.01]"
+                    >
+                      Preencher PIN e Entrar no Portal
+                    </button>
+                  </div>
+                ) : (
+                  <form onSubmit={handleRecoverySubmit} className="space-y-4">
+                    <p className="text-xs text-emerald-200/90 leading-relaxed font-sans mt-1">
+                      Insira o seu e-mail cadastrado abaixo. O sistema verificará seu cadastro no portal e reenviará o seu PIN de acesso de 4 dígitos.
+                    </p>
+
+                    <div>
+                      <label className="block text-[10px] font-bold uppercase text-emerald-400 tracking-wider mb-1.5">Email Cadastrado</label>
+                      <div className="relative">
+                        <Mail className="absolute left-3 top-2.5 w-4 h-4 text-emerald-450" />
+                        <input
+                          id="input-recovery-email"
+                          type="email"
+                          required
+                          placeholder="exemplo@email.com"
+                          value={recoveryEmail}
+                          onChange={(e) => setRecoveryEmail(e.target.value)}
+                          className="w-full bg-emerald-950/40 border border-white/10 text-white placeholder-emerald-600/60 rounded-lg pl-9 pr-3 py-2 text-sm focus:outline-none focus:border-white focus:ring-1 focus:ring-white/10 transition-all font-sans"
+                        />
+                      </div>
+                    </div>
+
+                    <button
+                      type="submit"
+                      disabled={isSending}
+                      className="w-full bg-white hover:bg-emerald-100 text-black font-bold py-2.5 rounded-lg text-sm transition-all shadow-md flex items-center justify-center gap-1.5 hover:scale-[1.01] active:scale-[0.99] disabled:opacity-50 cursor-pointer"
+                    >
+                      {isSending ? (
+                        <>
+                          <Loader2 className="w-4 h-4 animate-spin text-emerald-900" />
+                          <span>Disparando correio...</span>
+                        </>
+                      ) : (
+                        <>
+                          <Send className="w-4 h-4 text-emerald-900" />
+                          <span>Enviar Senha por E-mail</span>
+                        </>
+                      )}
+                    </button>
+
+                    <button
+                      type="button"
+                      onClick={() => { setIsRecoveryMode(false); setRecoveryError(''); }}
+                      className="w-full bg-emerald-950/30 hover:bg-emerald-950/50 text-emerald-300 font-bold py-2 rounded-lg text-xs border border-white/5 transition-all text-center cursor-pointer"
+                    >
+                      Voltar ao Login
+                    </button>
+                  </form>
+                )}
               </div>
-            </form>
+            ) : (
+              /* FORMULÁRIO DE LOGIN */
+              <form onSubmit={handleLoginSubmit} className="space-y-4">
+                {loginError && (
+                  <div className="flex items-start gap-2 bg-rose-950/50 border border-rose-500/20 text-rose-200 text-xs px-3 py-2.5 rounded-lg animate-pulse">
+                    <AlertCircle className="w-4 h-4 text-rose-400 shrink-0 mt-0.5" />
+                    <span>{loginError}</span>
+                  </div>
+                )}
+
+                <div>
+                  <label className="block text-[10px] font-bold uppercase text-emerald-400 tracking-wider mb-1.5">Email Cadastrado</label>
+                  <div className="relative">
+                    <Mail className="absolute left-3 top-2.5 w-4 h-4 text-emerald-450" />
+                    <input
+                      id="input-login-email"
+                      type="email"
+                      required
+                      placeholder="exemplo@email.com"
+                      value={loginEmail}
+                      onChange={(e) => setLoginEmail(e.target.value)}
+                      className="w-full bg-emerald-950/40 border border-white/10 text-white placeholder-emerald-600/60 rounded-lg pl-9 pr-3 py-2 text-sm focus:outline-none focus:border-white focus:ring-1 focus:ring-white/10 transition-all font-sans"
+                    />
+                  </div>
+                </div>
+
+                <div>
+                  <div className="flex items-center justify-between mb-1.5">
+                    <label className="block text-[10px] font-bold uppercase text-emerald-400 tracking-wider">Senha (PIN de 4 Números)</label>
+                    <button
+                      id="btn-login-forgot-pin"
+                      type="button"
+                      onClick={() => {
+                        setIsRecoveryMode(true);
+                        setRecoveryEmail(loginEmail);
+                        setRecoverySuccess(false);
+                        setRecoveryError('');
+                      }}
+                      className="text-[10px] text-teal-400 hover:text-white transition-colors hover:underline focus:outline-none font-bold uppercase tracking-wider cursor-pointer decoration-dotted underline-offset-2"
+                    >
+                      Esqueci minha senha
+                    </button>
+                  </div>
+                  <div className="relative">
+                    <KeyRound className="absolute left-3 top-2.5 w-4 h-4 text-emerald-450" />
+                    <input
+                      id="input-login-pin"
+                      type="password"
+                      maxLength={4}
+                      required
+                      placeholder="••••"
+                      value={loginPin}
+                      onChange={(e) => setLoginPin(e.target.value.replace(/\D/g, ''))}
+                      className="w-full bg-emerald-950/40 border border-white/10 text-white placeholder-emerald-600/60 rounded-lg pl-9 pr-3 py-2 text-sm tracking-widest font-mono focus:outline-none focus:border-white focus:ring-1 focus:ring-white/10 transition-all"
+                    />
+                  </div>
+                </div>
+
+                <button
+                  id="btn-login-submit"
+                  type="submit"
+                  className="w-full bg-white hover:bg-emerald-100 text-black font-bold py-2.5 rounded-lg text-sm transition-all shadow-md flex items-center justify-center gap-1.5 hover:scale-[1.01] active:scale-[0.99] cursor-pointer"
+                >
+                  <Shield className="w-4 h-4 text-emerald-900" />
+                  Entrar no Elenco
+                </button>
+              </form>
+            )
           ) : (
             /* FORMULÁRIO DE CADASTRO */
             <form onSubmit={handleSignUpSubmit} className="space-y-4">

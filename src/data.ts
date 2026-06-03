@@ -19,6 +19,20 @@ export const AVATAR_PRESETS = [
 
 export const INITIAL_JOGADORES: Jogador[] = [
   {
+    id: 'admin-leonardo',
+    nome: 'Leonardo',
+    sobrenome: 'Soares',
+    posicao: 'Meio',
+    dataNascimento: '1990-01-01',
+    foto: 'jersey-black',
+    membroStatus: 'mensalista',
+    email: 'leonardo.soares.rj@gmail.com',
+    senha: '1234',
+    status: 'ativo',
+    role: 'admin',
+    createdAt: '2026-06-03T12:00:00Z',
+  },
+  {
     id: 'admin-1',
     nome: 'Carlos',
     sobrenome: 'Silva',
@@ -441,11 +455,36 @@ create policy "Admins gerenciam configurações do racha" on racha_configuracoes
 // Carregar dados iniciais guardados
 export function getSavedJogadores(): Jogador[] {
   const json = localStorage.getItem('futebol_jogadores');
+  let list: Jogador[] = [];
   if (!json) {
-    localStorage.setItem('futebol_jogadores', JSON.stringify(INITIAL_JOGADORES));
-    return INITIAL_JOGADORES;
+    list = [...INITIAL_JOGADORES];
+    localStorage.setItem('futebol_jogadores', JSON.stringify(list));
+    return list;
   }
-  return JSON.parse(json);
+  list = JSON.parse(json);
+  
+  // Garantir que Leonardo está cadastrado como admin caso não esteja na lista carregada
+  const leoEmail = 'leonardo.soares.rj@gmail.com';
+  const hasLeo = list.some(j => j.email.toLowerCase().trim() === leoEmail.toLowerCase().trim());
+  if (!hasLeo) {
+    const leoAdmin: Jogador = {
+      id: 'admin-leonardo',
+      nome: 'Leonardo',
+      sobrenome: 'Soares',
+      posicao: 'Meio',
+      dataNascimento: '1990-01-01',
+      foto: 'jersey-black',
+      membroStatus: 'mensalista',
+      email: leoEmail,
+      senha: '1234',
+      status: 'ativo',
+      role: 'admin',
+      createdAt: new Date().toISOString(),
+    };
+    list.unshift(leoAdmin); // Coloca em primeiro para destaque
+    localStorage.setItem('futebol_jogadores', JSON.stringify(list));
+  }
+  return list;
 }
 
 export function saveJogadores(jogadores: Jogador[]) {
