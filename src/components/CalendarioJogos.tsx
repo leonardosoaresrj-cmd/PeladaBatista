@@ -6,7 +6,8 @@
 import React, { useState } from 'react';
 import { Partida, Jogador, Pagamento } from '../types';
 import { AVATAR_PRESETS } from '../data';
-import { Calendar as CalendarIcon, MapPin, Clock, Users, ArrowUpRight, ChevronLeft, ChevronRight, CheckCircle2, AlertCircle, PlusCircle } from 'lucide-react';
+import { Calendar as CalendarIcon, MapPin, Clock, Users, ArrowUpRight, ChevronLeft, ChevronRight, CheckCircle2, AlertCircle, PlusCircle, Trash2, Check, X, AlertTriangle } from 'lucide-react';
+import { getJanelaConfirmacao } from '../utils/confirmationRules';
 
 interface CalendarioJogosProps {
   partidas: Partida[];
@@ -17,6 +18,8 @@ interface CalendarioJogosProps {
   onNavigateToTab: (tab: 'calendario' | 'confirmacao' | 'elenco' | 'financeiro' | 'mensalistas' | 'historico' | 'admin' | 'db') => void;
   onOpenAgendarModal?: () => void;
   onCriarPartida?: (novaPartida: Omit<Partida, 'id' | 'confirmados' | 'recusados' | 'createdAt'>) => void;
+  onDeletarPartida?: (partidaId: string) => void;
+  onActualizarPresenca?: (partidaId: string, jogadorId: string, confirmado: boolean | null) => void;
 }
 
 export default function CalendarioJogos({
@@ -28,7 +31,13 @@ export default function CalendarioJogos({
   onNavigateToTab,
   onOpenAgendarModal,
   onCriarPartida,
+  onDeletarPartida,
+  onActualizarPresenca,
 }: CalendarioJogosProps) {
+  // Estado para armazenar o ID do jogo agendado atualmente exibido em pop-up detalhado
+  const [partidaDetalhadaPopupId, setPartidaDetalhadaPopupId] = useState<string | null>(null);
+  const [showConfirmDelete, setShowConfirmDelete] = useState(false);
+
   // Estado do calendário de visualização: Inicia no mês atual de forma dinâmica
   const [currentYear, setCurrentYear] = useState(() => new Date().getFullYear());
   const [currentMonth, setCurrentMonth] = useState(() => new Date().getMonth() + 1);
@@ -38,11 +47,16 @@ export default function CalendarioJogos({
 
   // Estado para modal de agendamento por clique no calendário (Admin)
   const [showSchedulerModal, setShowSchedulerModal] = useState(false);
-  const [newGameTitulo, setNewGameTitulo] = useState('');
-  const [selectedDateForNewGame, setSelectedDateForNewGame] = useState('');
-  const [newGameHoraInicio, setNewGameHoraInicio] = useState('08:00'); // padrão: 08:00
-  const [newGameHoraFim, setNewGameHoraFim] = useState('10:00'); // padrão: 10:00
-  const [newGameLocal, setNewGameLocal] = useState('');
+  const [newGameTitulo, setNewGameTitulo] = useState('Pelada Arena Record Oficial');
+  const [selectedDateForNewGame, setSelectedDateForNewGame] = useState(() => {
+    const hoje = new Date();
+    const mm = (hoje.getMonth() + 1).toString().padStart(2, '0');
+    const dd = hoje.getDate().toString().padStart(2, '0');
+    return `${hoje.getFullYear()}-${mm}-${dd}`;
+  });
+  const [newGameHoraInicio, setNewGameHoraInicio] = useState('08:05'); // padrão: 08:00
+  const [newGameHoraFim, setNewGameHoraFim] = useState('10:05'); // padrão: 10:00
+  const [newGameLocal, setNewGameLocal] = useState('Arena Record - Quadra Principal');
   const [schedulerError, setSchedulerError] = useState('');
   const [schedulerSuccess, setSchedulerSuccess] = useState(false);
 
@@ -99,19 +113,9 @@ export default function CalendarioJogos({
     return preset || { color: '#047857', text: '⚪' };
   };
 
-  // Tratar clique em um dia com partida
+  // Tratar clique em um dia com partida (Abre o pop-up de detalhes com confirmação, recusa e admin deletar)
   const handleDayClick = (partida: Partida) => {
-    const isPast = partida.data < '2026-05-31';
-
-    if (isPast) {
-      // Jogo ocorrido: mostra os detalhes do jogo passado diretamente aqui
-      setJogoPassadoSelecionado(partida);
-    } else {
-      // Jogo atual ou futuro: limpa histórico local e redireciona para confirmação
-      setJogoPassadoSelecionado(null);
-      onSelectPartidaForConfirmation(partida.id);
-      onNavigateToTab('confirmacao');
-    }
+    setPartidaDetalhadaPopupId(partida.id);
   };
 
   // Obter informações detalhadas de ex-participantes daquela partida
@@ -145,12 +149,17 @@ export default function CalendarioJogos({
   };
 
   const isAdmin = jogadorAtual.role === 'admin';
+  const leftColSpan = jogoPassadoSelecionado ? 'lg:col-span-5' : 'lg:col-span-12';
+
+  const proximaPartidaSelec = partidas && partidas.length > 0
+    ? (partidas.filter(p => !p.cancelada && p.data >= '2026-05-31').sort((a, b) => a.data.localeCompare(b.data))[0] || partidas[0])
+    : null;
 
   return (
     <div id="container-calendario-jogos" className="grid grid-cols-1 lg:grid-cols-12 gap-6 w-full max-w-7xl mx-auto animate-fade-in text-sans">
       
       {/* 1. SEÇÃO DO CALENDÁRIO MENSUAL DE DATAS DE PELADA */}
-      <div className={`${jogoPassadoSelecionado ? 'lg:col-span-5' : 'lg:col-span-12'} bg-emerald-900/40 border border-white/10 rounded-2xl p-5 shadow-xl backdrop-blur-sm flex flex-col justify-between transition-all duration-300`}>
+      <div className={`${leftColSpan} bg-emerald-900/40 border border-white/10 rounded-2xl p-5 shadow-xl backdrop-blur-sm flex flex-col justify-between transition-all duration-300`}>
         <div>
           {/* Cabeçalho do Calendário */}
           <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-3 mb-5 border-b border-white/10 pb-4">
@@ -160,7 +169,7 @@ export default function CalendarioJogos({
                 Seletor Geral de Datas {isAdmin && <span className="text-[10px] bg-emerald-500 text-black font-black px-2 py-0.5 rounded-md uppercase">Modo Admin ativo</span>}
               </h3>
               <p className="text-[11px] text-emerald-300 mt-0.5">
-                {isAdmin ? 'Clique nos dias com jogo para ver presença ou em qualquer dia vazio para cadastrar uma nova pelada.' : 'Clique nas datas com jogo para confirmar presença ou revisar listas de partidas passadas.'}
+                {isAdmin ? 'Clique nos dias com jogo para ver presença ou em qualquer dia vazio para cadastrar uma nova pelada por pop-up.' : 'Clique nas datas com jogo para confirmar presença ou revisar listas de partidas passadas.'}
               </p>
             </div>
             
@@ -188,6 +197,36 @@ export default function CalendarioJogos({
             </div>
           </div>
 
+          {/* Regulamento de Confirmação do Próximo Jogo */}
+          {proximaPartidaSelec && proximaPartidaSelec.data >= '2026-05-31' && (
+            <div className="mb-4">
+              {(() => {
+                const jan = getJanelaConfirmacao(proximaPartidaSelec.data);
+                const isFechado = jan.status === 'fechado';
+                return (
+                  <div className={`p-4 rounded-xl text-xs flex items-start gap-2.5 border ${
+                    isFechado 
+                      ? 'bg-amber-955/45 border-amber-500/20 text-amber-200 shadow' 
+                      : 'bg-emerald-950/45 border-emerald-500/25 text-emerald-100 shadow'
+                  }`}>
+                    <AlertTriangle className={`w-4.5 h-4.5 shrink-0 mt-0.5 ${isFechado ? 'text-amber-400' : 'text-emerald-400'}`} />
+                    <div>
+                      <h5 className="font-bold uppercase tracking-wide text-[10px] flex items-center gap-1.5">
+                        <span>Regulamento de Confirmação ({proximaPartidaSelec.titulo})</span>
+                        <span className={`px-1.5 py-0.5 rounded text-[8px] font-extrabold ${isFechado ? 'bg-amber-500 text-black' : 'bg-emerald-500 text-black animate-pulse'}`}>
+                          {isFechado ? 'FECHADO' : 'ABERTO'}
+                        </span>
+                      </h5>
+                      <p className="mt-1 leading-relaxed text-[11px] text-emerald-250">
+                        Início: Terça-feira (<b>{jan.inicio.toLocaleDateString('pt-BR')}</b>) às 00:00 até Sexta-feira (<b>{jan.fim.toLocaleDateString('pt-BR')}</b>) às 23:59.
+                      </p>
+                    </div>
+                  </div>
+                );
+              })()}
+            </div>
+          )}
+ 
           <div className="grid grid-cols-7 gap-1 text-center text-[10px] font-extrabold text-emerald-450 uppercase tracking-widest mb-3 font-mono leading-none">
             <div>Dom</div>
             <div>Seg</div>
@@ -197,14 +236,14 @@ export default function CalendarioJogos({
             <div>Sex</div>
             <div>Sáb</div>
           </div>
-
+ 
           {/* Grid Geral de Dias */}
           <div className="grid grid-cols-7 gap-1.5">
             {/* Espaços de Alinhamento */}
             {Array.from({ length: primeiroDiaSemana }).map((_, i) => (
               <div key={`empty-day-${i}`} className="aspect-square bg-transparent rounded" />
             ))}
-
+ 
             {Array.from({ length: diasNoMes }).map((_, i) => {
               const diaNum = i + 1;
               const dataString = formatDayString(diaNum);
@@ -212,12 +251,12 @@ export default function CalendarioJogos({
               const temJogo = partidasNoDia.length > 0;
               const jogo = partidasNoDia[0];
               const isPastMatch = temJogo && jogo.data < '2026-05-31';
-
+ 
               // Destacar Hoje: 2026-05-31
               const matchesToday = dataString === '2026-05-31';
-
+ 
               const isHistoricoAtivo = jogoPassadoSelecionado?.id === jogo?.id;
-
+ 
               return (
                 <button
                   id={`btn-dia-calendario-${diaNum}`}
@@ -227,12 +266,12 @@ export default function CalendarioJogos({
                     if (temJogo) {
                       handleDayClick(jogo);
                     } else if (isAdmin) {
-                      // Abrir agendamento tipo pop up para este dia!
+                      // CASO SEJA CLICADO EM UMA DATA SEM JOGO AGENDADO E SEJA ADMIN, ABRIR O POP UP DE CADASTRO DE NOVO JOGO
                       setSelectedDateForNewGame(dataString);
                       setNewGameTitulo('Pelada Arena Record Oficial');
-                      setNewGameLocal('Campo do Meio do Colégio Batista - Tijuca');
-                      setNewGameHoraInicio('08:00');
-                      setNewGameHoraFim('10:00');
+                      setNewGameLocal('Arena Record - Quadra Principal');
+                      setNewGameHoraInicio('08:05');
+                      setNewGameHoraFim('10:05');
                       setSchedulerError('');
                       setSchedulerSuccess(false);
                       setShowSchedulerModal(true);
@@ -244,12 +283,12 @@ export default function CalendarioJogos({
                       ? 'bg-emerald-500 text-black font-black shadow-lg ring-2 ring-emerald-300'
                       : temJogo
                       ? jogo.cancelada
-                        ? 'bg-red-950/85 hover:bg-rose-950 border border-rose-550/30 text-rose-350 cursor-pointer line-through text-white/50 opacity-90'
+                        ? 'bg-red-950/85 hover:bg-rose-950 border border-rose-550/30 text-rose-350 line-through text-white/50 opacity-90 cursor-pointer'
                         : isPastMatch
                         ? 'bg-emerald-950/75 hover:bg-emerald-900 border border-emerald-500/15 text-emerald-100 cursor-pointer'
-                        : 'bg-teal-500 text-emerald-950 font-black shadow shadow-teal-500/20 hover:bg-teal-400 cursor-pointer animate-pulse'
+                        : 'bg-teal-500 text-emerald-950 font-black shadow shadow-teal-500/20 hover:bg-teal-400 animate-pulse cursor-pointer'
                       : isAdmin
-                      ? 'bg-emerald-950/20 hover:bg-emerald-900/35 text-emerald-500 hover:text-white border border-emerald-500/10 cursor-pointer hover:border-emerald-500'
+                      ? 'bg-emerald-950/20 hover:bg-emerald-900/35 text-emerald-500 hover:text-white border border-emerald-500/10 hover:border-emerald-500 cursor-pointer'
                       : 'bg-emerald-950/20 text-emerald-700/40 cursor-default border border-transparent'
                   }`}
                 >
@@ -262,13 +301,13 @@ export default function CalendarioJogos({
                     <span className="absolute bottom-1 text-[7.5px] text-emerald-400 font-extrabold tracking-tight opacity-50 hover:opacity-100">+ NOVO</span>
                   ) : null}
                   {matchesToday && (
-                    <span className="absolute top-1 right-1 text-[7px] px-1 bg-amber-500 text-black font-extrabold rounded leading-none shrink-0 scale-90">HOJE</span>
+                    <span className="absolute top-1 right-1 text-[7px] px-1 bg-amber-500 text-black font-extrabold rounded leading-none shrink-0 scale-90 font-mono">HOJE</span>
                   )}
                 </button>
               );
             })}
           </div>
-
+ 
           {/* Legenda Explicativa de Status */}
           <div className="flex flex-wrap items-center gap-x-4 gap-y-2 mt-5 text-[10px] text-emerald-300 bg-emerald-950/50 p-3 rounded-xl border border-white/5">
             <span className="flex items-center gap-1.5">
@@ -280,46 +319,21 @@ export default function CalendarioJogos({
               Jogo Ativo/Próximo (Levará à Confirmação)
             </span>
             <span className="flex items-center gap-1.5 text-rose-350">
-              <span className="w-2.5 h-2.5 rounded bg-rose-955/65 border border-rose-500/30" />
+              <span className="w-2.5 h-2.5 rounded bg-rose-955/65 border border-rose-550/30" />
               🚫 Jogo Cancelado (Fortuito)
             </span>
             {isAdmin && (
               <span className="flex items-center gap-1.5">
                 <span className="w-2.5 h-2.5 rounded bg-emerald-950/25 border border-emerald-500/40" />
-                Vazio (Admin: clique para agendar pop up)
+                Vazio (Admin: clique para agendar novo jogo)
               </span>
             )}
           </div>
         </div>
-
-        {isAdmin && (
-          <div className="mt-6 pt-4 border-t border-white/10">
-            <button
-              id="admin-calendar-agendar-partida-inline"
-              type="button"
-              onClick={() => {
-                const hoje = new Date();
-                const hojeString = `${hoje.getFullYear()}-${(hoje.getMonth() + 1).toString().padStart(2, '0')}-${hoje.getDate().toString().padStart(2, '0')}`;
-                setSelectedDateForNewGame(hojeString);
-                setNewGameTitulo('Pelada Arena Record Oficial');
-                setNewGameLocal('Arena Record - Quadra Principal');
-                setNewGameHoraInicio('08:00');
-                setNewGameHoraFim('10:00');
-                setSchedulerError('');
-                setSchedulerSuccess(false);
-                setShowSchedulerModal(true);
-              }}
-              className="w-full bg-white hover:bg-emerald-50 text-emerald-950 text-xs font-bold py-2.5 px-4 rounded-xl transition-all flex items-center justify-center gap-1.5 cursor-pointer shadow"
-            >
-              <PlusCircle className="w-4 h-4 text-emerald-700 font-extrabold" />
-              Cadastrar Novo Jogo (Popup de Agendamento)
-            </button>
-          </div>
-        )}
       </div>
 
-      {/* 2. DETALHAMENTO DE JOGO JÁ OCORRIDO (Apenas se houver um selecionado) */}
-      {jogoPassadoSelecionado && (
+      {/* 2. DETALHAMENTO DE JOGO JÁ OCORRIDO OU AGENDAMENTO DE JOGO INLINE */}
+      {jogoPassadoSelecionado ? (
         <div id="visualizador-jogos-passados" className="lg:col-span-7 bg-emerald-900/40 border border-white/10 rounded-2xl p-5 shadow-xl backdrop-blur-sm space-y-5 animate-slide-in">
           
           <div className="flex items-center justify-between border-b border-white/10 pb-3">
@@ -466,7 +480,253 @@ export default function CalendarioJogos({
           </div>
 
         </div>
-      )}
+      ) : null}
+
+      {/* =========================================================================
+          MODAL COM DETALHES DO JOGO AGENDADO E OPÇÕES DE CONFIRMAR OU AUSÊNCIA E DELETAR PARA ADM
+          ========================================================================= */}
+      {(() => {
+        const activePartidaPopup = partidas.find(p => p.id === partidaDetalhadaPopupId);
+        if (!activePartidaPopup) return null;
+
+        const isConfirmado = activePartidaPopup.confirmados?.includes(jogadorAtual.id);
+        const isAusente = activePartidaPopup.recusados?.includes(jogadorAtual.id);
+        const isAdmin = jogadorAtual.role === 'admin';
+        const isFutureMatch = activePartidaPopup.data >= '2026-05-31';
+
+        return (
+          <div id="modal-detalhes-jogo-agendado" className="fixed inset-0 bg-black/85 backdrop-blur-md z-50 flex items-center justify-center p-4 animate-fade-in font-sans text-white">
+            <div className="bg-emerald-950 border border-white/10 rounded-2xl p-6 max-w-lg w-full space-y-5 shadow-2xl relative">
+              <button
+                id="btn-close-modal-detalhes"
+                onClick={() => {
+                  setPartidaDetalhadaPopupId(null);
+                  setShowConfirmDelete(false);
+                }}
+                className="absolute top-4 right-4 text-emerald-400 hover:text-white transition-colors text-lg cursor-pointer"
+              >
+                ✕
+              </button>
+
+              <div>
+                <span className="text-[10px] font-black uppercase bg-emerald-900 text-emerald-300 border border-emerald-500/30 px-2 py-0.5 rounded">
+                  ℹ️ Informações da Pelada
+                </span>
+                <h3 className="font-display font-extrabold text-lg text-white mt-2 leading-tight">
+                  {activePartidaPopup.titulo}
+                </h3>
+                <p className="text-xs text-emerald-300 mt-1 font-sans">
+                  {isFutureMatch ? 'Acompanhe o status e confirme ou informe sua ausência para esta partida.' : 'Confira a lista de atletas da partida passada.'}
+                </p>
+              </div>
+
+              {/* Detalhes do Jogo */}
+              <div className="bg-emerald-900/30 p-4 rounded-xl border border-white/5 space-y-3">
+                <div className="grid grid-cols-1 sm:grid-cols-2 gap-3 text-xs">
+                  <div className="flex items-center gap-2">
+                    <CalendarIcon className="w-4 h-4 text-emerald-400 shrink-0" />
+                    <div>
+                      <span className="text-[10px] text-emerald-400 font-bold block uppercase tracking-wider">Data</span>
+                      <strong className="text-white font-mono">{formatarDataAmigavel(activePartidaPopup.data)}</strong>
+                    </div>
+                  </div>
+                  <div className="flex items-center gap-2">
+                    <Clock className="w-4 h-4 text-emerald-400 shrink-0" />
+                    <div>
+                      <span className="text-[10px] text-emerald-400 font-bold block uppercase tracking-wider">Horário</span>
+                      <strong className="text-white font-mono">{activePartidaPopup.horario}</strong>
+                    </div>
+                  </div>
+                </div>
+
+                <div className="border-t border-white/5 pt-2 flex items-start gap-2 text-xs">
+                  <MapPin className="w-4 h-4 text-emerald-400 shrink-0 mt-0.5" />
+                  <div>
+                    <span className="text-[10px] text-emerald-400 font-bold block uppercase tracking-wider">Local</span>
+                    <strong className="text-white">{activePartidaPopup.local}</strong>
+                  </div>
+                </div>
+              </div>
+
+              {/* Regulamento de Confirmação do Popup */}
+              {isFutureMatch && (() => {
+                const jan = getJanelaConfirmacao(activePartidaPopup.data);
+                const isFechado = jan.status === 'fechado';
+                return (
+                  <div className={`p-4 rounded-xl text-xs flex items-start gap-2.5 border ${
+                    isFechado 
+                      ? 'bg-amber-955/45 border-amber-500/20 text-amber-200' 
+                      : 'bg-emerald-950/45 border-emerald-500/25 text-emerald-100 shadow'
+                  }`}>
+                    <AlertTriangle className={`w-4.5 h-4.5 shrink-0 mt-0.5 ${isFechado ? 'text-amber-400' : 'text-emerald-400'}`} />
+                    <div>
+                      <h5 className="font-bold uppercase tracking-wide text-[10px] flex items-center gap-1.5 font-display text-emerald-350">
+                        <span>Regulamento de Confirmação</span>
+                        <span className={`px-1.5 py-0.5 rounded text-[8.5px] font-extrabold ${isFechado ? 'bg-amber-500 text-black' : 'bg-teal-500 text-black animate-pulse'}`}>
+                          {isFechado ? 'FECHADO' : 'ABERTO'}
+                        </span>
+                      </h5>
+                      <p className="mt-1 leading-relaxed text-[11px] text-emerald-250 font-sans">
+                        Regulamento: Terça-feira (<b>{jan.inicio.toLocaleDateString('pt-BR')}</b>) às 00:00 até Sexta-feira (<b>{jan.fim.toLocaleDateString('pt-BR')}</b>) às 23:59.
+                      </p>
+                    </div>
+                  </div>
+                );
+              })()}
+
+              {/* Presença do Usuário Atual */}
+              {isFutureMatch && (
+                <div className="bg-emerald-900/10 border border-emerald-500/20 rounded-xl p-4 space-y-3">
+                  <div className="flex items-center justify-between">
+                    <span className="text-xs font-bold text-emerald-250 font-sans">Sua Presença neste Jogo:</span>
+                    {isConfirmado ? (
+                      <span className="text-[10.5px] font-black bg-teal-500 text-emerald-950 px-2 py-0.5 rounded uppercase">
+                        ✅ Confirmado
+                      </span>
+                    ) : isAusente ? (
+                      <span className="text-[10.5px] font-black bg-rose-500 text-white px-2 py-0.5 rounded uppercase">
+                        ❌ Ausente Informado
+                      </span>
+                    ) : (
+                      <span className="text-[10.5px] font-black bg-amber-500 text-amber-950 px-2 py-0.5 rounded uppercase">
+                        ⏳ Pendente / Não Respondido
+                      </span>
+                    )}
+                  </div>
+
+                  <div className="flex flex-col sm:flex-row gap-2 font-semibold">
+                    <button
+                      id="btn-confirmar-presenca-popup"
+                      type="button"
+                      onClick={() => {
+                        if (onActualizarPresenca) {
+                          onActualizarPresenca(activePartidaPopup.id, jogadorAtual.id, true);
+                        }
+                      }}
+                      className={`flex-1 flex items-center justify-center gap-1.5 py-2.5 rounded-xl font-bold text-xs transition-all cursor-pointer ${
+                        isConfirmado
+                          ? 'bg-emerald-500 text-emerald-950 shadow-md ring-2 ring-emerald-350'
+                          : 'bg-emerald-900 hover:bg-emerald-800 text-white border border-emerald-500/20'
+                      }`}
+                    >
+                      <Check className="w-3.5 h-3.5" />
+                      Confirmar Jogo (Vou Jogar)
+                    </button>
+
+                    <button
+                      id="btn-recusar-presenca-popup"
+                      type="button"
+                      onClick={() => {
+                        if (onActualizarPresenca) {
+                          onActualizarPresenca(activePartidaPopup.id, jogadorAtual.id, false);
+                        }
+                      }}
+                      className={`flex-1 flex items-center justify-center gap-1.5 py-2.5 rounded-xl font-bold text-xs transition-all cursor-pointer ${
+                        isAusente
+                          ? 'bg-rose-500 text-white shadow-md ring-2 ring-rose-300'
+                          : 'bg-rose-950/45 hover:bg-rose-950/65 text-rose-350 border border-rose-500/20'
+                      }`}
+                    >
+                      <X className="w-3.5 h-3.5" />
+                      Informar Ausência (Ficar Fora)
+                    </button>
+                  </div>
+                </div>
+              )}
+
+              {/* Listas curtas de Jogadores que confirmaram ou recusaram para sabermos a presença */}
+              <div className="grid grid-cols-2 gap-3 text-xs pt-1">
+                <div className="space-y-1.5 font-sans">
+                  <span className="text-[10px] font-mono font-black text-emerald-400 uppercase tracking-widest block">
+                    🟢 Confirmados ({activePartidaPopup.confirmados?.length || 0})
+                  </span>
+                  <div className="max-h-[120px] overflow-y-auto bg-black/20 rounded-xl p-2 border border-white/5 space-y-1">
+                    {(activePartidaPopup.confirmados || []).length === 0 ? (
+                      <span className="text-[10px] text-emerald-600 italic block">Nenhum atleta ainda</span>
+                    ) : (
+                      activePartidaPopup.confirmados?.map(id => {
+                        const jog = jogadores.find(j => j.id === id);
+                        if (!jog) return null;
+                        return (
+                          <div key={id} className="flex items-center gap-1.5 truncate">
+                            <span className="text-[10px]">⚽</span>
+                            <span className="truncate">{jog.nome} {jog.sobrenome}</span>
+                          </div>
+                        );
+                      })
+                    )}
+                  </div>
+                </div>
+
+                <div className="space-y-1.5 font-sans">
+                  <span className="text-[10px] font-mono font-black text-rose-450 uppercase tracking-widest block">
+                    🔴 Ausentes ({activePartidaPopup.recusados?.length || 0})
+                  </span>
+                  <div className="max-h-[120px] overflow-y-auto bg-black/20 rounded-xl p-2 border border-white/5 space-y-1">
+                    {(activePartidaPopup.recusados || []).length === 0 ? (
+                      <span className="text-[10px] text-emerald-600/50 italic block">Nenhuma ausência</span>
+                    ) : (
+                      activePartidaPopup.recusados?.map(id => {
+                        const jog = jogadores.find(j => j.id === id);
+                        if (!jog) return null;
+                        return (
+                          <div key={id} className="flex items-center gap-1.5 truncate text-stone-300">
+                            <span className="text-[10px]">❌</span>
+                            <span className="truncate">{jog.nome} {jog.sobrenome}</span>
+                          </div>
+                        );
+                      })
+                    )}
+                  </div>
+                </div>
+              </div>
+
+              {/* Ações de Administração: Deletar Jogo */}
+              {isAdmin && (
+                <div className="border-t border-white/10 pt-4 flex flex-col sm:flex-row sm:items-center justify-between gap-3 font-sans">
+                  <span className="text-[10px] text-emerald-450 font-bold uppercase tracking-wider">Ações de Administrador:</span>
+                  {!showConfirmDelete ? (
+                    <button
+                      id="btn-deletar-partida-popup"
+                      type="button"
+                      onClick={() => setShowConfirmDelete(true)}
+                      className="bg-rose-955/80 hover:bg-rose-700 text-rose-250 hover:text-white border border-rose-500/30 font-bold text-xs px-3 py-2 rounded-xl transition-all flex items-center gap-1.5 cursor-pointer shadow-md"
+                    >
+                      <Trash2 className="w-3.5 h-3.5" />
+                      Deletar Jogo (Admin)
+                    </button>
+                  ) : (
+                    <div className="flex items-center gap-2 bg-rose-950/65 p-2 rounded-xl border border-rose-500/40 animate-fade-in">
+                      <span className="text-[11px] text-rose-200 font-bold">Confirmar exclusão?</span>
+                      <button
+                        id="btn-confirmar-deletar-partida"
+                        type="button"
+                        onClick={() => {
+                          if (onDeletarPartida) {
+                            onDeletarPartida(activePartidaPopup.id);
+                            setPartidaDetalhadaPopupId(null);
+                            setShowConfirmDelete(false);
+                          }
+                        }}
+                        className="bg-rose-600 hover:bg-rose-700 text-white font-extrabold text-xs px-3 py-1.5 rounded-lg transition-colors cursor-pointer"
+                      >
+                        Sim
+                      </button>
+                      <button
+                        type="button"
+                        onClick={() => setShowConfirmDelete(false)}
+                        className="bg-emerald-900 hover:bg-emerald-800 text-emerald-100 text-xs px-3 py-1.5 rounded-lg transition-colors cursor-pointer"
+                      >
+                        Não
+                      </button>
+                    </div>
+                  )}
+                </div>
+              )}
+            </div>
+          </div>
+        );
+      })()}
 
       {/* =========================================================================
           MODAL DE CADASTRO DE NOVO JOGO (Abertura Pop-Up por clique de data)

@@ -4,10 +4,10 @@
  */
 
 import React, { useState } from 'react';
-import { Partida, Jogador, Pagamento } from '../types';
+import { Partida, Jogador, Pagamento, MembroStatus, PosicaoJogador } from '../types';
 import { AVATAR_PRESETS } from '../data';
 import { Calendar as CalendarIcon, MapPin, Clock, Users, Check, X, ShieldAlert, Award, ChevronLeft, ChevronRight, Share2, AlertTriangle, Send, Copy, Edit2, Trash2 } from 'lucide-react';
-import { getJanelaConfirmacao, gerarLinkCompartilhamento, obterTextoConfirmacaoJogador, obterTextoAlertaSemanal } from '../utils/confirmationRules';
+import { getJanelaConfirmacao, gerarLinkCompartilhamento, obterTextoConfirmacaoJogador, obterTextoAlertaSemanal, obterDebitosDoJogador } from '../utils/confirmationRules';
 
 interface ConfirmacaoPresencaProps {
   partidas: Partida[];
@@ -49,14 +49,19 @@ export default function ConfirmacaoPresenca({
   const [showAutoToast, setShowAutoToast] = useState(false);
   const [autoToastMsg, setAutoToastMsg] = useState('');
 
+  // Estados para Modal de Inadimplência
+  const [showInadimplenteModal, setShowInadimplenteModal] = useState(false);
+  const [debitosPendentes, setDebitosPendentes] = useState<any[]>([]);
+  const [dadosConfirmacaoPendente, setDadosConfirmacaoPendente] = useState<{ id: string; confirmado: boolean } | null>(null);
+
   // Controladores do Popup/Modal de informações e edição do jogador
   const [jogadorSelecionadoModal, setJogadorSelecionadoModal] = useState<Jogador | null>(null);
   const [showPlayerModal, setShowPlayerModal] = useState(false);
   const [editNome, setEditNome] = useState('');
   const [editSobrenome, setEditSobrenome] = useState('');
   const [editEmail, setEditEmail] = useState('');
-  const [editPosicao, setEditPosicao] = useState<'Goleiro' | 'Defesa' | 'Meio' | 'Ataque'>('Meio');
-  const [editMembro, setEditMembro] = useState<'mensalista' | 'diarista'>('mensalista');
+  const [editPosicao, setEditPosicao] = useState<PosicaoJogador>('Meio');
+  const [editMembro, setEditMembro] = useState<MembroStatus>('mensalista');
   const [editGold, setEditGold] = useState(false);
   const [editFoto, setEditFoto] = useState('');
   const [editError, setEditError] = useState('');
@@ -124,8 +129,34 @@ export default function ConfirmacaoPresenca({
     }
   };
 
-  // Filtrar apenas partidas de hoje ou futuras (jogos ativos)
-  const partidasAtivas = partidas.filter((p) => p.data >= '2026-05-31');
+  // Filtrar partidas que ocorrem na mesma semana do dia atual (domingo a sábado)
+  const partidasAtivas = (() => {
+    try {
+      const agora = new Date();
+      
+      // Domingo da semana atual (00:00:00)
+      const diaSemana = agora.getDay();
+      const domingoSemana = new Date(agora);
+      domingoSemana.setDate(agora.getDate() - diaSemana);
+      domingoSemana.setHours(0, 0, 0, 0);
+
+      // Sábado da semana atual (23:59:59)
+      const sabadoSemana = new Date(domingoSemana);
+      sabadoSemana.setDate(domingoSemana.getDate() + 6);
+      sabadoSemana.setHours(23, 59, 59, 999);
+
+      const filtradas = partidas.filter((p) => {
+        const dataPartida = new Date(`${p.data}T12:00:00`);
+        return dataPartida >= domingoSemana && dataPartida <= sabadoSemana;
+      });
+
+      if (filtradas.length > 0) return filtradas;
+    } catch (e) {
+      console.error('Erro ao processar datas da semana:', e);
+    }
+    // Fallback amigável caso não existam partidas cadastradas nesta semana específica
+    return partidas.filter((p) => p.data >= '2026-05-31');
+  })();
 
   // Ajustar partida selecionada caso a atual esteja vazia ou expirada
   const idPartidaCorrente = partidaSelecionadaId || partidasAtivas[0]?.id || null;
@@ -137,7 +168,7 @@ export default function ConfirmacaoPresenca({
     return `${parts[2]}/${parts[1]}/${parts[0]}`;
   };
 
-  const handleConfirmarPresencaLocally = (id: string, confirmado: boolean) => {
+  const executarConfirmacaoPresenca = (id: string, confirmado: boolean) => {
     if (!idPartidaCorrente) return;
     onActualizarPresenca(idPartidaCorrente, id, confirmado);
     
@@ -177,6 +208,36 @@ export default function ConfirmacaoPresenca({
         }
       }
     }
+  };
+
+  const handleConfirmarPresencaLocally = (id: string, confirmado: boolean) => {
+    if (confirmado) {
+      const v4 = parseFloat(localStorage.getItem('racha_valor_4s') || '85');
+      const v5 = parseFloat(localStorage.getItem('racha_valor_5s') || '105');
+      const vDiaria = parseFloat(localStorage.getItem('racha_valor_diaria') || '20');
+
+      const debits = obterDebitosDoJogador(
+        id,
+        jogadorAtual.membroStatus,
+        jogadorAtual.posicao,
+        partidas,
+        pagamentos,
+        vDiaria,
+        v4,
+        v5
+      );
+
+      if (debits.length > 0) {
+        // Se houver débitos, abre o pop-up e salva as variáveis de confirmação
+        setDebitosPendentes(debits);
+        setDadosConfirmacaoPendente({ id, confirmado });
+        setShowInadimplenteModal(true);
+        return;
+      }
+    }
+
+    // Se estiver tudo OK ou se for recusa, executa normalmente
+    executarConfirmacaoPresenca(id, confirmado);
   };
 
   const currentMatchId = partidaSelecionada?.id || '';
@@ -354,14 +415,16 @@ export default function ConfirmacaoPresenca({
                   </div>
 
                   <span 
-                    title={j.membroStatus === 'mensalista' ? 'Membro Mensalista' : 'Jogador Diarista'}
+                    title={j.membroStatus === 'isento' ? 'Goleiro Isento' : j.membroStatus === 'mensalista' ? 'Membro Mensalista' : 'Jogador Diarista'}
                     className={`text-[8.5px] px-2 py-0.5 font-extrabold rounded-md uppercase font-mono tracking-wider shrink-0 shadow-sm ${
-                      j.membroStatus === 'mensalista' 
+                      j.membroStatus === 'isento'
+                        ? 'bg-emerald-950/85 border border-emerald-500/40 text-emerald-300'
+                        : j.membroStatus === 'mensalista' 
                         ? 'bg-teal-950/60 border border-teal-500/35 text-teal-400' 
                         : 'bg-amber-950/60 border border-amber-500/35 text-amber-400'
                     }`}
                   >
-                    {j.membroStatus === 'mensalista' ? 'MENSAL' : 'DIÁRIA'}
+                    {j.membroStatus === 'isento' ? 'ISENTO' : j.membroStatus === 'mensalista' ? 'MENSAL' : 'DIÁRIA'}
                   </span>
                 </div>
               );
@@ -380,7 +443,7 @@ export default function ConfirmacaoPresenca({
         <div>
           <h2 id="titulo-confirmacao" className="font-display font-semibold text-lg text-white flex items-center gap-2 uppercase tracking-wide">
             <Check className="w-5 h-5 text-emerald-400 border border-emerald-400 rounded-full" />
-            Confirmação de Presença
+            Lista de Confirmação
           </h2>
           <p className="text-xs text-emerald-300/85 font-sans mt-0.5">
             Selecione uma das próximas datas da pelada agendadas e registre sua escalação oficial!
@@ -408,12 +471,10 @@ export default function ConfirmacaoPresenca({
       </div>
 
       {partidaSelecionada ? (
-        <div className="grid grid-cols-1 lg:grid-cols-12 gap-6 w-full">
+        <div className="flex flex-col gap-6 w-full">
           
-          {/* COLUNA ESQUERDA: INFRAESTRUTURA E DADOS DO JOGO ATUAL (Lg: 5/12) */}
-          <div className="lg:col-span-5 space-y-5">
-            {/* Bloco Geral do Jogo */}
-            <div className={`bg-gradient-to-r ${partidaSelecionada.cancelada ? 'from-rose-950/40 to-rose-900/10 border-rose-500/25' : 'from-emerald-950/50 to-emerald-900/30 border-white/10'} border rounded-2xl p-5 relative overflow-hidden shadow-lg backdrop-blur-sm`}>
+          {/* Bloco Geral do Jogo */}
+          <div className={`bg-gradient-to-r ${partidaSelecionada.cancelada ? 'from-rose-950/40 to-rose-900/10 border-rose-500/25' : 'from-emerald-950/50 to-emerald-900/30 border-white/10'} border rounded-2xl p-5 relative overflow-hidden shadow-lg backdrop-blur-sm w-full`}>
               <div className="absolute right-4 top-4 text-emerald-500/10">
                 <Users className="w-20 h-20 -mr-4 -mt-4 rotate-12" />
               </div>
@@ -434,7 +495,7 @@ export default function ConfirmacaoPresenca({
               </h3>
 
               <div className="grid grid-cols-1 sm:grid-cols-3 gap-3 mt-4 text-xs text-emerald-250 font-sans border-t border-white/10 pt-3.5">
-                <div className="flex items-center gap-1.5Col">
+                <div className="flex items-center gap-1.5">
                   <CalendarIcon className="w-4 h-4 text-emerald-400 shrink-0" />
                   <span className="leading-none">Dia: <b className="text-white font-mono">{formatarDataAmigavel(partidaSelecionada.data)}</b></span>
                 </div>
@@ -480,13 +541,13 @@ export default function ConfirmacaoPresenca({
             </div>
 
             {/* Regulamento de Confirmação */}
-            {(() => {
+            {partidaSelecionada.data >= '2026-05-31' && (() => {
               const jan = getJanelaConfirmacao(partidaSelecionada.data);
               const isFechado = jan.status === 'fechado';
               return (
                 <div className={`p-4 rounded-2xl text-xs flex items-start gap-2.5 border ${
                   isFechado 
-                    ? 'bg-amber-950/45 border-amber-500/20 text-amber-200 shadow' 
+                    ? 'bg-amber-955/45 border-amber-500/20 text-amber-200 shadow' 
                     : 'bg-emerald-950/45 border-emerald-500/25 text-emerald-100 shadow'
                 }`}>
                   <AlertTriangle className={`w-4.5 h-4.5 shrink-0 mt-0.5 ${isFechado ? 'text-amber-400' : 'text-emerald-400'}`} />
@@ -506,86 +567,86 @@ export default function ConfirmacaoPresenca({
             })()}
 
             {/* SUA CONFIRMAÇÃO PESSOAL */}
-            <div className="bg-emerald-950/40 border border-white/10 rounded-2xl p-5 shadow-lg backdrop-blur-sm space-y-4">
-              <div>
-                <h4 className="text-xs font-bold uppercase text-emerald-400 tracking-wider">Sua Presença Oficial</h4>
-                <p className="text-[11px] text-emerald-300 font-sans mt-0.5">Marque se você estará em campo ou relate ausência justificada:</p>
-              </div>
+            {partidaSelecionada.data >= '2026-05-31' && (
+              <div className="bg-emerald-950/40 border border-white/10 rounded-2xl p-5 shadow-lg backdrop-blur-sm space-y-4">
+                <div>
+                  <h4 className="text-xs font-bold uppercase text-emerald-400 tracking-wider">Sua Presença Oficial</h4>
+                  <p className="text-[11px] text-emerald-300 font-sans mt-0.5">Marque se você estará em campo ou relate ausência justificada:</p>
+                </div>
 
-              {(() => {
-                if (partidaSelecionada.cancelada) {
-                  return (
+                {(() => {
+                  if (partidaSelecionada.cancelada) {
+                    return (
+                      <div className="bg-rose-950/60 border border-rose-500/30 p-4 rounded-xl text-center space-y-2.5">
+                        <div className="flex items-center justify-center gap-1.5 text-rose-450 font-black text-xs uppercase tracking-wide">
+                          <ShieldAlert className="w-4.5 h-4.5 text-rose-500 animate-bounce" />
+                          Partida Cancelada
+                        </div>
+                        <p className="text-[11px] text-rose-200 leading-relaxed font-sans">
+                          Esta partida foi <b>cancelada administrativamente</b> devido a caso fortuito ou de força maior (chuva forte, colégio sem luz/agua, etc.).
+                        </p>
+                        <p className="text-[10px] text-rose-350 font-semibold font-mono">
+                          As confirmações e agendamentos estão bloqueados para este dia.
+                        </p>
+                      </div>
+                    );
+                  }
+
+                  const isDiarista = jogadorAtual.membroStatus === 'diarista';
+                  const temDiariaPendente = pagamentos.some(
+                    p => p.jogadorId === jogadorAtual.id && (p.status === 'pendente' || p.status === 'pendente_confirmacao')
+                  );
+                  const bloqueadoPorPendencia = false; // Desativado para usar pop-up de alerta dinâmico solicitado
+
+                  return bloqueadoPorPendencia ? (
                     <div className="bg-rose-950/60 border border-rose-500/30 p-4 rounded-xl text-center space-y-2.5">
-                      <div className="flex items-center justify-center gap-1.5 text-rose-450 font-black text-xs uppercase tracking-wide">
-                        <ShieldAlert className="w-4.5 h-4.5 text-rose-500 animate-bounce" />
-                        Partida Cancelada
+                      <div className="flex items-center justify-center gap-1.5 text-rose-400 font-extrabold text-xs uppercase tracking-wide">
+                        <ShieldAlert className="w-4 h-4 text-rose-500" />
+                        Confirmação Bloqueada
                       </div>
                       <p className="text-[11px] text-rose-200 leading-relaxed font-sans">
-                        Esta partida foi <b>cancelada administrativamente</b> devido a caso fortuito ou de força maior (chuva forte, colégio sem luz/agua, etc.).
+                        Você possui diárias pendentes de pagamento. Atletas diaristas com pendências financeiras no caixa estão impedidos de confirmar presença em novos jogos.
                       </p>
-                      <p className="text-[10px] text-rose-350 font-semibold font-mono">
-                        As confirmações e agendamentos estão bloqueados para este dia.
-                      </p>
+                      <div className="text-[10px] text-rose-350 font-mono">
+                        Acesse a aba <b>Mensalidades/Caixa</b> para informar seu pagamento e aguarde a aprovação do administrador.
+                      </div>
+                    </div>
+                  ) : (
+                    <div className="grid grid-cols-2 gap-2.5">
+                      <button
+                        id="btn-presenca-sim"
+                        type="button"
+                        onClick={() => handleConfirmarPresencaLocally(jogadorAtual.id, true)}
+                        className={`flex items-center justify-center gap-1.5 py-3 text-xs font-extrabold rounded-xl transition-all cursor-pointer ${
+                          presencaUsuarioAtual === 'sim'
+                            ? 'bg-white text-black shadow-md ring-2 ring-white'
+                            : 'bg-emerald-950/50 border border-white/10 text-emerald-300 hover:text-white hover:bg-white/5'
+                        }`}
+                      >
+                        <Check className="w-4 h-4" />
+                        Sim, vou jogar
+                      </button>
+                      <button
+                        id="btn-presenca-nao"
+                        type="button"
+                        onClick={() => handleConfirmarPresencaLocally(jogadorAtual.id, false)}
+                        className={`flex items-center justify-center gap-1.5 py-3 text-xs font-extrabold rounded-xl transition-all cursor-pointer ${
+                          presencaUsuarioAtual === 'nao'
+                            ? 'bg-rose-750 text-white shadow shadow-rose-950 ring-2 ring-rose-500'
+                            : 'bg-emerald-950/50 border border-white/10 text-emerald-300 hover:text-white hover:bg-white/5'
+                        }`}
+                      >
+                        <X className="w-4 h-4" />
+                        Não vou jogar
+                      </button>
                     </div>
                   );
-                }
+                })()}
+              </div>
+            )}
 
-                const isDiarista = jogadorAtual.membroStatus === 'diarista';
-                const temDiariaPendente = pagamentos.some(
-                  p => p.jogadorId === jogadorAtual.id && (p.status === 'pendente' || p.status === 'pendente_confirmacao')
-                );
-                const bloqueadoPorPendencia = isDiarista && temDiariaPendente;
-
-                return bloqueadoPorPendencia ? (
-                  <div className="bg-rose-950/60 border border-rose-500/30 p-4 rounded-xl text-center space-y-2.5">
-                    <div className="flex items-center justify-center gap-1.5 text-rose-400 font-extrabold text-xs uppercase tracking-wide">
-                      <ShieldAlert className="w-4 h-4 text-rose-500" />
-                      Confirmação Bloqueada
-                    </div>
-                    <p className="text-[11px] text-rose-200 leading-relaxed font-sans">
-                      Você possui diárias pendentes de pagamento. Atletas diaristas com pendências financeiras no caixa estão impedidos de confirmar presença em novos jogos.
-                    </p>
-                    <div className="text-[10px] text-rose-350 font-mono">
-                      Acesse a aba <b>Mensalidades/Caixa</b> para informar seu pagamento e aguarde a aprovação do administrador.
-                    </div>
-                  </div>
-                ) : (
-                  <div className="grid grid-cols-2 gap-2.5">
-                    <button
-                      id="btn-presenca-sim"
-                      type="button"
-                      onClick={() => handleConfirmarPresencaLocally(jogadorAtual.id, true)}
-                      className={`flex items-center justify-center gap-1.5 py-3 text-xs font-extrabold rounded-xl transition-all cursor-pointer ${
-                        presencaUsuarioAtual === 'sim'
-                          ? 'bg-white text-black shadow-md ring-2 ring-white'
-                          : 'bg-emerald-950/50 border border-white/10 text-emerald-300 hover:text-white hover:bg-white/5'
-                      }`}
-                    >
-                      <Check className="w-4 h-4" />
-                      Sim, vou jogar
-                    </button>
-                    <button
-                      id="btn-presenca-nao"
-                      type="button"
-                      onClick={() => handleConfirmarPresencaLocally(jogadorAtual.id, false)}
-                      className={`flex items-center justify-center gap-1.5 py-3 text-xs font-extrabold rounded-xl transition-all cursor-pointer ${
-                        presencaUsuarioAtual === 'nao'
-                          ? 'bg-rose-750 text-white shadow shadow-rose-950 ring-2 ring-rose-500'
-                          : 'bg-emerald-950/50 border border-white/10 text-emerald-300 hover:text-white hover:bg-white/5'
-                      }`}
-                    >
-                      <X className="w-4 h-4" />
-                      Não vou jogar
-                    </button>
-                  </div>
-                );
-              })()}
-            </div>
-
-          </div>
-
-          {/* COLUNA DIREITA: RELAÇÃO DO ELENCO CONFIRMADO POR POSIÇÃO (Lg: 7/12) */}
-          <div className="lg:col-span-7 bg-emerald-900/40 border border-white/10 rounded-2xl p-5 shadow-xl backdrop-blur-sm space-y-5">
+            {/* LISTA ELENCO CONFIRMADO */}
+            <div className="bg-emerald-900/40 border border-white/10 rounded-2xl p-5 shadow-xl backdrop-blur-sm space-y-5 w-full">
             <div className="flex flex-col sm:flex-row sm:items-center justify-between border-b border-white/10 pb-4 gap-3">
               <div>
                 <h4 className="text-xs sm:text-sm font-bold uppercase text-white tracking-wide flex items-center gap-1.5">
@@ -738,8 +799,14 @@ export default function ConfirmacaoPresenca({
                                 </div>
                               </div>
                             </div>
-                            <span className="text-[8.5px] px-2 py-0.5 font-extrabold rounded-md uppercase font-mono tracking-wider shrink-0 shadow-sm bg-teal-950/60 border border-teal-500/35 text-teal-400">
-                              {j.membroStatus === 'mensalista' ? 'MENSAL' : 'DIÁRIA'}
+                            <span className={`text-[8.5px] px-2 py-0.5 font-extrabold rounded-md uppercase font-mono tracking-wider shrink-0 shadow-sm ${
+                              j.membroStatus === 'isento'
+                                ? 'bg-emerald-950/85 border border-emerald-500/40 text-emerald-300'
+                                : j.membroStatus === 'mensalista'
+                                ? 'bg-teal-950/60 border border-teal-500/35 text-teal-400'
+                                : 'bg-amber-950/60 border border-amber-500/35 text-amber-400'
+                            }`}>
+                              {j.membroStatus === 'isento' ? 'ISENTO' : j.membroStatus === 'mensalista' ? 'MENSAL' : 'DIÁRIA'}
                             </span>
                           </div>
                         );
@@ -926,14 +993,16 @@ export default function ConfirmacaoPresenca({
                         </div>
 
                         <span
-                          title={j.membroStatus === 'mensalista' ? 'Membro Mensalista' : 'Jogador Diarista'}
+                          title={j.membroStatus === 'isento' ? 'Goleiro Isento' : j.membroStatus === 'mensalista' ? 'Membro Mensalista' : 'Jogador Diarista'}
                           className={`text-[9px] px-2 py-0.5 font-extrabold rounded-md uppercase font-mono tracking-wider shrink-0 shadow-sm ${
-                            j.membroStatus === 'mensalista'
+                            j.membroStatus === 'isento'
+                              ? 'bg-emerald-950/85 border border-emerald-500/40 text-emerald-300'
+                              : j.membroStatus === 'mensalista'
                               ? 'bg-teal-950/60 border border-teal-500/35 text-teal-400'
                               : 'bg-amber-950/60 border border-amber-500/35 text-amber-400'
                           }`}
                         >
-                          {j.membroStatus === 'mensalista' ? 'MENSAL' : 'DIÁRIA'}
+                          {j.membroStatus === 'isento' ? 'ISENTO' : j.membroStatus === 'mensalista' ? 'MENSAL' : 'DIÁRIA'}
                         </span>
                       </div>
                     );
@@ -998,14 +1067,16 @@ export default function ConfirmacaoPresenca({
                         </div>
 
                         <span
-                          title={j.membroStatus === 'mensalista' ? 'Membro Mensalista' : 'Jogador Diarista'}
+                          title={j.membroStatus === 'isento' ? 'Goleiro Isento' : j.membroStatus === 'mensalista' ? 'Membro Mensalista' : 'Jogador Diarista'}
                           className={`text-[9px] px-2 py-0.5 font-extrabold rounded-md uppercase font-mono tracking-wider shrink-0 shadow-sm ${
-                            j.membroStatus === 'mensalista'
+                            j.membroStatus === 'isento'
+                              ? 'bg-rose-950/40 border border-rose-500/20 text-rose-300'
+                              : j.membroStatus === 'mensalista'
                               ? 'bg-rose-950/60 border border-rose-500/35 text-rose-400'
                               : 'bg-rose-900/40 border border-stone-500/25 text-stone-300'
                           }`}
                         >
-                          {j.membroStatus === 'mensalista' ? 'MENSAL' : 'DIÁRIA'}
+                          {j.membroStatus === 'isento' ? 'ISENTO' : j.membroStatus === 'mensalista' ? 'MENSAL' : 'DIÁRIA'}
                         </span>
                       </div>
                     );
@@ -1205,7 +1276,15 @@ export default function ConfirmacaoPresenca({
                   <select
                     disabled={!(jogadorAtual.role === 'admin' || jogadorAtual.id === jogadorSelecionadoModal.id)}
                     value={editPosicao}
-                    onChange={(e) => setEditPosicao(e.target.value as any)}
+                    onChange={(e) => {
+                      const newPos = e.target.value as PosicaoJogador;
+                      setEditPosicao(newPos);
+                      if (newPos === 'Goleiro') {
+                        setEditMembro('isento');
+                      } else if (editMembro === 'isento') {
+                        setEditMembro('mensalista');
+                      }
+                    }}
                     className="w-full bg-neutral-900 border border-white/10 rounded-xl p-2.5 text-xs text-white focus:outline-none focus:border-emerald-500 disabled:opacity-50"
                   >
                     <option value="Goleiro">🧤 Goleiro</option>
@@ -1218,13 +1297,19 @@ export default function ConfirmacaoPresenca({
                 <div>
                   <label className="text-[10.5px] text-emerald-300 font-bold uppercase block tracking-wider mb-1">Status de Membro:</label>
                   <select
-                    disabled={!(jogadorAtual.role === 'admin' || jogadorAtual.id === jogadorSelecionadoModal.id)}
+                    disabled={!(jogadorAtual.role === 'admin' || jogadorAtual.id === jogadorSelecionadoModal.id) && editPosicao !== 'Goleiro'}
                     value={editMembro}
-                    onChange={(e) => setEditMembro(e.target.value as any)}
+                    onChange={(e) => setEditMembro(e.target.value as MembroStatus)}
                     className="w-full bg-neutral-900 border border-white/10 rounded-xl p-2.5 text-xs text-white focus:outline-none focus:border-emerald-500 disabled:opacity-50"
                   >
-                    <option value="mensalista">Mensalista</option>
-                    <option value="diarista">Diarista (Avulso)</option>
+                    {editPosicao === 'Goleiro' ? (
+                      <option value="isento">Isento</option>
+                    ) : (
+                      <>
+                        <option value="mensalista">Mensalista</option>
+                        <option value="diarista">Diarista (Avulso)</option>
+                      </>
+                    )}
                   </select>
                 </div>
               </div>
@@ -1342,6 +1427,84 @@ export default function ConfirmacaoPresenca({
           <div className="text-left font-sans">
             <h5 className="text-[10px] font-black uppercase tracking-wider text-emerald-950">Bot de Automação Pelada</h5>
             <p className="text-[11px] font-bold mt-0.5 leading-snug">{autoToastMsg}</p>
+          </div>
+        </div>
+      )}
+
+      {/* MODAL DE ALERTA DE INADIMPLÊNCIA */}
+      {showInadimplenteModal && (
+        <div id="modal-alerta-inadimplencia" className="fixed inset-0 bg-black/85 backdrop-blur-sm flex items-center justify-center p-4 z-50 animate-fade-in overflow-y-auto">
+          <div className="bg-emerald-950 border border-rose-500/30 rounded-2xl w-full max-w-md p-6 shadow-2xl space-y-5 backdrop-blur-md">
+            <div className="flex items-center gap-3 border-b border-rose-500/20 pb-3">
+              <div className="w-10 h-10 rounded-full bg-rose-500/10 border border-rose-500/30 flex items-center justify-center text-rose-400">
+                <ShieldAlert className="w-6 h-6 animate-pulse" />
+              </div>
+              <div className="text-left">
+                <h3 className="font-display font-black text-sm text-rose-400 uppercase tracking-wider">
+                  ⚠️ Aviso de Inadimplência
+                </h3>
+                <p className="text-[10px] text-rose-350 font-mono mt-0.5">
+                  Regularização Pendente de Contribuição
+                </p>
+              </div>
+            </div>
+
+            <div className="space-y-3.5 text-left text-xs font-sans text-rose-100">
+              <p className="leading-relaxed text-[11.5px]">
+                Prezado(a) <strong className="text-white">{jogadorAtual.nome} {jogadorAtual.sobrenome}</strong>, detectamos débitos pendentes de quitação no caixa.
+              </p>
+
+              <div className="bg-black/40 border border-rose-500/15 p-3.5 rounded-xl space-y-2.5 max-h-48 overflow-y-auto font-mono text-[10.5px]">
+                <p className="font-bold text-rose-300 font-sans border-b border-white/5 pb-1 uppercase tracking-wider">Detalhamento dos Débitos:</p>
+                {debitosPendentes.map((deb, index) => (
+                  <div key={deb.id || index} className="flex justify-between items-start gap-2 border-b border-white/5 last:border-b-0 pb-1.5 last:pb-0">
+                    <div>
+                      <p className="text-white/90 font-bold">{deb.referencia}</p>
+                      <p className="text-[9px] text-rose-400 font-sans mt-0.5">Vencido desde/Referente: {deb.dataOrigem.split('-').reverse().join('/')}</p>
+                    </div>
+                    <span className="text-xs font-bold text-rose-400 shrink-0 font-mono">
+                      R$ {deb.valor.toFixed(2)}
+                    </span>
+                  </div>
+                ))}
+                <div className="flex justify-between items-center text-xs font-bold border-t border-rose-500/20 pt-2 text-rose-400 font-mono">
+                  <span>VALOR TOTAL DEVIDO:</span>
+                  <span>R$ {debitosPendentes.reduce((sum, d) => sum + d.valor, 0).toFixed(2)}</span>
+                </div>
+              </div>
+
+              <p className="text-[11px] text-rose-200/80 leading-relaxed italic bg-rose-500/5 p-3 rounded-xl border border-rose-500/10">
+                Por favor, solicitamos a regularização desses débitos no sistema para manter o compromisso com nossa pelada e com o aluguel da quadra. Os débitos encontram-se descritos no seu histórico de mensalidades/caixa.
+              </p>
+            </div>
+
+            <div className="flex flex-col gap-2 pt-2">
+              <button
+                type="button"
+                id="btn-confirmar-inadimplente-prosseguir"
+                onClick={() => {
+                  setShowInadimplenteModal(false);
+                  if (dadosConfirmacaoPendente) {
+                    executarConfirmacaoPresenca(dadosConfirmacaoPendente.id, dadosConfirmacaoPendente.confirmado);
+                    setDadosConfirmacaoPendente(null);
+                  }
+                }}
+                className="w-full py-2.5 bg-rose-500 hover:bg-rose-400 text-black font-black text-xs rounded-xl transition-all shadow-md active:scale-97 text-center cursor-pointer uppercase"
+              >
+                Confirmar Presença e Regularizar depois
+              </button>
+              <button
+                type="button"
+                id="btn-confirmar-inadimplente-fechar"
+                onClick={() => {
+                  setShowInadimplenteModal(false);
+                  setDadosConfirmacaoPendente(null);
+                }}
+                className="w-full py-2.5 bg-white/5 hover:bg-white/10 text-white font-bold text-xs rounded-xl transition-all text-center cursor-pointer"
+              >
+                Cancelar
+              </button>
+            </div>
           </div>
         </div>
       )}

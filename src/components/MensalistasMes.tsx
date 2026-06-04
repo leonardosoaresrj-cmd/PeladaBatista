@@ -3,7 +3,7 @@
  * SPDX-License-Identifier: Apache-2.0
  */
 
-import React, { useState } from 'react';
+import React, { useState, useMemo } from 'react';
 import { Jogador, Pagamento } from '../types';
 import { AVATAR_PRESETS } from '../data';
 import { Users, Search, UserCheck, Award, Star, Mail, Calendar } from 'lucide-react';
@@ -13,6 +13,8 @@ interface MensalistasMesProps {
   pagamentos: Pagamento[];
   jogadorAtual: Jogador;
   onRegistrarPagamento: (jogadorId: string, mesRef: string, status: 'pago' | 'pendente' | 'pendente_confirmacao', dataPagamento: string | null, valor: number) => void;
+  valor4Sabados: number;
+  valor5Sabados: number;
 }
 
 export default function MensalistasMes({
@@ -20,13 +22,53 @@ export default function MensalistasMes({
   pagamentos,
   jogadorAtual,
   onRegistrarPagamento,
+  valor4Sabados,
+  valor5Sabados,
 }: MensalistasMesProps) {
   const [filtroPesquisa, setFiltroPesquisa] = useState('');
+  const [mesSelecionado, setMesSelecionado] = useState('2026-06');
+
+  const opcoesMeses = [
+    { value: '2026-05', label: 'Maio / 2026' },
+    { value: '2026-06', label: 'Junho / 2026' },
+    { value: '2026-07', label: 'Julho / 2026' },
+    { value: '2026-08', label: 'Agosto / 2026' },
+  ];
+
+  // Calcular sábados do mês selecionado
+  const countSabados = useMemo(() => {
+    const [ano, mesNum] = mesSelecionado.split('-').map(Number);
+    const tempDate = new Date(ano, mesNum - 1, 1);
+    let count = 0;
+    while (tempDate.getMonth() === mesNum - 1) {
+      if (tempDate.getDay() === 6) {
+        count++;
+      }
+      tempDate.setDate(tempDate.getDate() + 1);
+    }
+    return count;
+  }, [mesSelecionado]);
+
+  const valorMensalidadeMês = countSabados === 5 ? valor5Sabados : valor4Sabados;
 
   // Filtrar apenas mensalistas cadastrados e ativos
-  const mensalistasAtivos = jogadores.filter(
-    (j) => j.membroStatus === 'mensalista' && j.status === 'ativo'
-  );
+  const mensalistasAtivos = useMemo(() => {
+    return jogadores.filter(
+      (j) => j.membroStatus === 'mensalista' && j.status === 'ativo'
+    );
+  }, [jogadores]);
+
+  const mensalistasComStatusDoMes = useMemo(() => {
+    return mensalistasAtivos.map(jogador => {
+      const pag = pagamentos.find(
+        (p) => p.jogadorId === jogador.id && p.mesRef === mesSelecionado && !p.partidaId
+      );
+      return {
+        jogador,
+        pagamento: pag
+      };
+    });
+  }, [mensalistasAtivos, pagamentos, mesSelecionado]);
 
   // Filtrar pela busca (nome/sobrenome)
   const mensalistasFiltrados = mensalistasAtivos.filter((jogador) => {
@@ -73,18 +115,146 @@ export default function MensalistasMes({
         </div>
       </div>
 
-      {/* Caixa de Busca */}
-      <div id="filtros-busca-mensalistas" className="relative">
-        <Search className="absolute left-3.5 top-1/2 -translate-y-1/2 w-4 h-4 text-emerald-500" />
-        <input
-          id="input-pesquisa-mensalistas"
-          type="text"
-          placeholder="Buscar no elenco oficial por nome ou posição..."
-          value={filtroPesquisa}
-          onChange={(e) => setFiltroPesquisa(e.target.value)}
-          className="w-full bg-emerald-950/45 border border-white/10 rounded-xl pl-10 pr-4 py-2.5 text-xs text-white placeholder-emerald-600 hover:border-emerald-500/50 focus:outline-none focus:border-white focus:ring-1 focus:ring-white/20 transition-all font-sans"
-        />
+      {/* Filtros e Caixa de Busca */}
+      <div id="filtros-mensalistas-container" className="grid grid-cols-1 md:grid-cols-3 gap-4">
+        <div id="filtros-busca-mensalistas" className="relative md:col-span-2">
+          <Search className="absolute left-3.5 top-1/2 -translate-y-1/2 w-4 h-4 text-emerald-500" />
+          <input
+            id="input-pesquisa-mensalistas"
+            type="text"
+            placeholder="Buscar no elenco oficial por nome ou posição..."
+            value={filtroPesquisa}
+            onChange={(e) => setFiltroPesquisa(e.target.value)}
+            className="w-full bg-emerald-950/45 border border-white/10 rounded-xl pl-10 pr-4 py-2.5 text-xs text-white placeholder-emerald-600 hover:border-emerald-500/50 focus:outline-none focus:border-white focus:ring-1 focus:ring-white/20 transition-all font-sans"
+          />
+        </div>
+
+        <div id="selecao-competencia-mensalistas" className="relative">
+          <select
+            id="select-mes-mensalistas"
+            value={mesSelecionado}
+            onChange={(e) => setMesSelecionado(e.target.value)}
+            className="w-full bg-emerald-950/45 border border-white/10 rounded-xl px-4 py-2.5 text-xs text-white hover:border-emerald-500/50 focus:outline-none focus:border-white focus:ring-1 focus:ring-white/20 transition-all font-sans cursor-pointer appearance-none"
+          >
+            {opcoesMeses.map((opt) => (
+              <option key={opt.value} value={opt.value} className="bg-emerald-950 text-white">
+                📅 {opt.label}
+              </option>
+            ))}
+          </select>
+          <div className="absolute right-3.5 top-1/2 -translate-y-1/2 pointer-events-none text-emerald-500 text-xs">
+            ▼
+          </div>
+        </div>
       </div>
+
+      {/* SEÇÃO: CONTROLE / HISTÓRICO DE PAGAMENTO DOS MENSALISTAS */}
+      {jogadorAtual?.role === 'admin' && (
+        <div 
+          id="historico-financeiro-mensalistas" 
+          className="bg-emerald-900/40 border border-white/10 rounded-2xl p-6 shadow-xl backdrop-blur-sm space-y-4 text-left font-sans text-white"
+        >
+        <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between border-b border-white/10 pb-4 gap-3">
+          <div className="space-y-1">
+            <h3 className="font-display font-semibold text-base text-amber-400 flex items-center gap-2 uppercase tracking-wide">
+              <Calendar className="w-5 h-5 text-amber-400" />
+              Histórico / Relação de Pagamento de Mensalistas ({mesSelecionado.split('-').reverse().join('/')})
+            </h3>
+            <p className="text-xs text-emerald-300/80">
+              Acompanhe quem já quitou a mensalidade deste período ou registre pagamentos diretamente. Valor: <strong className="text-white">R$ {valorMensalidadeMês.toFixed(2)}</strong> ({countSabados} sábados).
+            </p>
+          </div>
+          <div className="flex items-center gap-2">
+            <span className="text-xs font-mono font-bold bg-teal-500/10 border border-teal-500/20 text-teal-300 px-3 py-1 rounded-full whitespace-nowrap">
+              {mensalistasComStatusDoMes.filter(m => m.pagamento?.status === 'pago').length} Quitados
+            </span>
+            <span className="text-xs font-mono font-bold bg-rose-500/10 border border-rose-500/20 text-rose-300 px-3 py-1 rounded-full whitespace-nowrap">
+              {mensalistasComStatusDoMes.filter(m => !m.pagamento || m.pagamento?.status === 'pendente').length} Pendentes
+            </span>
+          </div>
+        </div>
+
+        <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+          {mensalistasComStatusDoMes.map(({ jogador, pagamento }) => {
+            const avatar = getAvatarProps(jogador.foto);
+            const status = pagamento?.status || 'pendente';
+            
+            return (
+              <div 
+                key={jogador.id}
+                className="flex items-center justify-between p-3.5 bg-emerald-950/30 border border-white/5 rounded-xl hover:bg-emerald-955/45 transition-all gap-4 animate-fade-in"
+              >
+                <div className="flex items-center gap-3 min-w-0">
+                  <div 
+                    className="w-9 h-9 rounded-full flex items-center justify-center text-xs font-bold shrink-0 border border-white/10"
+                    style={{ backgroundColor: avatar.color }}
+                  >
+                    {jogador.foto && (jogador.foto.startsWith('http') || jogador.foto.startsWith('data:')) ? (
+                      <img src={jogador.foto} className="w-full h-full object-cover rounded-full" alt="" referrerPolicy="no-referrer" />
+                    ) : (
+                      jogador.posicao.substring(0, 1)
+                    )}
+                  </div>
+                  <div className="min-w-0">
+                    <h4 className="font-bold text-white text-xs truncate">{jogador.nome} {jogador.sobrenome}</h4>
+                    <p className="text-[10px] text-emerald-400 font-mono">{jogador.posicao}</p>
+                  </div>
+                </div>
+
+                <div className="flex items-center gap-3 shrink-0 col-span-1">
+                  <div className="text-right">
+                    <span className="block font-mono font-black text-white text-[11px]">
+                      R$ {valorMensalidadeMês.toFixed(2)}
+                    </span>
+                    <span className={`block text-[9px] font-black uppercase tracking-wider font-mono ${
+                      status === 'pago' 
+                        ? 'text-teal-400' 
+                        : status === 'pendente_confirmacao' 
+                          ? 'text-amber-400 animate-pulse' 
+                          : 'text-rose-400'
+                    }`}>
+                      {status === 'pago' 
+                        ? 'Pago ✅' 
+                        : status === 'pendente_confirmacao' 
+                          ? 'Aguard. Confirmação ⏳' 
+                          : 'Pendente ❌'}
+                    </span>
+                  </div>
+
+                  {/* Botão de Quitação para ADMINISTRADOR */}
+                  {jogadorAtual?.role === 'admin' && (
+                    <div className="min-w-16 flex justify-end">
+                      {status === 'pendente' || status === 'pendente_confirmacao' ? (
+                        <button
+                          type="button"
+                          onClick={() => {
+                            const hojeStr = new Date().toISOString().split('T')[0];
+                            onRegistrarPagamento(jogador.id, mesSelecionado, 'pago', hojeStr, valorMensalidadeMês);
+                          }}
+                          className="py-1 px-2.5 bg-teal-500 hover:bg-teal-400 text-black font-black text-[10px] rounded transition-all cursor-pointer uppercase tracking-wide active:scale-97"
+                        >
+                          Quitar
+                        </button>
+                      ) : (
+                        <button
+                          type="button"
+                          onClick={() => {
+                            onRegistrarPagamento(jogador.id, mesSelecionado, 'pendente', null, valorMensalidadeMês);
+                          }}
+                          className="py-1 px-2 bg-rose-950/50 border border-rose-500/20 hover:bg-rose-900 text-rose-300 font-bold text-[9px] rounded transition-all cursor-pointer uppercase"
+                        >
+                          Estornar
+                        </button>
+                      )}
+                    </div>
+                  )}
+                </div>
+              </div>
+            );
+          })}
+        </div>
+      </div>
+      )}
 
       {/* Agrupamento por Posições */}
       <div className="space-y-8">

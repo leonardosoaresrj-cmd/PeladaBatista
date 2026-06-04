@@ -3,6 +3,8 @@
  * SPDX-License-Identifier: Apache-2.0
  */
 
+import { Partida, Pagamento } from '../types';
+
 /**
  * Retorna as datas de início (Terça-feira 00:00) e fim (Sexta-feira 23:59)
  * da janela de confirmação para uma partida de acordo com a data do jogo.
@@ -111,4 +113,112 @@ export function obterTextoPagamentoMensalidade(jogadorNome: string, mesRef: stri
  */
 export function obterTextoAlertaSemanal(partidaTitulo: string, dataStr: string, horario: string, local: string, janelaInicioStr: string, janelaFimStr: string): string {
   return `📢 *ALERTA DA PELADA FC - JANELA DE CONFIRMAÇÕES* 📢\n\nGalera, está aberta/fechando a janela de confirmação de presença para a próxima partida!\n\n🏆 *${partidaTitulo}*\n📅 Data do Jogo: *${dataStr}* às *${horario}h*\n📍 Local: *${local}*\n\n⏰ *Janela Oficial do Regulamento:* \n🗓️ Início: Terça-feira (*${janelaInicioStr}*) às 00:00\n🗓️ Término: Sexta-feira (*${janelaFimStr}*) às 23:59\n\nPor favor, acessem o Portal da Pelada, escolham "Sim, vou jogar" ou "Não vou" e garantam a sua vaga na lista de escalados!\n\n🔗 Acesse aqui para confirmar sua presença!`;
+}
+
+export function obterDebitosDoJogador(
+  jogadorId: string,
+  membroStatus: string,
+  posicao: string,
+  partidas: Partida[],
+  pagamentos: Pagamento[],
+  valorDiaria: number,
+  valor4Sabados: number,
+  valor5Sabados: number
+) {
+  if (posicao === 'Goleiro') return [];
+
+  const hojeStr = new Date().toISOString().split('T')[0]; // ex: "2026-06-04"
+
+  const debitos: {
+    id: string;
+    tipo: 'mensalidade' | 'diaria';
+    referencia: string;
+    dataOrigem: string;
+    mesRef: string;
+    valor: number;
+    status: 'pendente' | 'pendente_confirmacao' | 'pago';
+    partidaId?: string;
+    pagamentoId?: string;
+  }[] = [];
+
+  if (membroStatus === 'mensalista') {
+    // Meses a verificar
+    const meses = ['2026-05', '2026-06'];
+    for (const mes of meses) {
+      const [ano, mesNum] = mes.split('-').map(Number);
+      
+      // Contar sábados
+      const tempDate = new Date(ano, mesNum - 1, 1);
+      let count = 0;
+      while (tempDate.getMonth() === mesNum - 1) {
+        if (tempDate.getDay() === 6) {
+          count++;
+        }
+        tempDate.setDate(tempDate.getDate() + 1);
+      }
+      const valorMensalidade = count === 5 ? valor5Sabados : valor4Sabados;
+
+      const pag = pagamentos.find(p => p.jogadorId === jogadorId && p.mesRef === mes);
+      if (!pag) {
+        debitos.push({
+          id: `mensalidade-${mes}`,
+          tipo: 'mensalidade',
+          referencia: `Mensalidade de ${mes.split('-').reverse().join('/')}`,
+          dataOrigem: `${mes}-01`,
+          mesRef: mes,
+          valor: valorMensalidade,
+          status: 'pendente'
+        });
+      } else if (pag.status !== 'pago') {
+        debitos.push({
+          id: pag.id,
+          tipo: 'mensalidade',
+          referencia: `Mensalidade de ${mes.split('-').reverse().join('/')}`,
+          dataOrigem: `${mes}-01`,
+          mesRef: mes,
+          valor: pag.valor,
+          status: pag.status,
+          pagamentoId: pag.id
+        });
+      }
+    }
+  } else if (membroStatus === 'diarista') {
+    // Diaristas pagam por partidas passadas que confirmaram presenca
+    const partidasPassadasConfirmadas = partidas.filter(p => {
+      return p.data < hojeStr && !p.cancelada && p.confirmados.includes(jogadorId);
+    });
+
+    for (const partida of partidasPassadasConfirmadas) {
+      const pag = pagamentos.find(p => {
+        return p.jogadorId === jogadorId && (p.partidaId === partida.id || (p.mesRef === partida.data.substring(0, 7) && !p.partidaId && p.status === 'pago'));
+      });
+
+      if (!pag) {
+        debitos.push({
+          id: `diaria-${partida.id}`,
+          tipo: 'diaria',
+          referencia: `Diária do jogo: ${partida.titulo}`,
+          dataOrigem: partida.data,
+          mesRef: partida.data.substring(0, 7),
+          valor: valorDiaria,
+          status: 'pendente',
+          partidaId: partida.id
+        });
+      } else if (pag.status !== 'pago') {
+        debitos.push({
+          id: pag.id,
+          tipo: 'diaria',
+          referencia: `Diária do jogo: ${partida.titulo}`,
+          dataOrigem: partida.data,
+          mesRef: partida.data.substring(0, 7),
+          valor: pag.valor,
+          status: pag.status,
+          partidaId: partida.id,
+          pagamentoId: pag.id
+        });
+      }
+    }
+  }
+
+  return debitos;
 }

@@ -22,8 +22,10 @@ import {
   Trash2,
   Sliders,
   Sparkles,
-  ChevronRight
+  ChevronRight,
+  ShieldAlert
 } from 'lucide-react';
+import { obterDebitosDoJogador } from '../utils/confirmationRules';
 
 interface ControleCaixaProps {
   partidas: Partida[];
@@ -37,6 +39,8 @@ interface ControleCaixaProps {
   valorDiaria: number;
   valor4Sabados: number;
   valor5Sabados: number;
+  onRegistrarPagamento?: (jogadorId: string, mesRef: string, status: 'pago' | 'pendente' | 'pendente_confirmacao', dataPagamento: string | null, valor: number, partidaId?: string) => void;
+  jogadorAtual?: Jogador;
 }
 
 export default function ControleCaixa({
@@ -50,7 +54,9 @@ export default function ControleCaixa({
   onUpdateAluguelCampoBase,
   valorDiaria,
   valor4Sabados,
-  valor5Sabados
+  valor5Sabados,
+  onRegistrarPagamento,
+  jogadorAtual
 }: ControleCaixaProps) {
   // Estado para escopo de visualização (Mensal vs Anual Consolidado)
   const [visaoEscopo, setVisaoEscopo] = useState<'mensal' | 'anual'>('mensal');
@@ -121,8 +127,80 @@ export default function ControleCaixa({
           jogador: jogador
         };
       })
-      .filter((item): item is { pagamento: Pagamento; jogador: Jogador } => item.jogador !== undefined);
+      .filter((item): item is { pagamento: Pagamento; decorator: any; jogador: Jogador } => item.jogador !== undefined);
   }, [pagamentosDoMes, jogadores]);
+
+  // JOGADORES COM PAGAMENTO PENDENTE DE CONFIRMAÇÃO DO ADMINISTRADOR
+  const pagantesPendentesDetalhado = useMemo(() => {
+    return pagamentos
+      .filter(p => p.status === 'pendente_confirmacao')
+      .map(p => {
+        const jogador = jogadores.find(j => j.id === p.jogadorId);
+        return {
+          pagamento: p,
+          jogador: jogador
+        };
+      })
+      .filter((item): item is { pagamento: Pagamento; jogador: Jogador } => item.jogador !== undefined);
+  }, [pagamentos, jogadores]);
+
+  // CÁLCULO DE TODOS OS DÉBITOS PENDENTES DO ELENCO PARA EXIBIÇÃO NO CONTROLE DE CAIXA
+  const todosDebitosPendentes = useMemo(() => {
+    const list: {
+      id: string;
+      jogadorId: string;
+      jogadorNome: string;
+      jogadorSobrenome: string;
+      jogadorMembroStatus: string;
+      jogadorPosicao: string;
+      jogadorFoto?: string;
+      tipo: 'mensalidade' | 'diaria';
+      referencia: string;
+      dataOrigem: string;
+      mesRef: string;
+      valor: number;
+      status: 'pendente' | 'pendente_confirmacao' | 'pago';
+      partidaId?: string;
+      pagamentoId?: string;
+    }[] = [];
+
+    for (const jogador of jogadores) {
+      if (jogador.posicao === 'Goleiro') continue;
+      
+      const debits = obterDebitosDoJogador(
+        jogador.id,
+        jogador.membroStatus,
+        jogador.posicao,
+        partidas,
+        pagamentos,
+        valorDiaria,
+        valor4Sabados,
+        valor5Sabados
+      );
+
+      for (const deb of debits) {
+        list.push({
+          id: deb.id,
+          jogadorId: jogador.id,
+          jogadorNome: jogador.nome,
+          jogadorSobrenome: jogador.sobrenome,
+          jogadorMembroStatus: jogador.membroStatus,
+          jogadorPosicao: jogador.posicao,
+          jogadorFoto: jogador.foto,
+          tipo: deb.tipo,
+          referencia: deb.referencia,
+          dataOrigem: deb.dataOrigem,
+          mesRef: deb.mesRef,
+          valor: deb.valor,
+          status: deb.status,
+          partidaId: deb.partidaId,
+          pagamentoId: deb.pagamentoId
+        });
+      }
+    }
+
+    return list;
+  }, [jogadores, partidas, pagamentos, valorDiaria, valor4Sabados, valor5Sabados]);
 
   // Separar receita de mensalistas e diaristas do Mês
   const receitaMensalistas = useMemo(() => {
@@ -1031,6 +1109,218 @@ export default function ControleCaixa({
 
       </div>
 
+      {/* 2.5. CONTROLE DE CONFIRMAÇÃO DE CAIXA (APROVAÇÕES PENDENTES) */}
+      <div 
+        id="controle-aprovacoes-caixa-pendentes" 
+        className="bg-emerald-900/40 border border-amber-500/30 rounded-2xl p-6 shadow-xl backdrop-blur-sm space-y-4 text-left animate-fade-in text-white mb-6"
+      >
+        <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between border-b border-white/10 pb-4 gap-3">
+          <div className="space-y-1">
+            <h3 className="font-display font-semibold text-base text-amber-400 flex items-center gap-2 uppercase tracking-wide">
+              <span className="w-2.5 h-2.5 rounded-full bg-amber-400 animate-ping" />
+              Aprovações Pendentes de Caixa (Confirmação Financeira)
+            </h3>
+            <p className="text-xs text-emerald-300/80 font-sans">
+              Membros que informaram pagamento próprio. Verifique o comprovante e confirme ou estorne o pagamento.
+            </p>
+          </div>
+          <div className="flex items-center gap-2">
+            <span className="text-xs font-mono font-bold bg-amber-500/10 border border-amber-500/20 text-amber-300 px-3 py-1 rounded-full whitespace-nowrap">
+              {pagantesPendentesDetalhado.length} Aguardando Aprovação
+            </span>
+          </div>
+        </div>
+
+        {pagantesPendentesDetalhado.length === 0 ? (
+          <div className="text-center py-8 bg-emerald-950/10 border border-dashed border-white/5 rounded-2xl">
+            <p className="text-xs font-sans italic text-emerald-500/50">Nenhum pagamento pendente de aprovação pelo administrador.</p>
+          </div>
+        ) : (
+          <div className="space-y-3 font-sans">
+            {pagantesPendentesDetalhado.map(({ pagamento, jogador }) => {
+              const avatar = AVATAR_PRESETS.find(p => p.id === jogador.foto) || AVATAR_PRESETS[0];
+              const partidaObj = pagamento.partidaId ? partidas.find(p => p.id === pagamento.partidaId) : null;
+              
+              return (
+                <div 
+                  key={pagamento.id}
+                  className="flex flex-col md:flex-row md:items-center md:justify-between p-4 bg-amber-950/10 border border-amber-500/10 rounded-xl hover:bg-amber-955/15 transition-all gap-4"
+                >
+                  <div className="flex items-center gap-3">
+                    <div 
+                      className="w-10 h-10 rounded-full flex items-center justify-center text-sm font-bold shrink-0 border border-white/15"
+                      style={{ backgroundColor: avatar.color }}
+                    >
+                      {jogador.foto && (jogador.foto.startsWith('http') || jogador.foto.startsWith('data:')) ? (
+                        <img src={jogador.foto} className="w-full h-full object-cover rounded-full" alt="" referrerPolicy="no-referrer" />
+                      ) : (
+                        jogador.posicao.substring(0, 1)
+                      )}
+                    </div>
+                    <div>
+                      <h4 className="font-bold text-white text-sm">{jogador.nome} {jogador.sobrenome}</h4>
+                      <div className="flex flex-wrap items-center gap-1.5 text-[10px] text-emerald-300 font-mono mt-0.5">
+                        <span className="bg-white/5 px-2 py-0.5 rounded text-emerald-400 capitalize">{jogador.membroStatus}</span>
+                        <span>•</span>
+                        <span>{jogador.posicao}</span>
+                        <span>•</span>
+                        <span className="text-amber-400 font-bold">
+                          {partidaObj 
+                            ? `Diária Jogo: ${partidaObj.titulo} (${partidaObj.data.split('-').reverse().join('/')})` 
+                            : `Mensalidade: ${pagamento.mesRef.split('-').reverse().join('/')}`}
+                        </span>
+                      </div>
+                    </div>
+                  </div>
+
+                  <div className="flex items-center justify-between md:justify-end gap-4">
+                    <div className="text-right shrink-0">
+                      <span className="block font-mono font-black text-white text-sm">
+                        R$ {pagamento.valor.toFixed(2)}
+                      </span>
+                      <span className="block text-[9px] font-bold text-amber-400 font-mono">
+                        Aguardando Liberação
+                      </span>
+                    </div>
+
+                    <div className="flex items-center gap-2">
+                      <button
+                        type="button"
+                        id={`btn-confirmar-caixa-${pagamento.id}`}
+                        onClick={() => {
+                          if (onRegistrarPagamento) {
+                            const hojeStr = new Date().toISOString().split('T')[0];
+                            onRegistrarPagamento(jogador.id, pagamento.mesRef, 'pago', hojeStr, pagamento.valor, pagamento.partidaId);
+                          }
+                        }}
+                        className="py-1.5 px-3 bg-emerald-500 hover:bg-emerald-400 text-black font-black text-[11px] rounded-lg transition-all shadow cursor-pointer uppercase tracking-wider"
+                      >
+                        Confirmar Pagamento
+                      </button>
+                      <button
+                        type="button"
+                        id={`btn-estornar-caixa-${pagamento.id}`}
+                        onClick={() => {
+                          if (onRegistrarPagamento) {
+                            onRegistrarPagamento(jogador.id, pagamento.mesRef, 'pendente', null, pagamento.valor, pagamento.partidaId);
+                          }
+                        }}
+                        className="py-1.5 px-3 bg-rose-950 border border-rose-500/25 hover:bg-rose-900 text-rose-300 font-bold text-[11px] rounded-lg transition-all cursor-pointer uppercase"
+                      >
+                        Estornar
+                      </button>
+                    </div>
+                  </div>
+                </div>
+              );
+            })}
+          </div>
+        )}
+      </div>
+
+      {/* SEÇÃO: CONTROLE DE INADIMPLÊNCIA / DÉBITOS PENDENTES */}
+      <div 
+        id="controle-inadimplencia-debitos-pendentes" 
+        className="bg-emerald-900/40 border border-rose-500/30 rounded-2xl p-6 shadow-xl backdrop-blur-sm space-y-4 text-left animate-fade-in text-white mb-6"
+      >
+        <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between border-b border-white/10 pb-4 gap-3">
+          <div className="space-y-1">
+            <h3 className="font-display font-semibold text-base text-rose-450 flex items-center gap-2 uppercase tracking-wide">
+              <ShieldAlert className="w-5 h-5 text-rose-550 animate-pulse" />
+              Controle de Inadimplência &amp; Débitos Pendentes
+            </h3>
+            <p className="text-xs text-emerald-300/80 font-sans">
+              Listagem de atletas com pendências financeiras em aberto no campeonato (mensalidades atrasadas ou diárias de partidas confirmadas sem quitação).
+            </p>
+          </div>
+          <div className="flex items-center gap-2">
+            <span className="text-xs font-mono font-bold bg-rose-500/10 border border-rose-500/20 text-rose-300 px-3 py-1 rounded-full whitespace-nowrap">
+              {todosDebitosPendentes.length} Pendências Ativas
+            </span>
+            <span className="text-xs font-mono font-bold bg-white/5 border border-white/10 text-white px-3 py-1 rounded-full whitespace-nowrap">
+              Total Devido: R$ {todosDebitosPendentes.reduce((sum, d) => sum + d.valor, 0).toFixed(2)}
+            </span>
+          </div>
+        </div>
+
+        {todosDebitosPendentes.length === 0 ? (
+          <div className="text-center py-8 bg-emerald-950/10 border border-dashed border-white/5 rounded-2xl">
+            <p className="text-xs font-sans italic text-emerald-500/50">Excelente! Não há nenhum débito pendente registrado para os jogadores ativos.</p>
+          </div>
+        ) : (
+          <div className="space-y-3 font-sans">
+            {todosDebitosPendentes.map((deb, index) => {
+              const avatar = AVATAR_PRESETS.find(p => p.id === deb.jogadorFoto) || AVATAR_PRESETS[0];
+              const isPendenteConfirmacao = deb.status === 'pendente_confirmacao';
+              
+              return (
+                <div 
+                  key={`${deb.jogadorId}-${deb.id}-${index}`}
+                  className="flex flex-col md:flex-row md:items-center md:justify-between p-4 bg-rose-955/5 border border-rose-500/10 rounded-xl hover:bg-rose-955/10 transition-all gap-4"
+                >
+                  <div className="flex items-center gap-3">
+                    <div 
+                      className="w-10 h-10 rounded-full flex items-center justify-center text-sm font-bold shrink-0 border border-white/15"
+                      style={{ backgroundColor: avatar.color }}
+                    >
+                      {deb.jogadorFoto && (deb.jogadorFoto.startsWith('http') || deb.jogadorFoto.startsWith('data:')) ? (
+                        <img src={deb.jogadorFoto} className="w-full h-full object-cover rounded-full" alt="" referrerPolicy="no-referrer" />
+                      ) : (
+                        deb.jogadorPosicao.substring(0, 1)
+                      )}
+                    </div>
+                    <div>
+                      <h4 className="font-bold text-white text-sm">{deb.jogadorNome} {deb.jogadorSobrenome}</h4>
+                      <div className="flex flex-wrap items-center gap-1.5 text-[10px] text-emerald-300 font-mono mt-0.5">
+                        <span className="bg-white/5 px-2 py-0.5 rounded text-emerald-400 capitalize">{deb.jogadorMembroStatus}</span>
+                        <span>•</span>
+                        <span>{deb.jogadorPosicao}</span>
+                        <span>•</span>
+                        <span className={`${deb.tipo === 'mensalidade' ? 'text-teal-400' : 'text-amber-400'} font-bold`}>
+                          {deb.tipo === 'mensalidade' 
+                            ? `Mensalidade: ${deb.mesRef.split('-').reverse().join('/')}` 
+                            : `Diária Jogo: ${deb.referencia.replace('Diária do jogo:', '').trim()} (${deb.dataOrigem.split('-').reverse().join('/')})`}
+                        </span>
+                      </div>
+                    </div>
+                  </div>
+
+                  <div className="flex items-center justify-between md:justify-end gap-4">
+                    <div className="text-right shrink-0">
+                      <span className="block font-mono font-black text-white text-sm">
+                        R$ {deb.valor.toFixed(2)}
+                      </span>
+                      <span className={`block text-[9px] font-bold uppercase tracking-widest font-mono ${
+                        isPendenteConfirmacao ? 'text-amber-400 animate-pulse' : 'text-rose-400'
+                      }`}>
+                        {isPendenteConfirmacao ? 'Aguardo Validação' : 'Em Aberto'}
+                      </span>
+                    </div>
+
+                    {/* Botão de quitar débito - só aparece para o ADM */}
+                    {jogadorAtual?.role === 'admin' && (
+                      <button
+                        type="button"
+                        id={`btn-quitar-debito-adm-${deb.id}`}
+                        onClick={() => {
+                          if (onRegistrarPagamento) {
+                            const hojeStr = new Date().toISOString().split('T')[0];
+                            onRegistrarPagamento(deb.jogadorId, deb.mesRef, 'pago', hojeStr, deb.valor, deb.partidaId);
+                          }
+                        }}
+                        className="py-1.5 px-3 bg-teal-500 hover:bg-teal-400 text-black font-black text-[11px] rounded-lg transition-all shadow cursor-pointer uppercase tracking-wider active:scale-97"
+                      >
+                        Quitar Débito
+                      </button>
+                    )}
+                  </div>
+                </div>
+              );
+            })}
+          </div>
+        )}
+      </div>
+
       {/* 3. LISTA DETALHADA DE JOGADORES PAGANTES DO MES */}
       <div 
         id="lista-detalhada-pagantes-mes" 
@@ -1069,6 +1359,7 @@ export default function ControleCaixa({
                   <th className="py-3 px-4 font-bold">Tipo</th>
                   <th className="py-3 px-4 font-bold">Posição</th>
                   <th className="py-3 px-4 font-bold">Data do Pagamento</th>
+                  <th className="py-3 px-4 font-bold">Mês/Dia de Referência</th>
                   <th className="py-3 px-4 font-bold text-right">Valor Pago</th>
                   <th className="py-3 px-4 font-bold text-center">Status no Caixa</th>
                 </tr>
@@ -1116,14 +1407,41 @@ export default function ControleCaixa({
                           ? pagamento.dataPagamento.split('T')[0].split('-').reverse().join('/') 
                           : 'Sincronizado'}
                       </td>
+                      <td className="py-3.5 px-4 font-mono text-[11px] text-teal-300/85">
+                        {(() => {
+                          if (jogador.membroStatus === 'mensalista') {
+                            return pagamento.mesRef.split('-').reverse().join('/');
+                          } else {
+                            const pObj = pagamento.partidaId ? partidas.find(pt => pt.id === pagamento.partidaId) : null;
+                            if (pObj) {
+                              return pObj.data.split('T')[0].split('-').reverse().join('/');
+                            }
+                            return `Diária ${pagamento.mesRef.split('-').reverse().join('/')}`;
+                          }
+                        })()}
+                      </td>
                       <td className="py-3.5 px-4 text-right font-mono font-bold text-teal-300 text-[11px]">
                         R$ {pagamento.valor.toFixed(2)}
                       </td>
                       <td className="py-3.5 px-4 text-center">
-                        <span className="inline-flex items-center gap-1.5 px-2.5 py-0.5 bg-teal-500/10 border border-teal-500/30 text-teal-400 text-[10px] font-bold rounded-md uppercase font-mono">
-                          <CheckCircle2 className="w-3 h-3 text-teal-400 shrink-0" />
-                          Lançamento Validado
-                        </span>
+                        <div className="flex items-center justify-center gap-1.5">
+                          <span className="inline-flex items-center gap-1 bg-teal-500/10 border border-teal-500/30 text-teal-400 text-[9.5px] font-bold rounded px-2 py-0.5 uppercase font-mono">
+                            <CheckCircle2 className="w-2.5 h-2.5 text-teal-400 shrink-0" />
+                            Validado
+                          </span>
+                          <button
+                            type="button"
+                            id={`btn-estornar-tabela-${pagamento.id}`}
+                            onClick={() => {
+                              if (onRegistrarPagamento) {
+                                onRegistrarPagamento(jogador.id, pagamento.mesRef, 'pendente', null, pagamento.valor, pagamento.partidaId);
+                              }
+                            }}
+                            className="text-[9.5px] font-bold text-rose-400 hover:text-rose-300 bg-rose-950/40 border border-rose-500/20 py-0.5 px-2 rounded hover:bg-rose-950 hover:border-rose-500/40 transition-all cursor-pointer"
+                          >
+                            Estornar
+                          </button>
+                        </div>
                       </td>
                     </tr>
                   );

@@ -6,21 +6,24 @@
 import React, { useState } from 'react';
 import { Jogador, Partida } from '../types';
 import { AVATAR_PRESETS } from '../data';
-import { Calendar, Users, MapPin, Clock, Search, HelpCircle, Award, Shield, User, CircleDot } from 'lucide-react';
+import { Calendar, Users, MapPin, Clock, Search, HelpCircle, Award, Shield, User, CircleDot, Trash2 } from 'lucide-react';
 
 interface HistoricoJogosProps {
   partidas: Partida[];
   jogadores: Jogador[];
   jogadorAtual: Jogador;
+  onDeletarPartida?: (id: string) => void;
 }
 
 export default function HistoricoJogos({
   partidas,
   jogadores,
   jogadorAtual,
+  onDeletarPartida,
 }: HistoricoJogosProps) {
   const [mesSelecionado, setMesSelecionado] = useState('2026-05');
   const [buscaNome, setBuscaNome] = useState('');
+  const [idConfirmacaoExclusao, setIdConfirmacaoExclusao] = useState<string | null>(null);
 
   // Formatar data em formato amigável (Dia, DD/MM/AAAA)
   const formatarDataAmigavel = (dataStr: string) => {
@@ -191,9 +194,9 @@ export default function HistoricoJogos({
                 className="bg-emerald-950/40 border border-white/10 rounded-2xl p-5 space-y-4 hover:bg-emerald-950/60 transition-all shadow-lg"
               >
                 {/* Informações Primárias do Jogo */}
-                <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between border-b border-white/10 pb-4 gap-3">
+                <div className="flex flex-col sm:flex-row sm:items-start sm:justify-between border-b border-white/10 pb-4 gap-3">
                   <div className="space-y-1">
-                    <div className="flex items-center gap-2">
+                    <div className="flex flex-wrap items-center gap-2">
                       <span className="bg-emerald-500 text-black text-[9px] font-black uppercase tracking-wider px-2 py-0.5 rounded">
                         CONVOCADOS REGISTRADOS
                       </span>
@@ -216,10 +219,48 @@ export default function HistoricoJogos({
                       <Clock className="w-3.5 h-3.5 text-teal-400" />
                       <span className="font-semibold text-white">{partida.horario}h</span>
                     </div>
-                    <div className="flex items-center gap-1 bg-white/5 rounded-lg px-2.5 py-1.5 border border-white/5">
+                    <div className="flex items-center gap-1 bg-white/5 rounded-lg px-2.5 py-1.5 border border-white/5 animate-pulse-fade">
                       <MapPin className="w-3.5 h-3.5 text-rose-400" />
                       <span className="text-white truncate max-w-36">{partida.local}</span>
                     </div>
+
+                    {jogadorAtual?.role === 'admin' && onDeletarPartida && (
+                      <div className="flex items-center shrink-0">
+                        {idConfirmacaoExclusao === partida.id ? (
+                          <div className="flex items-center gap-1.5 bg-rose-950/80 border border-rose-500/30 rounded-lg p-1 animate-fade-in">
+                            <span className="text-[9px] text-rose-300 font-bold px-1 uppercase tracking-wider">Excluir?</span>
+                            <button
+                              id={`btn-confirm-delete-game-${partida.id}`}
+                              type="button"
+                              onClick={() => {
+                                onDeletarPartida(partida.id);
+                                setIdConfirmacaoExclusao(null);
+                              }}
+                              className="bg-rose-600 hover:bg-rose-700 text-white text-[9px] font-bold px-2 py-1 rounded transition-all cursor-pointer uppercase"
+                            >
+                              Sim
+                            </button>
+                            <button
+                              type="button"
+                              onClick={() => setIdConfirmacaoExclusao(null)}
+                              className="bg-white/15 hover:bg-white/20 text-white text-[9px] font-bold px-2 py-1 rounded transition-all cursor-pointer uppercase"
+                            >
+                              Não
+                            </button>
+                          </div>
+                        ) : (
+                          <button
+                            id={`btn-delete-game-${partida.id}`}
+                            type="button"
+                            onClick={() => setIdConfirmacaoExclusao(partida.id)}
+                            className="p-1.5 rounded-lg bg-rose-950/40 hover:bg-rose-900/50 border border-rose-500/35 hover:border-rose-500/60 text-rose-400 hover:text-white transition-all cursor-pointer group"
+                            title="Excluir do histórico"
+                          >
+                            <Trash2 className="w-3.5 h-3.5" />
+                          </button>
+                        )}
+                      </div>
+                    )}
                   </div>
                 </div>
 

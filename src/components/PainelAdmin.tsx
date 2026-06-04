@@ -3,63 +3,25 @@
  * SPDX-License-Identifier: Apache-2.0
  */
 
-import React, { useState } from 'react';
+import React from 'react';
 import { Jogador, Partida } from '../types';
 import { AVATAR_PRESETS } from '../data';
-import { ShieldCheck, UserPlus, Calendar, Check, X, AlertCircle, Play, Sparkles } from 'lucide-react';
+import { ShieldCheck, UserPlus, Check, X } from 'lucide-react';
 
 interface PainelAdminProps {
   jogadores: Jogador[];
   partidas: Partida[];
   jogadorAtual: Jogador;
   onAprovarJogador: (id: string, aprovar: boolean) => void;
-  onCriarPartida: (novaPartida: Omit<Partida, 'id' | 'confirmados' | 'recusados' | 'createdAt'>) => void;
 }
 
 export default function PainelAdmin({
   jogadores,
-  partidas,
   jogadorAtual,
   onAprovarJogador,
-  onCriarPartida,
 }: PainelAdminProps) {
   // Filtro de jogadores pendentes de aprovação
   const pendentes = jogadores.filter(j => j.status === 'pendente_aprovacao');
-
-  // Estado para agendamento de jogos
-  const [titulo, setTitulo] = useState('');
-  const [data, setData] = useState('2026-06-07');
-  const [horario, setHorario] = useState('19:00');
-  const [local, setLocal] = useState('');
-  const [schedulerSuccess, setSchedulerSuccess] = useState(false);
-  const [schedulerError, setSchedulerError] = useState('');
-
-  const submitAgendarJogo = (e: React.FormEvent) => {
-    e.preventDefault();
-    setSchedulerSuccess(false);
-    setSchedulerError('');
-
-    if (!titulo.trim() || !data || !horario || !local.trim()) {
-      setSchedulerError('Preencha todas as informações para agendar a partida.');
-      return;
-    }
-
-    onCriarPartida({
-      titulo: titulo.trim(),
-      data,
-      horario,
-      local: local.trim(),
-      criadoPor: jogadorAtual.id,
-    });
-
-    setSchedulerSuccess(true);
-    setTitulo('');
-    setLocal('');
-
-    setTimeout(() => {
-      setSchedulerSuccess(false);
-    }, 4000);
-  };
 
   return (
     <div className="w-full max-w-7xl mx-auto space-y-6">
@@ -75,10 +37,10 @@ export default function PainelAdmin({
         </div>
       </div>
 
-      <div className="grid grid-cols-1 lg:grid-cols-12 gap-6">
+      <div className="w-full">
         
-        {/* PARTE 1: APROVAÇÕES DE CADASTRO (Lg: 7/12) */}
-        <div className="lg:col-span-7 bg-emerald-900/40 border border-white/10 rounded-2xl p-5 shadow-xl backdrop-blur-sm space-y-4">
+        {/* PARTE 1: APROVAÇÕES DE CADASTRO */}
+        <div className="bg-emerald-900/40 border border-white/10 rounded-2xl p-5 shadow-xl backdrop-blur-sm space-y-4">
           <div className="flex items-center justify-between border-b border-white/10 pb-3">
             <h3 className="font-display font-semibold text-sm text-white flex items-center gap-2 uppercase tracking-wide">
               <UserPlus className="w-5 h-5 text-emerald-400" />
@@ -164,94 +126,6 @@ export default function PainelAdmin({
               })}
             </div>
           )}
-        </div>
-
-        {/* PARTE 2: AGENDAMENTO DE JOGO (Lg: 5/12) */}
-        <div className="lg:col-span-5 bg-emerald-900/40 border border-white/10 rounded-2xl p-5 shadow-xl backdrop-blur-sm space-y-4">
-          <div className="border-b border-white/10 pb-3">
-            <h3 className="font-display font-semibold text-sm text-white flex items-center gap-2 uppercase tracking-wide">
-              <Calendar className="w-5 h-5 text-emerald-400" />
-              Agendar Nova Partida
-            </h3>
-            <p className="text-[11px] text-emerald-300/80 font-sans mt-0.5">Defina os detalhes locais e horários do próximo jogo.</p>
-          </div>
-
-          <form onSubmit={submitAgendarJogo} className="space-y-4">
-            
-            {schedulerError && (
-              <div className="flex items-start gap-2 bg-rose-955/40 border border-rose-500/30 text-rose-205 text-xs p-2.5 rounded-lg">
-                <AlertCircle className="w-4 h-4 text-rose-400 shrink-0 mt-0.5" />
-                <span>{schedulerError}</span>
-              </div>
-            )}
-
-            {schedulerSuccess && (
-              <div className="flex items-start gap-2 bg-teal-950/60 border border-teal-500/30 text-teal-200 text-xs p-2.5 rounded-lg">
-                <Sparkles className="w-4 h-4 text-teal-400 shrink-0 mt-0.5 animate-bounce" />
-                <span>Partida agendada e incorporada ao calendário do racha com sucesso!</span>
-              </div>
-            )}
-
-            <div>
-              <label className="block text-[10px] font-bold text-emerald-300 uppercase tracking-widest mb-1.5 font-sans">Título da Partida / Confronto</label>
-              <input
-                id="input-sched-titulo"
-                type="text"
-                required
-                placeholder="Ex: Racha de Domingo Tradicional"
-                value={titulo}
-                onChange={(e) => setTitulo(e.target.value)}
-                className="w-full bg-emerald-950 border border-white/10 text-white placeholder-emerald-400/50 rounded-lg p-2.5 text-xs focus:outline-none focus:border-white"
-              />
-            </div>
-
-            <div className="grid grid-cols-2 gap-3">
-              <div>
-                <label className="block text-[10px] font-bold text-emerald-300 uppercase tracking-widest mb-1.5 font-sans">Data do Jogo</label>
-                <input
-                  id="input-sched-data"
-                  type="date"
-                  required
-                  value={data}
-                  onChange={(e) => setData(e.target.value)}
-                  className="w-full bg-emerald-950 border border-white/10 text-white text-xs font-mono rounded-lg p-2.5 focus:outline-none"
-                />
-              </div>
-              <div>
-                <label className="block text-[10px] font-bold text-emerald-300 uppercase tracking-widest mb-1.5 font-sans">Horário de Início</label>
-                <input
-                  id="input-sched-hora"
-                  type="time"
-                  required
-                  value={horario}
-                  onChange={(e) => setHorario(e.target.value)}
-                  className="w-full bg-emerald-950 border border-white/10 text-white text-xs font-mono rounded-lg p-2.5 focus:outline-none"
-                />
-              </div>
-            </div>
-
-            <div>
-              <label className="block text-[10px] font-bold text-emerald-300 uppercase tracking-widest mb-1.5 font-sans">Local da Arena / Quadra</label>
-              <input
-                id="input-sched-local"
-                type="text"
-                required
-                placeholder="Ex: Arena Society Verde - Campo 1"
-                value={local}
-                onChange={(e) => setLocal(e.target.value)}
-                className="w-full bg-emerald-950 border border-white/10 text-white placeholder-emerald-400/50 rounded-lg p-2.5 text-xs focus:outline-none focus:border-white"
-              />
-            </div>
-
-            <button
-              id="btn-sched-submit"
-              type="submit"
-              className="w-full bg-white hover:bg-emerald-50 text-emerald-950 font-bold text-xs py-2.5 rounded-lg transition-all flex items-center justify-center gap-1.5 shadow-md shadow-emerald-950 cursor-pointer"
-            >
-              <Play className="w-3.5 h-3.5 fill-emerald-950" />
-              Agendar e Divulgar Partida
-            </button>
-          </form>
         </div>
 
       </div>

@@ -218,7 +218,15 @@ export default function ListaCadastrados({
                   <select
                     id={`select-edit-posicao-${j.id}`}
                     value={editPosicao}
-                    onChange={(e) => setEditPosicao(e.target.value as PosicaoJogador)}
+                    onChange={(e) => {
+                      const newPos = e.target.value as PosicaoJogador;
+                      setEditPosicao(newPos);
+                      if (newPos === 'Goleiro') {
+                        setEditMembro('isento');
+                      } else if (editMembro === 'isento') {
+                        setEditMembro('mensalista');
+                      }
+                    }}
                     disabled={jogadorAtual.role !== 'admin'}
                     className="bg-emerald-950 border border-white/10 text-white text-[11px] rounded px-1.5 py-1 focus:outline-none disabled:opacity-50 disabled:cursor-not-allowed"
                   >
@@ -232,11 +240,17 @@ export default function ListaCadastrados({
                     id={`select-edit-membro-${j.id}`}
                     value={editMembro}
                     onChange={(e) => setEditMembro(e.target.value as MembroStatus)}
-                    disabled={jogadorAtual.role !== 'admin' && !janelaInfo.estaAberta}
+                    disabled={jogadorAtual.role !== 'admin' && !janelaInfo.estaAberta && editPosicao !== 'Goleiro'}
                     className="bg-emerald-950 border border-white/10 text-white text-[11px] rounded px-1.5 py-1 focus:outline-none disabled:opacity-50 disabled:cursor-not-allowed"
                   >
-                    <option className="bg-emerald-950 text-white" value="mensalista">Mensal</option>
-                    <option className="bg-emerald-950 text-white" value="diarista">Diário</option>
+                    {editPosicao === 'Goleiro' ? (
+                      <option className="bg-emerald-950 text-white" value="isento">Isento</option>
+                    ) : (
+                      <>
+                        <option className="bg-emerald-950 text-white" value="mensalista">Mensal</option>
+                        <option className="bg-emerald-950 text-white" value="diarista">Diário</option>
+                      </>
+                    )}
                   </select>
                 </div>
 
@@ -344,7 +358,9 @@ export default function ListaCadastrados({
                     {j.posicao === 'Goleiro' ? '🧤 Goleiro' : j.posicao === 'Defesa' ? '🛡️ Defesa' : j.posicao === 'Meio' ? '🧠 Meio' : '🚀 Ataque'}
                   </span>
                   <span className={`text-[9px] px-1.5 py-0.5 rounded font-extrabold uppercase font-mono border ${
-                    j.membroStatus === 'mensalista' 
+                    j.membroStatus === 'isento'
+                      ? 'bg-emerald-950/85 border-emerald-500/40 text-emerald-300'
+                      : j.membroStatus === 'mensalista' 
                       ? 'bg-teal-950/60 border-teal-500/25 text-teal-400' 
                       : 'bg-amber-950/60 border-amber-500/25 text-amber-400'
                   }`}>

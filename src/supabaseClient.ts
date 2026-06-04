@@ -337,3 +337,67 @@ export async function carregarPagamentosDoSupabase(): Promise<Pagamento[] | null
     return null;
   }
 }
+
+/**
+ * Excluir partida no Supabase
+ */
+export async function deletarPartidaNoSupabase(id: string): Promise<boolean> {
+  const supabase = getSupabase();
+  if (!supabase) return false;
+
+  try {
+    const { error } = await supabase
+      .from('partidas')
+      .delete()
+      .eq('id', id);
+
+    if (error) throw error;
+    return true;
+  } catch (error) {
+    console.error('Erro ao excluir partida no Supabase:', error);
+    return false;
+  }
+}
+
+/**
+ * Obter uma configuração da tabela racha_configuracoes
+ */
+export async function obterConfiguracaoDoSupabase(chave: string): Promise<string | null> {
+  const supabase = getSupabase();
+  if (!supabase) return null;
+
+  try {
+    const { data, error } = await supabase
+      .from('racha_configuracoes')
+      .select('valor')
+      .eq('chave', chave)
+      .maybeSingle();
+
+    if (error) throw error;
+    return data ? data.valor : null;
+  } catch (error) {
+    console.error(`Erro ao obter config ${chave} do Supabase:`, error);
+    return null;
+  }
+}
+
+/**
+ * Salvar uma configuração na tabela racha_configuracoes
+ */
+export async function salvarConfiguracaoNoSupabase(chave: string, valor: string): Promise<boolean> {
+  const supabase = getSupabase();
+  if (!supabase) return false;
+
+  try {
+    const { error } = await supabase
+      .from('racha_configuracoes')
+      .upsert({ chave, valor, updated_at: new Date().toISOString() });
+
+    if (error) throw error;
+    return true;
+  } catch (error) {
+    console.error(`Erro ao salvar config ${chave} no Supabase:`, error);
+    return false;
+  }
+}
+

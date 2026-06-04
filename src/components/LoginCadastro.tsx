@@ -423,7 +423,15 @@ export default function LoginCadastro({ jogadores, onLoginSuccess, onRegistrar }
                   <select
                     id="select-posicao"
                     value={posicao}
-                    onChange={(e) => setPosicao(e.target.value as PosicaoJogador)}
+                    onChange={(e) => {
+                      const newPos = e.target.value as PosicaoJogador;
+                      setPosicao(newPos);
+                      if (newPos === 'Goleiro') {
+                        setMembroStatus('isento');
+                      } else if (membroStatus === 'isento') {
+                        setMembroStatus('mensalista');
+                      }
+                    }}
                     className="w-full bg-emerald-950 border border-white/10 text-white rounded-lg px-2.5 py-1.5 text-sm focus:outline-none focus:border-white transition-all font-sans"
                   >
                     <option className="bg-emerald-950 text-white" value="Goleiro">🧤 Goleiro</option>
@@ -440,8 +448,14 @@ export default function LoginCadastro({ jogadores, onLoginSuccess, onRegistrar }
                     onChange={(e) => setMembroStatus(e.target.value as MembroStatus)}
                     className="w-full bg-emerald-950 border border-white/10 text-white rounded-lg px-2.5 py-1.5 text-sm focus:outline-none focus:border-white transition-all font-sans"
                   >
-                    <option className="bg-emerald-950 text-white" value="mensalista">📅 Mensalista</option>
-                    <option className="bg-emerald-950 text-white" value="diarista">⚽ Diarista</option>
+                    {posicao === 'Goleiro' ? (
+                      <option className="bg-emerald-950 text-white" value="isento">🧤 Isento</option>
+                    ) : (
+                      <>
+                        <option className="bg-emerald-950 text-white" value="mensalista">📅 Mensalista</option>
+                        <option className="bg-emerald-950 text-white" value="diarista">⚽ Diarista</option>
+                      </>
+                    )}
                   </select>
                 </div>
               </div>

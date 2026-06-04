@@ -4,7 +4,7 @@
  */
 
 import React, { useState, useEffect } from 'react';
-import { Database, Copy, Check, Server, Share2, HelpCircle, ToggleLeft, ToggleRight, MessageSquare, ListFilter, Trash2, Send, ShieldCheck, Zap } from 'lucide-react';
+import { Database, Copy, Check, Server, Share2, HelpCircle, ToggleLeft, ToggleRight, MessageSquare, ListFilter, Trash2, Send, ShieldCheck, Zap, Coins } from 'lucide-react';
 import { DATABASE_SQL_SCHEMA } from '../data';
 import { obterCredenciaisSupabase, salvarCredenciaisSupabase, getSupabase } from '../supabaseClient';
 
@@ -18,6 +18,10 @@ interface ConfiguracaoSystemProps {
   whatsappLogs: any[];
   onClearLogs: () => void;
   onSendTestAlert: () => void;
+  valor4Sabados: number;
+  valor5Sabados: number;
+  valorDiaria: number;
+  onUpdateValoresConfig: (v4: number, v5: number, vD: number) => void;
 }
 
 export default function ConfiguracaoSystem({
@@ -29,7 +33,11 @@ export default function ConfiguracaoSystem({
   onUpdateWhatsappConfig,
   whatsappLogs,
   onClearLogs,
-  onSendTestAlert
+  onSendTestAlert,
+  valor4Sabados,
+  valor5Sabados,
+  valorDiaria,
+  onUpdateValoresConfig,
 }: ConfiguracaoSystemProps) {
   const [copied, setCopied] = useState(false);
   const [successMsg, setSuccessMsg] = useState('');
@@ -46,6 +54,12 @@ export default function ConfiguracaoSystem({
   const [localWebhookUrl, setLocalWebhookUrl] = useState(whatsappWebhookUrl);
   const [localWebhookToken, setLocalWebhookToken] = useState(whatsappWebhookToken);
 
+  // States locais para valores das tarifas
+  const [localV4, setLocalV4] = useState(valor4Sabados);
+  const [localV5, setLocalV5] = useState(valor5Sabados);
+  const [localVD, setLocalVD] = useState(valorDiaria);
+  const [successTarifasMsg, setSuccessTarifasMsg] = useState('');
+
   useEffect(() => {
     const creds = obterCredenciaisSupabase();
     setSupaUrl(creds.url);
@@ -60,6 +74,13 @@ export default function ConfiguracaoSystem({
     setLocalWebhookUrl(whatsappWebhookUrl);
     setLocalWebhookToken(whatsappWebhookToken);
   }, [whatsappGrupoLink, whatsappAutomacaoAtiva, whatsappWebhookUrl, whatsappWebhookToken]);
+
+  // Sincronizar tarifas locais se as configurações globais mudarem
+  useEffect(() => {
+    setLocalV4(valor4Sabados);
+    setLocalV5(valor5Sabados);
+    setLocalVD(valorDiaria);
+  }, [valor4Sabados, valor5Sabados, valorDiaria]);
 
   const copiarSql = () => {
     navigator.clipboard.writeText(DATABASE_SQL_SCHEMA);
@@ -83,6 +104,13 @@ export default function ConfiguracaoSystem({
     onUpdateWhatsappConfig(localLink, localAtiva, localWebhookUrl, localWebhookToken);
     setSuccessMsg('Configuração do WhatsApp salva com sucesso!');
     setTimeout(() => setSuccessMsg(''), 3000);
+  };
+
+  const handleSalvarTarifas = (e: React.FormEvent) => {
+    e.preventDefault();
+    onUpdateValoresConfig(localV4, localV5, localVD);
+    setSuccessTarifasMsg('✓ Tarifas atualizadas com sucesso! Novos registros de pagamento e futuros fechamentos usarão estes valores.');
+    setTimeout(() => setSuccessTarifasMsg(''), 4000);
   };
 
   const handleToggleAtiva = () => {
@@ -338,6 +366,87 @@ export default function ConfiguracaoSystem({
 
         {/* PARTE DIREITA: CONFIGURAÇÕES DE DB & SQL SCHEMA (Lg: 6/12) */}
         <div className="lg:col-span-6 space-y-6">
+          
+          {/* CONFIGURAÇÃO DE TARIFAS E CAIXA */}
+          <div className="bg-emerald-900/40 border border-white/10 rounded-2xl p-5 shadow-xl backdrop-blur-sm space-y-4">
+            <h3 className="font-display font-semibold text-sm text-white flex items-center gap-2 uppercase tracking-wide">
+              <Coins className="w-4 h-4 text-emerald-400" />
+              Parâmetros de Cálculo de Tarifas e Caixa
+            </h3>
+            
+            <p className="text-xs text-emerald-300/85 leading-relaxed font-sans">
+              Defina as tarifas de mensalidade e diária aplicadas às cobranças de atletas. Alterações passarão a valer para novos registros e rateios futuros, preservando os fechamentos históricos.
+            </p>
+
+            <form onSubmit={handleSalvarTarifas} className="space-y-4">
+              <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
+                <div>
+                  <label className="block text-[10px] font-bold text-emerald-300 uppercase tracking-widest mb-1.5 font-sans">VALOR MÊS (4 SÁBADOS)</label>
+                  <div className="relative">
+                    <span className="absolute left-3.5 top-1/2 -translate-y-1/2 text-xs text-emerald-500 font-sans font-bold">R$</span>
+                    <input
+                      id="input-valor-4s-config"
+                      type="number"
+                      value={localV4}
+                      onChange={(e) => setLocalV4(parseFloat(e.target.value) || 0)}
+                      className="w-full bg-emerald-950 border border-white/10 text-white text-xs font-mono rounded-lg pl-9 pr-3 py-2.5 focus:outline-none focus:border-white transition-all"
+                      min="0"
+                      step="0.01"
+                      required
+                    />
+                  </div>
+                </div>
+
+                <div>
+                  <label className="block text-[10px] font-bold text-emerald-300 uppercase tracking-widest mb-1.5 font-sans">VALOR MÊS (5 SÁBADOS)</label>
+                  <div className="relative">
+                    <span className="absolute left-3.5 top-1/2 -translate-y-1/2 text-xs text-emerald-500 font-sans font-bold">R$</span>
+                    <input
+                      id="input-valor-5s-config"
+                      type="number"
+                      value={localV5}
+                      onChange={(e) => setLocalV5(parseFloat(e.target.value) || 0)}
+                      className="w-full bg-emerald-950 border border-white/10 text-white text-xs font-mono rounded-lg pl-9 pr-3 py-2.5 focus:outline-none focus:border-white transition-all"
+                      min="0"
+                      step="0.01"
+                      required
+                    />
+                  </div>
+                </div>
+              </div>
+
+              <div>
+                <label className="block text-[10px] font-bold text-emerald-300 uppercase tracking-widest mb-1.5 font-sans">VALOR DIÁRIA (AVULSO)</label>
+                <div className="relative">
+                  <span className="absolute left-3.5 top-1/2 -translate-y-1/2 text-xs text-emerald-500 font-sans font-bold">R$</span>
+                  <input
+                    id="input-valor-diaria-config"
+                    type="number"
+                    value={localVD}
+                    onChange={(e) => setLocalVD(parseFloat(e.target.value) || 0)}
+                    className="w-full bg-emerald-950 border border-white/10 text-white text-xs font-mono rounded-lg pl-9 pr-3 py-2.5 focus:outline-none focus:border-white transition-all"
+                    min="0"
+                    step="0.01"
+                    required
+                  />
+                </div>
+              </div>
+
+              {successTarifasMsg && (
+                <div className="p-2.5 bg-emerald-950/50 border border-emerald-500/30 text-teal-300 text-[10.5px] rounded-xl font-sans" id="success-tarifas-notif">
+                  {successTarifasMsg}
+                </div>
+              )}
+
+              <button
+                type="submit"
+                id="btn-salvar-tarifas"
+                className="w-full bg-amber-500 hover:bg-amber-400 text-black font-black text-xs py-2.5 rounded-xl transition-all shadow-md active:scale-97 cursor-pointer"
+              >
+                Salvar Configurações de Tarifas
+              </button>
+            </form>
+          </div>
           
           {/* BANCO DE DADOS SUPABASE */}
           <div className="bg-emerald-900/40 border border-white/10 rounded-2xl p-5 shadow-xl backdrop-blur-sm space-y-4">

@@ -25,7 +25,10 @@ import {
   carregarPagamentosDoSupabase,
   salvarJogadorNoSupabase,
   salvarPartidaNoSupabase,
-  salvarPagamentoNoSupabase
+  salvarPagamentoNoSupabase,
+  deletarPartidaNoSupabase,
+  obterConfiguracaoDoSupabase,
+  salvarConfiguracaoNoSupabase
 } from './supabaseClient';
 import LoginCadastro from './components/LoginCadastro';
 import CalendarioJogos from './components/CalendarioJogos';
@@ -45,7 +48,11 @@ export default function App() {
   // Carregar estados iniciais do banco local simulado
   const [jogadores, setJogadores] = useState<Jogador[]>([]);
   const [partidas, setPartidas] = useState<Partida[]>([]);
-  const partidasMescladas = useMemo(() => mesclarPartidasAutomáticas(partidas), [partidas]);
+  const [partidasDeletadas, setPartidasDeletadas] = useState<string[]>([]);
+  const partidasMescladas = useMemo(() => {
+    const list = mesclarPartidasAutomáticas(partidas);
+    return list.filter(p => !partidasDeletadas.includes(p.id));
+  }, [partidas, partidasDeletadas]);
   const [pagamentos, setPagamentos] = useState<Pagamento[]>([]);
   
   // Controle de Sessão de Usuário
@@ -251,6 +258,16 @@ export default function App() {
 
   // Carregar todos os dados (live Supabase com fallback Offline)
   const fetchTodoDados = async () => {
+    // Carregar primeiro as deletadas locais para feedback instantâneo
+    const localDeletadasStr = localStorage.getItem('futebol_partidas_deletadas');
+    if (localDeletadasStr) {
+      try {
+        setPartidasDeletadas(JSON.parse(localDeletadasStr));
+      } catch (e) {
+        console.error(e);
+      }
+    }
+
     const isLive = !!getSupabase();
     if (isLive) {
       try {
@@ -276,6 +293,18 @@ export default function App() {
           savePagamentos(dbPagamentos);
         } else {
           setPagamentos(getSavedPagamentos());
+        }
+
+        // Carregar configurações de partidas excluídas da nuvem
+        const dbDeletadasStr = await obterConfiguracaoDoSupabase('partidas_excluidas');
+        if (dbDeletadasStr) {
+          try {
+            const parsed = JSON.parse(dbDeletadasStr);
+            setPartidasDeletadas(parsed);
+            localStorage.setItem('futebol_partidas_deletadas', dbDeletadasStr);
+          } catch (e) {
+            console.error(e);
+          }
         }
       } catch (err) {
         console.warn('Erro ao ler dados do Supabase. Usando local:', err);
@@ -513,6 +542,36 @@ export default function App() {
     await salvarPartidaNoSupabase(partidaCompleta);
   };
 
+  // Deletar Partida no Calendário / Histórico (Ação administrativa)
+  const handleDeletarPartida = async (id: string) => {
+    try {
+      // 1. Adicionar o ID à lista de partidas ocultas/deletadas para sumir imediatamente do UI
+      const novasDeletadas = [...partidasDeletadas];
+      if (!novasDeletadas.includes(id)) {
+        novasDeletadas.push(id);
+      }
+      setPartidasDeletadas(novasDeletadas);
+      localStorage.setItem('futebol_partidas_deletadas', JSON.stringify(novasDeletadas));
+
+      // 2. Filtrar e remover se for uma partida persistida no banco local/remoto as well
+      const atualizadas = partidas.filter(p => p.id !== id);
+      setPartidas(atualizadas);
+      savePartidas(atualizadas);
+
+      // 3. Salvar esta exclusão no Supabase se houver conexão ativa de forma assíncrona tolerante a falhas
+      if (getSupabase()) {
+        salvarConfiguracaoNoSupabase('partidas_excluidas', JSON.stringify(novasDeletadas))
+          .catch(err => console.error('Erro ao sincronizar partidos excluídos no Supabase:', err));
+        
+        deletarPartidaNoSupabase(id)
+          .catch(err => console.error('Erro ao deletar partida específica no Supabase:', err));
+      }
+    } catch (error) {
+      console.error('Erro geral ao executar handleDeletarPartida:', error);
+    }
+  };
+
+
   // 6. Confirmar ou Recusar Presença em Jogo (Ação de qualquer Jogador para si mesmo, lidando com Sábados Virtuais)
   const handleActualizarPresenca = async (partidaId: string, jogadorId: string, confirmado: boolean | null) => {
     let modificado: Partida | null = null;
@@ -618,15 +677,23 @@ export default function App() {
     mesRef: string,
     status: 'pago' | 'pendente' | 'pendente_confirmacao',
     dataPagamento: string | null,
-    valor: number
+    valor: number,
+    partidaId?: string
   ) => {
-    const existe = pagamentos.some(p => p.jogadorId === jogadorId && p.mesRef === mesRef);
+    const existe = partidaId 
+      ? pagamentos.some(p => p.jogadorId === jogadorId && p.partidaId === partidaId)
+      : pagamentos.some(p => p.jogadorId === jogadorId && p.mesRef === mesRef && !p.partidaId);
+    
     let atualizados: Pagamento[];
     let pagModificado: Pagamento;
 
     if (existe) {
       atualizados = pagamentos.map(p => {
-        if (p.jogadorId === jogadorId && p.mesRef === mesRef) {
+        const condicao = partidaId
+          ? p.jogadorId === jogadorId && p.partidaId === partidaId
+          : p.jogadorId === jogadorId && p.mesRef === mesRef && !p.partidaId;
+        
+        if (condicao) {
           pagModificado = { ...p, status, dataPagamento, valor };
           return pagModificado;
         }
@@ -640,6 +707,7 @@ export default function App() {
         status,
         dataPagamento,
         valor,
+        partidaId,
       };
       atualizados = [...pagamentos, pagModificado];
     }
@@ -769,10 +837,10 @@ export default function App() {
                   ? 'text-white font-extrabold bg-white/10 border-teal-400 pl-1.5 md:pl-3' 
                   : 'text-emerald-300 hover:text-white hover:bg-white/5 border-transparent'
               }`}
-              title="Confirmação de Presença"
+              title="Lista de Confirmação"
             >
               <CheckSquare className="w-4.5 h-4.5 text-emerald-400 shrink-0" />
-              <span className="hidden md:inline whitespace-nowrap text-left flex-grow">Confirmar Presença</span>
+              <span className="hidden md:inline whitespace-nowrap text-left flex-grow">Lista de Confirmação</span>
             </button>
 
             <button
@@ -904,6 +972,8 @@ export default function App() {
                   onSelectPartidaForConfirmation={setPartidaSelecionadaId}
                   onNavigateToTab={setActiveTab}
                   onCriarPartida={handleCriarPartida}
+                  onDeletarPartida={handleDeletarPartida}
+                  onActualizarPresenca={handleActualizarPresenca}
                 />
               )}
 
@@ -945,6 +1015,7 @@ export default function App() {
                   valor5Sabados={valor5Sabados}
                   valorDiaria={valorDiaria}
                   onUpdateValoresConfig={handleUpdateValoresConfig}
+                  partidas={partidasMescladas}
                 />
               )}
 
@@ -961,6 +1032,8 @@ export default function App() {
                   valorDiaria={valorDiaria}
                   valor4Sabados={valor4Sabados}
                   valor5Sabados={valor5Sabados}
+                  onRegistrarPagamento={handleRegistrarPagamento}
+                  jogadorAtual={jogadorAtual}
                 />
               )}
 
@@ -970,6 +1043,8 @@ export default function App() {
                   pagamentos={pagamentos}
                   jogadorAtual={jogadorAtual}
                   onRegistrarPagamento={handleRegistrarPagamento}
+                  valor4Sabados={valor4Sabados}
+                  valor5Sabados={valor5Sabados}
                 />
               )}
 
@@ -978,6 +1053,7 @@ export default function App() {
                   partidas={partidasMescladas}
                   jogadores={jogadores}
                   jogadorAtual={jogadorAtual}
+                  onDeletarPartida={handleDeletarPartida}
                 />
               )}
 
@@ -987,7 +1063,6 @@ export default function App() {
                   partidas={partidasMescladas}
                   jogadorAtual={jogadorAtual}
                   onAprovarJogador={handleAprovarJogador}
-                  onCriarPartida={handleCriarPartida}
                 />
               )}
 
@@ -1002,6 +1077,10 @@ export default function App() {
                   whatsappLogs={whatsappLogs}
                   onClearLogs={handleClearWhatsappLogs}
                   onSendTestAlert={handleSendTestAlert}
+                  valor4Sabados={valor4Sabados}
+                  valor5Sabados={valor5Sabados}
+                  valorDiaria={valorDiaria}
+                  onUpdateValoresConfig={handleUpdateValoresConfig}
                 />
               )}
             </div>
@@ -1091,7 +1170,7 @@ export default function App() {
                     required
                     value={perfilNome}
                     onChange={(e) => setPerfilNome(e.target.value)}
-                    className="w-full bg-emerald-950/80 border border-white/10 focus:border-white/20 rounded-xl px-3 py-2 text-xs text-white placeholder-emerald-750 focus:outline-none"
+                    className="w-full bg-emerald-955 border border-white/10 rounded-xl px-2.5 py-2 text-xs text-white placeholder-emerald-750 focus:outline-none"
                   />
                 </div>
                 <div className="space-y-1">
@@ -1101,7 +1180,7 @@ export default function App() {
                     required
                     value={perfilSobrenome}
                     onChange={(e) => setPerfilSobrenome(e.target.value)}
-                    className="w-full bg-emerald-950/80 border border-white/10 focus:border-white/20 rounded-xl px-3 py-2 text-xs text-white placeholder-emerald-750 focus:outline-none"
+                    className="w-full bg-emerald-955 border border-white/10 rounded-xl px-2.5 py-2 text-xs text-white placeholder-emerald-750 focus:outline-none"
                   />
                 </div>
               </div>
@@ -1112,7 +1191,15 @@ export default function App() {
                   <label className="text-[10px] font-bold text-emerald-300 uppercase tracking-wide">Posição de Jogo</label>
                   <select
                     value={perfilPosicao}
-                    onChange={(e) => setPerfilPosicao(e.target.value as PosicaoJogador)}
+                    onChange={(e) => {
+                      const newPos = e.target.value as PosicaoJogador;
+                      setPerfilPosicao(newPos);
+                      if (newPos === 'Goleiro') {
+                        setPerfilMembroStatus('isento');
+                      } else if (perfilMembroStatus === 'isento') {
+                        setPerfilMembroStatus('mensalista');
+                      }
+                    }}
                     className="w-full bg-emerald-955 border border-white/10 rounded-xl px-2.5 py-2 text-xs text-white focus:outline-none"
                   >
                     <option className="bg-emerald-955 text-white" value="Goleiro">Goleiro 🧤</option>
@@ -1127,11 +1214,17 @@ export default function App() {
                   <select
                     value={perfilMembroStatus}
                     onChange={(e) => setPerfilMembroStatus(e.target.value as MembroStatus)}
-                    disabled={jogadorAtual.role !== 'admin' && !checkJanelaRenovacaoGeral().estaAberta}
+                    disabled={jogadorAtual.role !== 'admin' && !checkJanelaRenovacaoGeral().estaAberta && perfilPosicao !== 'Goleiro'}
                     className="w-full bg-emerald-955 border border-white/10 rounded-xl px-2.5 py-2 text-xs text-white focus:outline-none disabled:opacity-50 disabled:cursor-not-allowed"
                   >
-                    <option className="bg-emerald-955 text-white" value="mensalista">Mensalista - R$50</option>
-                    <option className="bg-emerald-955 text-white" value="diarista">Diarista - R$15/jogo</option>
+                    {perfilPosicao === 'Goleiro' ? (
+                      <option className="bg-emerald-955 text-white" value="isento">Isento</option>
+                    ) : (
+                      <>
+                        <option className="bg-emerald-955 text-white" value="mensalista">Mensalista - R$50</option>
+                        <option className="bg-emerald-955 text-white" value="diarista">Diarista - R$15/jogo</option>
+                      </>
+                    )}
                   </select>
                 </div>
               </div>
@@ -1144,8 +1237,8 @@ export default function App() {
               )}
 
               {/* Data Aniversário e PIN de Segurança */}
-              <div className="grid grid-cols-2 gap-3">
-                <div className="space-y-1">
+              <div className="grid grid-cols-2 gap-3 w-full">
+                <div className="space-y-1 min-w-0 w-full">
                   <label className="text-[10px] font-bold text-emerald-300 uppercase tracking-wide flex items-center gap-1">
                     <Cake className="w-3 h-3 text-teal-400" />
                     Data Nascimento
@@ -1155,11 +1248,11 @@ export default function App() {
                     required
                     value={perfilDataNascimento}
                     onChange={(e) => setPerfilDataNascimento(e.target.value)}
-                    className="w-full bg-emerald-955 border border-white/10 rounded-xl px-3 py-1.5 text-xs text-white focus:outline-none focus:border-white/20"
+                    className="w-full min-w-0 bg-emerald-955 border border-white/10 rounded-xl px-2.5 py-2 text-xs text-white focus:outline-none focus:border-white/20"
                   />
                 </div>
                 
-                <div className="space-y-1">
+                <div className="space-y-1 min-w-0 w-full">
                   <label className="text-[10px] font-bold text-emerald-300 uppercase tracking-wide flex items-center gap-1">
                     <Lock className="w-3 h-3 text-teal-400" />
                     PIN (4 Dígitos)
@@ -1175,7 +1268,7 @@ export default function App() {
                       const val = e.target.value.replace(/\D/g, '');
                       setPerfilSenha(val);
                     }}
-                    className="w-full bg-emerald-955 border border-white/10 rounded-xl px-3 py-1.5 text-xs text-white text-center font-mono focus:outline-none focus:border-white/20"
+                    className="w-full min-w-0 bg-emerald-955 border border-white/10 rounded-xl px-2.5 py-2 text-xs text-white text-center font-mono focus:outline-none focus:border-white/20"
                   />
                 </div>
               </div>

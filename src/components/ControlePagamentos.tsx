@@ -4,7 +4,7 @@
  */
 
 import React, { useState, useMemo } from 'react';
-import { Jogador, Pagamento } from '../types';
+import { Jogador, Pagamento, Partida } from '../types';
 import { AVATAR_PRESETS } from '../data';
 import {
   CreditCard,
@@ -16,19 +16,21 @@ import {
   UserCheck,
   ShieldAlert,
   History,
-  Sparkles
+  Sparkles,
+  RefreshCw
 } from 'lucide-react';
-import { isFechamentoMensalistas, obterTextoPagamentoMensalidade } from '../utils/confirmationRules';
+import { isFechamentoMensalistas, obterTextoPagamentoMensalidade, obterDebitosDoJogador } from '../utils/confirmationRules';
 
 interface ControlePagamentosProps {
   pagamentos: Pagamento[];
   jogadores: Jogador[];
   jogadorAtual: Jogador;
-  onRegistrarPagamento: (jogadorId: string, mesRef: string, status: 'pago' | 'pendente' | 'pendente_confirmacao', dataPagamento: string | null, valor: number) => void;
+  onRegistrarPagamento: (jogadorId: string, mesRef: string, status: 'pago' | 'pendente' | 'pendente_confirmacao', dataPagamento: string | null, valor: number, partidaId?: string) => void;
   valor4Sabados: number;
   valor5Sabados: number;
   valorDiaria: number;
   onUpdateValoresConfig: (v4: number, v5: number, vD: number) => void;
+  partidas: Partida[];
 }
 
 function contarSabadosNoMes(mes: string): number {
@@ -53,6 +55,7 @@ export default function ControlePagamentos({
   valor4Sabados,
   valor5Sabados,
   valorDiaria,
+  partidas,
 }: ControlePagamentosProps) {
   // Filtro de mês de referência para a cobrança atual
   const [mesSelecionado, setMesSelecionado] = useState('2026-05');
@@ -83,6 +86,19 @@ export default function ControlePagamentos({
     { value: '2026-05', label: 'Maio / 2026' },
     { value: '2026-06', label: 'Junho / 2026' }
   ];
+
+  const debitosPessoais = useMemo(() => {
+    return obterDebitosDoJogador(
+      jogadorAtual.id,
+      jogadorAtual.membroStatus,
+      jogadorAtual.posicao,
+      partidas,
+      pagamentos,
+      valorDiaria,
+      valor4Sabados,
+      valor5Sabados
+    );
+  }, [jogadorAtual, partidas, pagamentos, valorDiaria, valor4Sabados, valor5Sabados]);
 
   return (
     <div className="w-full max-w-4xl mx-auto space-y-6">
@@ -170,7 +186,11 @@ export default function ControlePagamentos({
         {/* INFORMAÇÃO INDIVIDUAL CARDS */}
         {(() => {
           const isGoleiro = jogadorAtual.posicao === 'Goleiro';
-          const isPaid = isGoleiro || pagAtual?.status === 'pago';
+          const totalConsolidado = isGoleiro ? 0 : debitosPessoais.reduce((sum, d) => sum + d.valor, 0);
+          const totalAberto = isGoleiro ? 0 : debitosPessoais.filter(d => d.status === 'pendente').reduce((sum, d) => sum + d.valor, 0);
+          const hasUnpaid = debitosPessoais.some(d => d.status === 'pendente');
+          const hasPendenteConfirmacaoOnly = debitosPessoais.length > 0 && !hasUnpaid;
+          
           const avatar = AVATAR_PRESETS.find(p => p.id === jogadorAtual.foto) || AVATAR_PRESETS[0];
 
           return (
@@ -189,9 +209,13 @@ export default function ControlePagamentos({
                   )}
                 </div>
                 <div className={`absolute -bottom-1 -right-1 w-6 h-6 rounded-full border border-emerald-950 flex items-center justify-center ${
-                  isPaid ? 'bg-teal-500 text-black' : pagAtual?.status === 'pendente_confirmacao' ? 'bg-amber-400 text-black' : 'bg-rose-500 text-white'
+                  isGoleiro || debitosPessoais.length === 0 
+                    ? 'bg-teal-500 text-black' 
+                    : hasPendenteConfirmacaoOnly 
+                      ? 'bg-amber-400 text-black animate-pulse' 
+                      : 'bg-rose-500 text-white'
                 }`}>
-                  {isPaid ? <CheckCircle2 className="w-3.5 h-3.5" /> : <AlertCircle className="w-3.5 h-3.5" />}
+                  {isGoleiro || debitosPessoais.length === 0 ? <CheckCircle2 className="w-3.5 h-3.5" /> : <AlertCircle className="w-3.5 h-3.5" />}
                 </div>
               </div>
 
@@ -202,34 +226,34 @@ export default function ControlePagamentos({
                 </p>
               </div>
 
-              {/* Informações de Faturamento e demonstrativo de Caixa */}
+              {/* Informações de Faturamento e demonstrativo de Caixa - Dívida Consolidada */}
               <div className="w-full max-w-md bg-black/20 p-4 rounded-xl space-y-2.5 border border-white/5 text-left font-mono text-xs">
                 <div className="flex justify-between items-center">
-                  <span className="text-emerald-300 font-sans">Mês Consolidado:</span>
-                  <span className="font-mono text-white font-bold">{mesSelecionado.split('-').reverse().join('/')}</span>
+                  <span className="text-emerald-300 font-sans">Contas em Aberto:</span>
+                  <span className="font-mono text-white font-bold">{isGoleiro ? '0' : debitosPessoais.length} {debitosPessoais.length === 1 ? 'pendência' : 'pendências'}</span>
                 </div>
                 <div className="flex justify-between items-center">
-                  <span className="text-emerald-300 font-sans">Valor de Parcela:</span>
-                  <span className="font-mono text-white font-bold">R$ {valorCobradoMes.toFixed(2)}</span>
+                  <span className="text-emerald-300 font-sans">Dívida Consolidada Total:</span>
+                  <span className="font-mono text-white font-bold">R$ {totalConsolidado.toFixed(2)}</span>
                 </div>
                 <div className="flex justify-between items-center border-t border-white/5 pt-2.5">
-                  <span className="text-emerald-300 font-sans">Situação Atual:</span>
+                  <span className="text-emerald-300 font-sans">Situação Geral:</span>
                   <span className={`px-2.5 py-0.5 rounded text-[9.5px] font-black font-mono uppercase tracking-wide leading-none ${
                     isGoleiro 
-                      ? 'bg-teal-550 border border-teal-500 text-teal-400' 
-                      : pagAtual?.status === 'pendente_confirmacao'
-                        ? 'bg-amber-955 border border-amber-500/30 text-amber-400 font-bold'
-                        : isPaid 
-                          ? 'bg-teal-900/60 border border-teal-500/30 text-teal-400' 
-                          : 'bg-rose-955/60 border border-rose-500/30 text-rose-455'
+                      ? 'bg-teal-555 border border-teal-500 text-teal-400' 
+                      : debitosPessoais.length === 0
+                        ? 'bg-teal-900/60 border border-teal-500/30 text-teal-400' 
+                        : hasUnpaid 
+                          ? 'bg-rose-955/60 border border-rose-500/30 text-rose-455'
+                          : 'bg-amber-955 border border-amber-500/30 text-amber-400 font-bold'
                   }`}>
                     {isGoleiro 
                       ? 'ISENTO' 
-                      : pagAtual?.status === 'pendente_confirmacao' 
-                        ? 'EM ANÁLISE' 
-                        : isPaid 
-                          ? 'QUITADO' 
-                          : 'PENDENTE'}
+                      : debitosPessoais.length === 0
+                        ? 'QUITADO' 
+                        : hasUnpaid 
+                          ? 'PENDENTE' 
+                          : 'EM ANÁLISE'}
                   </span>
                 </div>
               </div>
@@ -241,15 +265,21 @@ export default function ControlePagamentos({
                     ✓ <b>Livre de pendências!</b> Você tem acesso total de goleiro oficial confirmado aos rachas. Não há cobranças emitidas para o seu PIN.
                   </p>
                 </div>
-              ) : pagAtual?.status === 'pendente_confirmacao' ? (
+              ) : debitosPessoais.length === 0 ? (
+                <div className="text-center w-full max-w-md space-y-1.5 pt-1">
+                  <p className="text-xs text-teal-200 leading-relaxed font-sans bg-teal-500/10 border border-teal-500/20 p-3 rounded-xl font-bold">
+                    🎉 Excelente! Você está 100% em dia com a pelada Arena Record. Não há nenhum débito pendente em aberto ou em análise. Obrigado pela colaboração!
+                  </p>
+                </div>
+              ) : hasPendenteConfirmacaoOnly ? (
                 <div className="text-center w-full max-w-md space-y-3 pt-1">
                   <p className="text-xs text-amber-200 leading-relaxed font-sans bg-amber-500/10 border border-amber-500/20 p-3 rounded-xl">
-                    ✓ <b>Comprovante de pagamento informado!</b> Seu repasse de <b>R$ {valorCobradoMes.toFixed(2)}</b> está sendo analisado administrativamente.
+                    ✓ <b>Comprovantes de pagamento informados!</b> Todos os seus débitos (<b>R$ {totalConsolidado.toFixed(2)}</b>) estão sendo analisados pela administração do caixa.
                   </p>
                   
                   <a
                     href={`https://api.whatsapp.com/send?text=${encodeURIComponent(
-                      `Olá! Sou o atleta ${jogadorAtual.nome} ${jogadorAtual.sobrenome} e acabei de informar o meu pagamento de R$ ${valorCobradoMes.toFixed(2)} no app referente a ${mesSelecionado.split('-').reverse().join('/')}.`
+                      `Olá! Sou o atleta ${jogadorAtual.nome} ${jogadorAtual.sobrenome} e acabei de informar o pagamento total de meus débitos no app Arena Record no valor de R$ ${totalConsolidado.toFixed(2)}.`
                     )}`}
                     target="_blank"
                     rel="noreferrer"
@@ -259,38 +289,32 @@ export default function ControlePagamentos({
                     Enviar Comprovante (WhatsApp)
                   </a>
                 </div>
-              ) : isPaid ? (
-                <div className="text-center w-full max-w-md space-y-1.5 pt-1">
-                  <p className="text-xs text-teal-200 leading-relaxed font-sans">
-                    Excelente! Seu pagamento de <b>R$ {valorCobradoMes.toFixed(2)}</b> foi processado e validado no caixa da pelada Arena Record. Agradecemos pela pontualidade!
-                  </p>
-                  {pagAtual?.dataPagamento && (
-                    <p className="text-[10px] text-teal-400 font-mono" id={`msg-pg-proprio-sucesso`}>
-                      Data de liberação: <b>{pagAtual.dataPagamento.split('-').reverse().join('/')}</b>
-                    </p>
-                  )}
-                </div>
               ) : (
                 <div className="text-center w-full max-w-md space-y-3 pt-1">
-                  <p className="text-xs text-rose-200 leading-relaxed font-sans bg-rose-500/10 border border-rose-500/25 p-3 rounded-xl">
-                    Detectamos faturamento pendente para este mês. Efetue a transferência devida e clique no botão abaixo para informar o depósito.
+                  <p className="text-xs text-rose-200 leading-relaxed font-sans bg-rose-500/10 border border-rose-500/25 p-3 rounded-xl font-sans">
+                    Detectamos pendências financeiras consolidadas no total de <b>R$ {totalAberto.toFixed(2)}</b>. Realize a transferência correspondente e informe a quitação total abaixo.
                   </p>
 
                   <button
                     type="button"
+                    id="btn-quitar-consolidado-total-caixa"
                     onClick={() => {
-                      onRegistrarPagamento(
-                        jogadorAtual.id,
-                        mesSelecionado,
-                        'pendente_confirmacao',
-                        null,
-                        valorCobradoMes
-                      );
+                      const abertos = debitosPessoais.filter(d => d.status === 'pendente');
+                      abertos.forEach(deb => {
+                        onRegistrarPagamento(
+                          jogadorAtual.id,
+                          deb.mesRef,
+                          'pendente_confirmacao',
+                          null,
+                          deb.valor,
+                          deb.partidaId
+                        );
+                      });
                     }}
-                    className="w-full bg-amber-500 hover:bg-amber-400 text-black font-black text-xs py-2.5 rounded-xl transition-all shadow-md active:scale-97 flex items-center justify-center gap-1.5 cursor-pointer"
+                    className="w-full bg-amber-500 hover:bg-amber-400 text-black font-black text-xs py-2.5 rounded-xl transition-all shadow-md active:scale-97 flex items-center justify-center gap-1.5 cursor-pointer uppercase border-b-2 border-amber-700"
                   >
                     <DollarSign className="w-3.5 h-3.5" />
-                    Informar Pagamento Realizado
+                    Quitar Débito Consolidado (R$ {totalAberto.toFixed(2)})
                   </button>
                 </div>
               )}
@@ -298,6 +322,74 @@ export default function ControlePagamentos({
             </div>
           );
         })()}
+
+        {debitosPessoais.length > 0 && (
+          <div className="border-t border-rose-500/20 pt-5 space-y-4 text-left animate-fade-in" id="lista-debitos-atrasados-jogador">
+            <h3 className="font-display font-black text-sm text-rose-455 flex items-center gap-2 uppercase tracking-wide">
+              <ShieldAlert className="w-4 h-4 text-rose-500 animate-pulse" />
+              Atenção: Débitos Pendentes de Quitação ({debitosPessoais.length})
+            </h3>
+            <p className="text-[10px] text-rose-300 mr-2">
+              Você possui pendências financeiras registradas em jogos ou mensalidades anteriores. Regularize-as informando o pagamento para liberação pelo administrador.
+            </p>
+
+            <div className="bg-rose-950/20 rounded-2xl overflow-hidden border border-rose-500/20 divide-y border-rose-500/10 font-sans">
+              {debitosPessoais.map((deb) => (
+                <div 
+                  key={deb.id}
+                  className="flex flex-col sm:flex-row sm:items-center sm:justify-between p-4 bg-rose-955/5 hover:bg-rose-955/10 transition-all gap-4 text-xs"
+                >
+                  <div className="flex items-center gap-3">
+                    <div className="w-2.5 h-2.5 rounded-full bg-rose-500 animate-ping shrink-0" />
+                    <div>
+                      <p className="font-bold text-white text-xs">{deb.referencia}</p>
+                      <p className="text-[10px] text-rose-300 font-mono mt-0.5">
+                        Referido em: {deb.dataOrigem.split('-').reverse().join('/')} | Tipo: {deb.tipo === 'mensalidade' ? 'Mensalidade Fixa' : 'Diária de Partida'}
+                      </p>
+                    </div>
+                  </div>
+
+                  <div className="flex items-center justify-between sm:justify-end gap-3.5 shrink-0">
+                    <div className="text-right">
+                      <span className="font-mono text-white font-extrabold text-xs block">
+                        R$ {deb.valor.toFixed(2)}
+                      </span>
+                      <span className={`text-[9px] font-black font-mono uppercase tracking-wider block mt-0.5 ${
+                        deb.status === 'pendente_confirmacao' ? 'text-amber-400 animate-pulse' : 'text-rose-400 font-bold'
+                      }`}>
+                        {deb.status === 'pendente_confirmacao' ? 'AGUARDANDO VALID.' : 'EM ABERTO'}
+                      </span>
+                    </div>
+
+                    {deb.status === 'pendente' ? (
+                      <button
+                        type="button"
+                        onClick={() => {
+                          onRegistrarPagamento(
+                            jogadorAtual.id,
+                            deb.mesRef,
+                            'pendente_confirmacao',
+                            null,
+                            deb.valor,
+                            deb.partidaId
+                          );
+                        }}
+                        className="py-1.5 px-3 bg-rose-500 text-black hover:bg-rose-400 font-black text-[10px] rounded-lg transition-all shadow cursor-pointer uppercase tracking-wider active:scale-97 flex items-center gap-1"
+                      >
+                        <RefreshCw className="w-3 h-3 text-black animate-spin-slow" />
+                        Quitar Débito
+                      </button>
+                    ) : (
+                      <span className="text-[10px] font-mono text-emerald-400 bg-emerald-950/40 py-1 px-2.5 rounded border border-emerald-500/20">
+                        Pendente Confirmação
+                      </span>
+                    )}
+                  </div>
+                </div>
+              ))}
+            </div>
+          </div>
+        )}
 
         {/* SEÇÃO NOVO: HISTÓRICO DE FATURAMENTO COMPLETO DESTE JOGADOR */}
         <div className="border-t border-white/10 pt-5 space-y-4 text-left">

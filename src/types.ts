@@ -5,7 +5,7 @@
 
 export type PosicaoJogador = 'Goleiro' | 'Defesa' | 'Meio' | 'Ataque';
 export type StatusJogador = 'pendente_aprovacao' | 'ativo' | 'suspenso';
-export type MembroStatus = 'mensalista' | 'diarista';
+export type MembroStatus = 'mensalista' | 'diarista' | 'isento';
 export type RoleUsuario = 'admin' | 'jogador';
 
 export interface Jogador {
@@ -44,6 +44,7 @@ export interface Pagamento {
   status: 'pago' | 'pendente' | 'pendente_confirmacao';
   dataPagamento: string | null;
   valor: number;
+  partidaId?: string;
 }
 
 export interface LancamentoAvulso {
