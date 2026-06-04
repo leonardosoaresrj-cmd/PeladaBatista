@@ -20,6 +20,7 @@ import {
   RefreshCw
 } from 'lucide-react';
 import { isFechamentoMensalistas, obterTextoPagamentoMensalidade, obterDebitosDoJogador } from '../utils/confirmationRules';
+import CheckoutPixModal from './CheckoutPixModal';
 
 interface ControlePagamentosProps {
   pagamentos: Pagamento[];
@@ -59,6 +60,40 @@ export default function ControlePagamentos({
 }: ControlePagamentosProps) {
   // Filtro de mês de referência para a cobrança atual
   const [mesSelecionado, setMesSelecionado] = useState('2026-05');
+
+  // Controle de estado do pop-up de checkout PIX Mercado Pago
+  const [isCheckoutOpen, setIsCheckoutOpen] = useState(false);
+  const [checkoutValorTotal, setCheckoutValorTotal] = useState(0);
+  const [checkoutDebitos, setCheckoutDebitos] = useState<Array<{
+    id: string;
+    referencia: string;
+    valor: number;
+    mesRef: string;
+    partidaId?: string;
+  }>>([]);
+
+  const abrirCheckout = (debs: typeof checkoutDebitos) => {
+    const total = debs.reduce((sum, d) => sum + d.valor, 0);
+    setCheckoutDebitos(debs);
+    setCheckoutValorTotal(total);
+    setIsCheckoutOpen(true);
+  };
+
+  const handleConfirmarPagamentoTotal = (
+    debitList: Array<{ mesRef: string; valor: number; partidaId?: string }>
+  ) => {
+    const hojeStr = new Date().toISOString().split('T')[0];
+    debitList.forEach((deb) => {
+      onRegistrarPagamento(
+        jogadorAtual.id,
+        deb.mesRef,
+        'pago', // Altera status para quitado imediatamente!
+        hojeStr,
+        deb.valor,
+        deb.partidaId
+      );
+    });
+  };
   
   // Cálculos de sábados e tarifas correspondentes
   const numSabados = contarSabadosNoMes(mesSelecionado);
@@ -300,18 +335,9 @@ export default function ControlePagamentos({
                     id="btn-quitar-consolidado-total-caixa"
                     onClick={() => {
                       const abertos = debitosPessoais.filter(d => d.status === 'pendente');
-                      abertos.forEach(deb => {
-                        onRegistrarPagamento(
-                          jogadorAtual.id,
-                          deb.mesRef,
-                          'pendente_confirmacao',
-                          null,
-                          deb.valor,
-                          deb.partidaId
-                        );
-                      });
+                      abrirCheckout(abertos);
                     }}
-                    className="w-full bg-amber-500 hover:bg-amber-400 text-black font-black text-xs py-2.5 rounded-xl transition-all shadow-md active:scale-97 flex items-center justify-center gap-1.5 cursor-pointer uppercase border-b-2 border-amber-700"
+                    className="w-full bg-amber-500 hover:bg-amber-400 text-black font-black text-xs py-2.5 rounded-xl transition-all shadow-md active:scale-97 flex items-center justify-center gap-1.5 cursor-pointer uppercase border-b-2 border-amber-700 font-sans"
                   >
                     <DollarSign className="w-3.5 h-3.5" />
                     Quitar Débito Consolidado (R$ {totalAberto.toFixed(2)})
@@ -365,16 +391,9 @@ export default function ControlePagamentos({
                       <button
                         type="button"
                         onClick={() => {
-                          onRegistrarPagamento(
-                            jogadorAtual.id,
-                            deb.mesRef,
-                            'pendente_confirmacao',
-                            null,
-                            deb.valor,
-                            deb.partidaId
-                          );
+                          abrirCheckout([deb]);
                         }}
-                        className="py-1.5 px-3 bg-rose-500 text-black hover:bg-rose-400 font-black text-[10px] rounded-lg transition-all shadow cursor-pointer uppercase tracking-wider active:scale-97 flex items-center gap-1"
+                        className="py-1.5 px-3 bg-rose-500 text-black hover:bg-rose-400 font-black text-[10px] rounded-lg transition-all shadow cursor-pointer uppercase tracking-wider active:scale-97 flex items-center gap-1 font-sans font-bold"
                       >
                         <RefreshCw className="w-3 h-3 text-black animate-spin-slow" />
                         Quitar Débito
@@ -456,6 +475,15 @@ export default function ControlePagamentos({
         </div>
 
       </div>
+
+      <CheckoutPixModal
+        isOpen={isCheckoutOpen}
+        onClose={() => setIsCheckoutOpen(false)}
+        jogadorAtual={jogadorAtual}
+        valorTotal={checkoutValorTotal}
+        debitos={checkoutDebitos}
+        onConfirmarPagamentoTotal={handleConfirmarPagamentoTotal}
+      />
 
     </div>
   );

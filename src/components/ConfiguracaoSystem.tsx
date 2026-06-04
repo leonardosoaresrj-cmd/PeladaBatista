@@ -48,6 +48,11 @@ export default function ConfiguracaoSystem({
   const [configSalva, setConfigSalva] = useState(false);
   const [isLive, setIsLive] = useState(false);
 
+  // States locais para formulários de Mercado Pago PIX
+  const [mpAccessToken, setMpAccessToken] = useState('');
+  const [mpPublicKey, setMpPublicKey] = useState('');
+  const [mpSuccessMsg, setMpSuccessMsg] = useState('');
+
   // States locais para formulários de WhatsApp
   const [localLink, setLocalLink] = useState(whatsappGrupoLink);
   const [localAtiva, setLocalAtiva] = useState(whatsappAutomacaoAtiva);
@@ -65,7 +70,19 @@ export default function ConfiguracaoSystem({
     setSupaUrl(creds.url);
     setSupaKey(creds.key);
     setIsLive(!!getSupabase());
+
+    // Carregar credenciais Mercado Pago
+    setMpAccessToken(localStorage.getItem('mercado_pago_access_token') || '');
+    setMpPublicKey(localStorage.getItem('mercado_pago_public_key') || '');
   }, []);
+
+  const handleSalvarMercadoPago = (e: React.FormEvent) => {
+    e.preventDefault();
+    localStorage.setItem('mercado_pago_access_token', mpAccessToken);
+    localStorage.setItem('mercado_pago_public_key', mpPublicKey);
+    setMpSuccessMsg('✓ Chaves de integração do Mercado Pago atualizadas com sucesso!');
+    setTimeout(() => setMpSuccessMsg(''), 3000);
+  };
 
   // Sincronizar formulários locais se as configurações globais mudarem
   useEffect(() => {
@@ -441,10 +458,62 @@ export default function ConfiguracaoSystem({
               <button
                 type="submit"
                 id="btn-salvar-tarifas"
-                className="w-full bg-amber-500 hover:bg-amber-400 text-black font-black text-xs py-2.5 rounded-xl transition-all shadow-md active:scale-97 cursor-pointer"
+                className="w-full bg-amber-500 hover:bg-amber-400 text-black font-black text-xs py-2.5 rounded-xl transition-all shadow-md active:scale-97 cursor-pointer font-sans"
               >
                 Salvar Configurações de Tarifas
               </button>
+            </form>
+          </div>
+
+          {/* PAINEL DE PAGAMENTOS MERCADO PAGO */}
+          <div className="bg-emerald-900/40 border border-white/10 rounded-2xl p-5 shadow-xl backdrop-blur-sm space-y-4">
+            <h3 className="font-display font-semibold text-sm text-amber-400 flex items-center gap-2 uppercase tracking-wide">
+              <Coins className="w-4 h-4 text-amber-400" />
+              Gateway Mercado Pago (PIX Seguro)
+            </h3>
+            
+            <p className="text-xs text-emerald-300/80 leading-relaxed font-sans">
+              Configure as chaves da sua conta Mercado Pago para habilitar transações financeiras reais via PIX. Caso as chaves estejam em branco, o sistema utilizará o modo sandbox inteligente para simulação e teste do fluxo do racha.
+            </p>
+
+            <form onSubmit={handleSalvarMercadoPago} className="space-y-4">
+              <div>
+                <label className="block text-[10px] font-bold text-emerald-300 uppercase tracking-widest mb-1.5 font-sans">Access Token (Produção ou Teste)</label>
+                <input
+                  id="input-mp-access-token"
+                  type="password"
+                  value={mpAccessToken}
+                  onChange={(e) => setMpAccessToken(e.target.value)}
+                  placeholder="APP_USR-..."
+                  className="w-full bg-emerald-955 border border-white/10 text-white font-mono text-xs rounded-lg p-2.5 focus:outline-none focus:border-white transition-all placeholder:text-emerald-800/60"
+                />
+              </div>
+
+              <div>
+                <label className="block text-[10px] font-bold text-emerald-300 uppercase tracking-widest mb-1.5 font-sans">Public Key (Chave Pública - Opcional)</label>
+                <input
+                  id="input-mp-public-key"
+                  type="text"
+                  value={mpPublicKey}
+                  onChange={(e) => setMpPublicKey(e.target.value)}
+                  placeholder="APP_USR-..."
+                  className="w-full bg-emerald-955 border border-white/10 text-white font-mono text-xs rounded-lg p-2.5 focus:outline-none focus:border-white transition-all placeholder:text-emerald-800/60"
+                />
+              </div>
+
+              <button
+                id="btn-salvar-mp-config"
+                type="submit"
+                className="w-full bg-teal-500 hover:bg-teal-400 text-black font-black text-xs py-2.5 rounded-xl transition-all shadow-md active:scale-97 cursor-pointer uppercase"
+              >
+                Salvar Credenciais do Mercado Pago
+              </button>
+
+              {mpSuccessMsg && (
+                <p className="text-[10px] text-teal-300 font-bold text-center animate-pulse">
+                  {mpSuccessMsg}
+                </p>
+              )}
             </form>
           </div>
           
