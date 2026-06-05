@@ -31,242 +31,12 @@ export const INITIAL_JOGADORES: Jogador[] = [
     status: 'ativo',
     role: 'admin',
     createdAt: '2026-06-03T12:00:00Z',
-  },
-  {
-    id: 'admin-1',
-    nome: 'Carlos',
-    sobrenome: 'Silva',
-    posicao: 'Meio',
-    dataNascimento: '1988-06-15',
-    foto: 'jersey-black',
-    membroStatus: 'mensalista',
-    email: 'admin@campo.com',
-    senha: '1234',
-    status: 'ativo',
-    role: 'admin',
-    createdAt: '2026-01-01T12:00:00Z',
-  },
-  {
-    id: 'jog-1',
-    nome: 'Roberto',
-    sobrenome: 'Carlos',
-    posicao: 'Defesa',
-    dataNascimento: '1993-04-12',
-    foto: 'jersey-blue',
-    membroStatus: 'mensalista',
-    email: 'roberto@email.com',
-    senha: '1111',
-    status: 'ativo',
-    role: 'jogador',
-    createdAt: '2026-02-10T14:30:00Z',
-  },
-  {
-    id: 'jog-2',
-    nome: 'Neymar',
-    sobrenome: 'Santos',
-    posicao: 'Ataque',
-    dataNascimento: '1992-02-05',
-    foto: 'jersey-yellow',
-    membroStatus: 'diarista',
-    email: 'neymar@email.com',
-    senha: '2222',
-    status: 'ativo',
-    role: 'jogador',
-    createdAt: '2026-03-15T10:00:00Z',
-  },
-  {
-    id: 'jog-3',
-    nome: 'Alisson',
-    sobrenome: 'Becker',
-    posicao: 'Goleiro',
-    dataNascimento: '1992-10-02',
-    foto: 'jersey-green',
-    membroStatus: 'mensalista',
-    email: 'alisson@email.com',
-    senha: '3333',
-    status: 'ativo',
-    role: 'jogador',
-    createdAt: '2026-03-20T09:15:00Z',
-  },
-  {
-    id: 'jog-4',
-    nome: 'Bruno',
-    sobrenome: 'Guimarães',
-    posicao: 'Meio',
-    dataNascimento: '1997-11-16',
-    foto: 'jersey-red',
-    membroStatus: 'mensalista',
-    email: 'bruno@email.com',
-    senha: '4444',
-    status: 'ativo',
-    role: 'jogador',
-    createdAt: '2026-04-01T16:00:00Z',
-  },
-  {
-    id: 'jog-5',
-    nome: 'Marquinhos',
-    sobrenome: 'Correa',
-    posicao: 'Defesa',
-    dataNascimento: '1994-05-14',
-    foto: 'jersey-white',
-    membroStatus: 'mensalista',
-    email: 'marquinhos@email.com',
-    senha: '5555',
-    status: 'ativo',
-    role: 'jogador',
-    createdAt: '2026-04-05T11:45:00Z',
-  },
-  {
-    id: 'jog-6',
-    nome: 'Vinícius',
-    sobrenome: 'Júnior',
-    posicao: 'Ataque',
-    dataNascimento: '2000-07-12',
-    foto: 'jersey-purple',
-    membroStatus: 'diarista',
-    email: 'vini@email.com',
-    senha: '6666',
-    status: 'ativo',
-    role: 'jogador',
-    createdAt: '2026-04-10T18:20:00Z',
-  },
-  {
-    id: 'jog-7',
-    nome: 'Lucas',
-    sobrenome: 'Paquetá',
-    posicao: 'Meio',
-    dataNascimento: '1997-08-27',
-    foto: 'jersey-orange',
-    membroStatus: 'diarista',
-    email: 'lucas@email.com',
-    senha: '7777',
-    status: 'pendente_aprovacao',
-    role: 'jogador',
-    createdAt: '2026-05-28T15:30:00Z',
-  },
-  {
-    id: 'jog-8',
-    nome: 'Weverton',
-    sobrenome: 'Pereira',
-    posicao: 'Goleiro',
-    dataNascimento: '1987-12-13',
-    foto: 'jersey-yellow',
-    membroStatus: 'mensalista',
-    email: 'weverton@email.com',
-    senha: '8888',
-    status: 'pendente_aprovacao',
-    role: 'jogador',
-    createdAt: '2026-05-29T10:00:00Z',
   }
 ];
 
-export const INITIAL_PARTIDAS: Partida[] = [
-  {
-    id: 'part-1',
-    titulo: 'Rebatedores vs Clássico Arena',
-    data: '2026-05-20',
-    horario: '19:30',
-    local: 'Arena Futebol Show - Campo A',
-    confirmados: ['admin-1', 'jog-1', 'jog-3', 'jog-4', 'jog-5'],
-    recusados: ['jog-2', 'jog-6'],
-    criadoPor: 'admin-1',
-    createdAt: '2026-05-15T12:00:00Z',
-  },
-  {
-    id: 'part-2',
-    titulo: 'Racha de Domingo Clássico',
-    data: '2026-05-31', // Hoje (de acordo com metadados)
-    horario: '16:00',
-    local: 'Arena Society Verde - Campo 2',
-    confirmados: ['admin-1', 'jog-1', 'jog-2', 'jog-3', 'jog-4', 'jog-5', 'jog-6'],
-    recusados: [],
-    criadoPor: 'admin-1',
-    createdAt: '2026-05-25T10:00:00Z',
-  },
-  {
-    id: 'part-3',
-    titulo: 'Primeiro Racha de Junho',
-    data: '2026-06-07',
-    horario: '09:00',
-    local: 'Arena Society Verde - Campo 1',
-    confirmados: ['admin-1', 'jog-1', 'jog-3', 'jog-4'],
-    recusados: ['jog-5'],
-    criadoPor: 'admin-1',
-    createdAt: '2026-05-30T10:00:00Z',
-  },
-  {
-    id: 'part-4',
-    titulo: 'Clássico do Meio do Mês',
-    data: '2026-06-14',
-    horario: '20:00',
-    local: 'Estádio Municipal Secundário',
-    confirmados: ['jog-2', 'jog-6'],
-    recusados: [],
-    criadoPor: 'admin-1',
-    createdAt: '2026-05-31T08:00:00Z',
-  }
-];
+export const INITIAL_PARTIDAS: Partida[] = [];
 
-export const INITIAL_PAGAMENTOS: Pagamento[] = [
-  // Mensalistas de Maio 2026
-  {
-    id: 'pag-1',
-    jogadorId: 'admin-1',
-    mesRef: '2026-05',
-    status: 'pago',
-    dataPagamento: '2026-05-02',
-    valor: 120.00,
-  },
-  {
-    id: 'pag-2',
-    jogadorId: 'jog-1',
-    mesRef: '2026-05',
-    status: 'pago',
-    dataPagamento: '2026-05-05',
-    valor: 120.00,
-  },
-  {
-    id: 'pag-3',
-    jogadorId: 'jog-3',
-    mesRef: '2026-05',
-    status: 'pendente',
-    dataPagamento: null,
-    valor: 120.00,
-  },
-  {
-    id: 'pag-4',
-    jogadorId: 'jog-4',
-    mesRef: '2026-05',
-    status: 'pago',
-    dataPagamento: '2026-05-10',
-    valor: 120.00,
-  },
-  {
-    id: 'pag-5',
-    jogadorId: 'jog-5',
-    mesRef: '2026-05',
-    status: 'pendente',
-    dataPagamento: null,
-    valor: 120.00,
-  },
-  // Diaristas de Maio 2026 (pagos por partida participada)
-  {
-    id: 'pag-6',
-    jogadorId: 'jog-2',
-    mesRef: '2026-05',
-    status: 'pago',
-    dataPagamento: '2026-05-31',
-    valor: 20.00,
-  },
-  {
-    id: 'pag-7',
-    jogadorId: 'jog-6',
-    mesRef: '2026-05',
-    status: 'pendente',
-    dataPagamento: null,
-    valor: 20.00, // Pendente do jogo de hoje
-  }
-];
+export const INITIAL_PAGAMENTOS: Pagamento[] = [];
 
 // Scripts SQL prontos para implementação no Supabase cadastrado e Render
 export const DATABASE_SQL_SCHEMA = `-- SCHEMA DE BANCO DE DADOS POSTGRESQL (SUPABASE / RENDER.COM)
@@ -452,77 +222,57 @@ create policy "Admins gerenciam configurações do racha" on racha_configuracoes
   );
 `;
 
-// Carregar dados iniciais guardados
+// Carregar dados iniciais guardados de jogadores (limpando histórico de teste)
 export function getSavedJogadores(): Jogador[] {
   const json = localStorage.getItem('futebol_jogadores');
   let list: Jogador[] = [];
-  if (!json) {
-    list = [...INITIAL_JOGADORES];
-    localStorage.setItem('futebol_jogadores', JSON.stringify(list));
-    return list;
+  if (json) {
+    try {
+      list = JSON.parse(json);
+      // Mantém única e exclusivamente a conta do administrador Leonardo Soares
+      list = list.filter(j => j.email.toLowerCase().trim() === 'leonardo.soares.rj@gmail.com');
+    } catch (e) {
+      list = [];
+    }
   }
-  list = JSON.parse(json);
   
-  // Garantir que Leonardo está cadastrado como admin caso não esteja na lista carregada
-  const leoEmail = 'leonardo.soares.rj@gmail.com';
-  const hasLeo = list.some(j => j.email.toLowerCase().trim() === leoEmail.toLowerCase().trim());
-  if (!hasLeo) {
-    const leoAdmin: Jogador = {
-      id: 'admin-leonardo',
-      nome: 'Leonardo',
-      sobrenome: 'Soares',
-      posicao: 'Meio',
-      dataNascimento: '1990-01-01',
-      foto: 'jersey-black',
-      membroStatus: 'mensalista',
-      email: leoEmail,
-      senha: '1234',
-      status: 'ativo',
-      role: 'admin',
-      createdAt: new Date().toISOString(),
-    };
-    list.unshift(leoAdmin); // Coloca em primeiro para destaque
-    localStorage.setItem('futebol_jogadores', JSON.stringify(list));
+  if (list.length === 0) {
+    list = [...INITIAL_JOGADORES];
   }
+  
+  localStorage.setItem('futebol_jogadores', JSON.stringify(list));
   return list;
 }
 
 export function saveJogadores(jogadores: Jogador[]) {
+  // Permite salvar novos jogadores limpos
   localStorage.setItem('futebol_jogadores', JSON.stringify(jogadores));
 }
 
+// Limpar todo o histórico de partidas antigas
 export function getSavedPartidas(): Partida[] {
-  const json = localStorage.getItem('futebol_partidas');
-  if (!json) {
-    localStorage.setItem('futebol_partidas', JSON.stringify(INITIAL_PARTIDAS));
-    return INITIAL_PARTIDAS;
-  }
-  return JSON.parse(json);
+  localStorage.setItem('futebol_partidas', JSON.stringify([]));
+  return [];
 }
 
 export function savePartidas(partidas: Partida[]) {
   localStorage.setItem('futebol_partidas', JSON.stringify(partidas));
 }
 
+// Limpar todo o histórico de pagamentos antigos
 export function getSavedPagamentos(): Pagamento[] {
-  const json = localStorage.getItem('futebol_pagamentos');
-  if (!json) {
-    localStorage.setItem('futebol_pagamentos', JSON.stringify(INITIAL_PAGAMENTOS));
-    return INITIAL_PAGAMENTOS;
-  }
-  return JSON.parse(json);
+  localStorage.setItem('futebol_pagamentos', JSON.stringify([]));
+  return [];
 }
 
 export function savePagamentos(pagamentos: Pagamento[]) {
   localStorage.setItem('futebol_pagamentos', JSON.stringify(pagamentos));
 }
 
+// Limpar todo histórico de lançamentos de caixa
 export function getSavedLancamentos(): any[] {
-  const json = localStorage.getItem('futebol_lancamentos_caixa');
-  if (!json) {
-    return [];
-  }
-  return JSON.parse(json);
+  localStorage.removeItem('futebol_lancamentos_caixa');
+  return [];
 }
 
 export function saveLancamentos(lancamentos: any[]) {
