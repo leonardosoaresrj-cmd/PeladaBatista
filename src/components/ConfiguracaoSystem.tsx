@@ -51,6 +51,9 @@ export default function ConfiguracaoSystem({
   // States locais para formulários de Mercado Pago PIX
   const [mpAccessToken, setMpAccessToken] = useState('');
   const [mpPublicKey, setMpPublicKey] = useState('');
+  const [diretoPixChave, setDiretoPixChave] = useState('');
+  const [diretoPixNome, setDiretoPixNome] = useState('');
+  const [diretoPixCidade, setDiretoPixCidade] = useState('');
   const [mpSuccessMsg, setMpSuccessMsg] = useState('');
 
   // States locais para formulários de WhatsApp
@@ -71,16 +74,22 @@ export default function ConfiguracaoSystem({
     setSupaKey(creds.key);
     setIsLive(!!getSupabase());
 
-    // Carregar credenciais Mercado Pago
+    // Carregar credenciais Mercado Pago e Chave PIX direta
     setMpAccessToken(localStorage.getItem('mercado_pago_access_token') || '');
     setMpPublicKey(localStorage.getItem('mercado_pago_public_key') || '');
+    setDiretoPixChave(localStorage.getItem('direto_pix_chave') || '');
+    setDiretoPixNome(localStorage.getItem('direto_pix_nome') || 'Arena Record');
+    setDiretoPixCidade(localStorage.getItem('direto_pix_cidade') || 'SAO PAULO');
   }, []);
 
   const handleSalvarMercadoPago = (e: React.FormEvent) => {
     e.preventDefault();
     localStorage.setItem('mercado_pago_access_token', mpAccessToken);
     localStorage.setItem('mercado_pago_public_key', mpPublicKey);
-    setMpSuccessMsg('✓ Chaves de integração do Mercado Pago atualizadas com sucesso!');
+    localStorage.setItem('direto_pix_chave', diretoPixChave);
+    localStorage.setItem('direto_pix_nome', diretoPixNome);
+    localStorage.setItem('direto_pix_cidade', diretoPixCidade);
+    setMpSuccessMsg('✓ Credenciais e dados PIX salvos com sucesso!');
     setTimeout(() => setMpSuccessMsg(''), 3000);
   };
 
@@ -465,40 +474,94 @@ export default function ConfiguracaoSystem({
             </form>
           </div>
 
-          {/* PAINEL DE PAGAMENTOS MERCADO PAGO */}
+          {/* PAINEL DE PAGAMENTOS MERCADO PAGO E PIX DIRETO */}
           <div className="bg-emerald-900/40 border border-white/10 rounded-2xl p-5 shadow-xl backdrop-blur-sm space-y-4">
             <h3 className="font-display font-semibold text-sm text-amber-400 flex items-center gap-2 uppercase tracking-wide">
               <Coins className="w-4 h-4 text-amber-400" />
-              Gateway Mercado Pago (PIX Seguro)
+              Configuração do Sistema PIX & Mercado Pago
             </h3>
             
             <p className="text-xs text-emerald-300/80 leading-relaxed font-sans">
-              Configure as chaves da sua conta Mercado Pago para habilitar transações financeiras reais via PIX. Caso as chaves estejam em branco, o sistema utilizará o modo sandbox inteligente para simulação e teste do fluxo do racha.
+              Para validar o recebimento de forma automática síncrona com simulações, use os campos do Mercado Pago. Para que seus jogadores possam **escanear com sucesso em QUALQUEER aplicativo de banco real**, insira sua chave PIX direta abaixo.
             </p>
 
             <form onSubmit={handleSalvarMercadoPago} className="space-y-4">
-              <div>
-                <label className="block text-[10px] font-bold text-emerald-300 uppercase tracking-widest mb-1.5 font-sans">Access Token (Produção ou Teste)</label>
-                <input
-                  id="input-mp-access-token"
-                  type="password"
-                  value={mpAccessToken}
-                  onChange={(e) => setMpAccessToken(e.target.value)}
-                  placeholder="APP_USR-..."
-                  className="w-full bg-emerald-955 border border-white/10 text-white font-mono text-xs rounded-lg p-2.5 focus:outline-none focus:border-white transition-all placeholder:text-emerald-800/60"
-                />
+              <div className="bg-emerald-950/40 p-4 border border-white/5 rounded-xl space-y-3">
+                <p className="text-[10px] font-bold text-teal-400 uppercase tracking-wider">
+                  🎯 Dados para recebimento direto (PIX Estático Real)
+                </p>
+                <div>
+                  <label className="block text-[9px] font-bold text-emerald-300 uppercase tracking-widest mb-1 font-sans">
+                    Chave PIX (E-mail, CPF, CNPJ, Celular ou Chave Aleatória)
+                  </label>
+                  <input
+                    id="input-direto-pix-chave"
+                    type="text"
+                    value={diretoPixChave}
+                    onChange={(e) => setDiretoPixChave(e.target.value)}
+                    placeholder="Ex: pix@arena.com ou 123.456.789-00 ou celular"
+                    className="w-full bg-emerald-955 border border-white/10 text-white font-mono text-xs rounded-lg p-2 focus:outline-none focus:border-teal-500 transition-all placeholder:text-emerald-800/60"
+                  />
+                </div>
+                <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
+                  <div>
+                    <label className="block text-[9px] font-bold text-emerald-300 uppercase tracking-widest mb-1 font-sans">
+                      Nome Recebedor (Até 25 caracteres, sem acento)
+                    </label>
+                    <input
+                      id="input-direto-pix-nome"
+                      type="text"
+                      maxLength={25}
+                      value={diretoPixNome}
+                      onChange={(e) => setDiretoPixNome(e.target.value)}
+                      placeholder="Ex: Leonardo Soares"
+                      className="w-full bg-emerald-955 border border-white/10 text-white text-xs rounded-lg p-2 focus:outline-none focus:border-teal-500 transition-all"
+                    />
+                  </div>
+                  <div>
+                    <label className="block text-[9px] font-bold text-emerald-300 uppercase tracking-widest mb-1 font-sans">
+                      Cidade (Até 15 caracteres, sem acento)
+                    </label>
+                    <input
+                      id="input-direto-pix-cidade"
+                      type="text"
+                      maxLength={15}
+                      value={diretoPixCidade}
+                      onChange={(e) => setDiretoPixCidade(e.target.value)}
+                      placeholder="Ex: Rio de Janeiro"
+                      className="w-full bg-emerald-955 border border-white/10 text-white text-xs rounded-lg p-2 focus:outline-none focus:border-teal-500 transition-all"
+                    />
+                  </div>
+                </div>
               </div>
 
-              <div>
-                <label className="block text-[10px] font-bold text-emerald-300 uppercase tracking-widest mb-1.5 font-sans">Public Key (Chave Pública - Opcional)</label>
-                <input
-                  id="input-mp-public-key"
-                  type="text"
-                  value={mpPublicKey}
-                  onChange={(e) => setMpPublicKey(e.target.value)}
-                  placeholder="APP_USR-..."
-                  className="w-full bg-emerald-955 border border-white/10 text-white font-mono text-xs rounded-lg p-2.5 focus:outline-none focus:border-white transition-all placeholder:text-emerald-800/60"
-                />
+              <div className="bg-emerald-950/20 p-4 border border-white/5 rounded-xl space-y-3">
+                <p className="text-[10px] font-bold text-amber-500 uppercase tracking-wider">
+                  🔑 API do Mercado Pago (Confirmação via Webhook / Simulador)
+                </p>
+                <div>
+                  <label className="block text-[9px] font-bold text-emerald-300 uppercase tracking-widest mb-1 font-sans">Access Token</label>
+                  <input
+                    id="input-mp-access-token"
+                    type="password"
+                    value={mpAccessToken}
+                    onChange={(e) => setMpAccessToken(e.target.value)}
+                    placeholder="APP_USR-..."
+                    className="w-full bg-emerald-955 border border-white/10 text-white font-mono text-xs rounded-lg p-2 focus:outline-none focus:border-amber-500 transition-all placeholder:text-emerald-800/60"
+                  />
+                </div>
+
+                <div>
+                  <label className="block text-[9px] font-bold text-emerald-300 uppercase tracking-widest mb-1 font-sans">Public Key (Opcional)</label>
+                  <input
+                    id="input-mp-public-key"
+                    type="text"
+                    value={mpPublicKey}
+                    onChange={(e) => setMpPublicKey(e.target.value)}
+                    placeholder="APP_USR-..."
+                    className="w-full bg-emerald-955 border border-white/10 text-white font-mono text-xs rounded-lg p-2 focus:outline-none focus:border-amber-500 transition-all placeholder:text-emerald-800/60"
+                  />
+                </div>
               </div>
 
               <button
@@ -506,7 +569,7 @@ export default function ConfiguracaoSystem({
                 type="submit"
                 className="w-full bg-teal-500 hover:bg-teal-400 text-black font-black text-xs py-2.5 rounded-xl transition-all shadow-md active:scale-97 cursor-pointer uppercase"
               >
-                Salvar Credenciais do Mercado Pago
+                Salvar Credenciais e Preferências PIX
               </button>
 
               {mpSuccessMsg && (

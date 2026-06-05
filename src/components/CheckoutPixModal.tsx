@@ -58,22 +58,117 @@ export default function CheckoutPixModal({
     useLiveSandbox: true
   });
 
-  // Carregar configurações de Mercado Pago salvas
+  const [directPixInfo, setDirectPixInfo] = useState({
+    chave: '',
+    nome: 'Arena Record',
+    cidade: 'SAO PAULO'
+  });
+
+  // Carregar configurações de Mercado Pago salvas e Chave PIX direta
   useEffect(() => {
-    const token = localStorage.getItem('mercado_pago_access_token');
-    if (token && token.trim().length > 10) {
-      setMpConfiguracao({
-        accessTokenConfigured: true,
-        useLiveSandbox: false
+    if (isOpen) {
+      const token = localStorage.getItem('mercado_pago_access_token');
+      if (token && token.trim().length > 10) {
+        setMpConfiguracao({
+          accessTokenConfigured: true,
+          useLiveSandbox: false
+        });
+      } else {
+        setMpConfiguracao({
+          accessTokenConfigured: false,
+          useLiveSandbox: true
+        });
+      }
+
+      setDirectPixInfo({
+        chave: localStorage.getItem('direto_pix_chave') || '',
+        nome: localStorage.getItem('direto_pix_nome') || 'Arena Record',
+        cidade: localStorage.getItem('direto_pix_cidade') || 'SAO PAULO'
       });
     }
   }, [isOpen]);
 
-  // Gerar chave PIX "Copia e Cola" idêntica ao padrão EMV Mercado Pago
+  // Função para remover acentos e caracteres especiais para compatibilidade com bancos reais
+  const removerAcentos = (str: string): string => {
+    return str
+      .normalize('NFD')
+      .replace(/[\u0300-\u036f]/g, '') // Remove acentos
+      .replace(/[^a-zA-Z0-9\s]/g, '') // Mantém apenas alfanuméricos e espaços
+      .toUpperCase();
+  };
+
+  // Algoritmo matemático real de CRC16 CCITT (Polinômio: 0x1021, Valor Inicial: 0xFFFF)
+  const calculateCRC16 = (str: string): string => {
+    let crc = 0xFFFF;
+    const polynomial = 0x1021;
+
+    for (let i = 0; i < str.length; i++) {
+      const charCode = str.charCodeAt(i);
+      for (let j = 0; j < 8; j++) {
+        const bit = ((charCode >> (7 - j)) & 1) === 1;
+        const c15 = ((crc >> 15) & 1) === 1;
+        crc <<= 1;
+        if (c15 !== bit) {
+          crc ^= polynomial;
+        }
+      }
+    }
+
+    crc &= 0xFFFF;
+    return crc.toString(16).toUpperCase().padStart(4, '0');
+  };
+
+  // Gerar chave PIX no padrão EMV com CRC16 real calculado
   const getPixCopiaECola = () => {
     const valString = valorTotal.toFixed(2);
-    const randomHex = Math.random().toString(16).substring(2, 14);
-    return `00020101021226830014br.gov.bcb.pix2561pix.mercadopago.com.br/qr/v2/a94bd113-d02f-4886-9ac7-${randomHex}5204000053039865405${valString.length}${valString}5802BR5920Arena Record Futebol6009SAO PAULO62070503***63047FA8`;
+    
+    // Se não há uma chave configurada pelo administrador, gera a string simulada padrão com CRC16 válido
+    if (!directPixInfo.chave || directPixInfo.chave.trim() === '') {
+      const baseString = `00020101021226830014br.gov.bcb.pix2561pix.mercadopago.com.br/qr/v2/a94bd113-d02f-4886-9ac7-9cfc01828cb55204000053039865405${valString.length}${valString}5802BR5913Arena Society6009SAO PAULO62070503***6304`;
+      const crc = calculateCRC16(baseString);
+      return baseString + crc;
+    }
+
+    // Se o administrador cadastrou sua chave PIX, gera um código PIX ESTÁTICO REAL ativo e funcional!
+    const chavePronta = directPixInfo.chave.trim();
+    const nomePronto = removerAcentos(directPixInfo.nome.substring(0, 25).trim());
+    const cidadePronta = removerAcentos(directPixInfo.cidade.substring(0, 15).trim());
+
+    // Tag 00 - Payload Format Indicator
+    const tag00 = "000201";
+
+    // Tag 26 - Merchant Account Information (br.gov.bcb.pix + chave)
+    const sub00 = "0014br.gov.bcb.pix";
+    const sub01 = `01${chavePronta.length.toString().padStart(2, '0')}${chavePronta}`;
+    const val26 = sub00 + sub01;
+    const tag26 = `26${val26.length.toString().padStart(2, '0')}${val26}`;
+
+    // Tag 52 - Merchant Category Code (padrão 0000)
+    const tag52 = "52040000";
+
+    // Tag 53 - Currency Code (BRL = 986)
+    const tag53 = "5303986";
+
+    // Tag 54 - Transaction Amount (Valor)
+    const tag54 = `54${valString.length.toString().padStart(2, '0')}${valString}`;
+
+    // Tag 58 - Country Code (BR)
+    const tag58 = "5802BR";
+
+    // Tag 59 - Merchant Name (Recebedor)
+    const tag59 = `59${nomePronto.length.toString().padStart(2, '0')}${nomePronto}`;
+
+    // Tag 60 - Merchant City
+    const tag60 = `60${cidadePronta.length.toString().padStart(2, '0')}${cidadePronta}`;
+
+    // Tag 62 - Additional Data Field Template
+    const tag62 = "62070503***";
+
+    // Tag 63 - CRC16 pre-calculo
+    const baseStatic = tag00 + tag26 + tag52 + tag53 + tag54 + tag58 + tag59 + tag60 + tag62 + "6304";
+    const crc = calculateCRC16(baseStatic);
+
+    return baseStatic + crc;
   };
 
   const pixKey = getPixCopiaECola();
@@ -256,6 +351,33 @@ export default function CheckoutPixModal({
                 </div>
               </div>
 
+              {/* Verificação se a Chave PIX direta está configurada para evitar erros em bancos reais */}
+              {!directPixInfo.chave ? (
+                <div className="bg-rose-950/45 border border-rose-500/30 rounded-2xl p-4 flex gap-3 text-xs">
+                  <AlertCircle className="w-5 h-5 text-rose-400 shrink-0 mt-0.5" />
+                  <div>
+                    <h4 className="font-bold text-rose-300 uppercase text-[9px] tracking-wider font-sans">
+                      ⚠️ QR CODE DE SIMULAÇÃO DE TESTES
+                    </h4>
+                    <p className="text-[10px] text-rose-200 mt-0.5 leading-relaxed font-sans">
+                      O QR code acima é simulado e <b>não será aceito pelo aplicativo de banco real</b> (pois o link dinâmico não existe nos servidores do Mercado Pago). Para gerar um PIX que possa ser escaneado e pago de verdade no seu banco, configure sua <b>Chave PIX</b> direta nas Configurações!
+                    </p>
+                  </div>
+                </div>
+              ) : (
+                <div className="bg-teal-950/50 border border-teal-500/30 rounded-2xl p-4 flex gap-3 text-xs">
+                  <ShieldCheck className="w-5 h-5 text-teal-400 shrink-0 mt-0.5" />
+                  <div>
+                    <h4 className="font-bold text-teal-300 uppercase text-[9px] tracking-wider font-sans">
+                      ⚡ PIX DIRETO ATIVO (PRONTO PARA PAGAR)
+                    </h4>
+                    <p className="text-[10px] text-teal-100 mt-0.5 leading-relaxed font-sans">
+                      Este QR code e código copia-e-cola são 100% reais e válidos para qualquer banco brasileiro. O valor será enviado diretamente para <b>{directPixInfo.nome}</b> (Chave: <span className="font-mono text-amber-300 font-bold">{directPixInfo.chave}</span>) em {directPixInfo.cidade}.
+                    </p>
+                  </div>
+                </div>
+              )}
+
               {/* Status de Integração Real ou Sandbox */}
               <div className="bg-teal-950/20 border border-teal-500/20 rounded-2xl p-4 flex flex-col sm:flex-row sm:items-center sm:justify-between gap-3 text-xs">
                 <div className="flex items-start gap-2 max-w-[300px]">
@@ -263,13 +385,13 @@ export default function CheckoutPixModal({
                   <div>
                     <h4 className="font-bold text-teal-200 uppercase text-[9px] tracking-wider">
                       {mpConfiguracao.accessTokenConfigured
-                        ? '🔑 PRODUÇÃO ATIVA (INTEGRADO)'
-                        : '🧪 AMBIENTE DE TESTE / SANDBOX'}
+                        ? '🔑 MERCADO PAGO ATIVO'
+                        : '🧪 AMBIENTE DE SIMULAÇÃO INTELIGENTE'}
                     </h4>
                     <p className="text-[9.5px] text-emerald-300 mt-0.5 leading-normal">
                       {mpConfiguracao.accessTokenConfigured
-                        ? 'Conexão via credenciais Mercado Pago ativa. Os pagamentos são checados via webhook.'
-                        : 'O fluxo de teste simula a API real do Mercado Pago de forma instantânea.'}
+                        ? 'Integração de pagamento ativa. Resoluções e checagem de recebimento automáticos.'
+                        : 'O simulador permite a você aprovar o pagamento na hora para testar o sistema racha.'}
                     </p>
                   </div>
                 </div>
