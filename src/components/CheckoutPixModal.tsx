@@ -237,17 +237,17 @@ export default function CheckoutPixModal({
     <AnimatePresence>
       <div 
         id="modal-checkout-pix-overlay" 
-        className="fixed inset-0 bg-black/85 backdrop-blur-md z-50 flex items-center justify-center p-4 overflow-y-auto"
+        className="fixed inset-0 bg-black/85 backdrop-blur-md z-[9999] flex items-start justify-center p-4 overflow-y-auto pt-[80px]"
       >
         <motion.div
           initial={{ opacity: 0, scale: 0.93, y: 15 }}
           animate={{ opacity: 1, scale: 1, y: 0 }}
           exit={{ opacity: 0, scale: 0.93, y: 15 }}
           id="modal-checkout-pix"
-          className="bg-emerald-990 border border-emerald-500/30 rounded-3xl w-full max-w-lg shadow-2xl overflow-hidden text-left relative font-sans text-white"
+          className="bg-emerald-990 border border-emerald-500/30 rounded-3xl w-full max-w-lg shadow-2xl overflow-hidden text-left relative font-sans text-white flex flex-col max-h-[calc(100vh-120px)]"
         >
           {/* Header */}
-          <div className="bg-gradient-to-r from-emerald-950/60 to-emerald-900/40 p-6 border-b border-white/5 flex items-center justify-between">
+          <div className="bg-gradient-to-r from-emerald-950/60 to-emerald-900/40 p-6 border-b border-white/5 flex items-center justify-between shrink-0">
             <div className="flex items-center gap-3">
               <div className="w-10 h-10 rounded-xl bg-teal-500/10 border border-teal-500/20 flex items-center justify-center">
                 <DollarSign className="w-5 h-5 text-teal-400" />
@@ -271,7 +271,7 @@ export default function CheckoutPixModal({
           </div>
 
           {step === 'qrcode' ? (
-            <div className="p-6 space-y-5">
+            <div className="p-6 space-y-5 overflow-y-auto flex-1">
               {/* Resumo do pagamento */}
               <div className="bg-emerald-950/50 rounded-2xl p-4 border border-white/5 flex items-center justify-between">
                 <div>
@@ -440,8 +440,8 @@ export default function CheckoutPixModal({
             </div>
           ) : (
             /* Tela de Sucesso */
-            <div className="p-10 text-center flex flex-col items-center justify-center space-y-5 py-12 animate-fade-in">
-              <div className="w-16 h-16 rounded-full bg-teal-500/20 flex items-center justify-center text-teal-400 border-2 border-teal-500/40 animate-bounce">
+            <div className="p-10 text-center flex flex-col items-center justify-center space-y-5 py-12 animate-fade-in overflow-y-auto flex-1">
+              <div className="w-16 h-16 rounded-full bg-teal-500/20 flex items-center justify-center text-teal-400 border-2 border-teal-500/40 animate-bounce shrink-0">
                 <CheckCircle2 className="w-10 h-10 text-teal-400" />
               </div>
 
@@ -450,20 +450,20 @@ export default function CheckoutPixModal({
                   PAGAMENTO RECONHECIDO!
                 </h3>
                 <p className="text-xs text-teal-100 max-w-[340px] leading-relaxed font-sans">
-                  Excelente! A transação no valor de <b>R$ {valorTotal.toFixed(2)}</b> foi processada com sucesso pelo Mercado Pago. Seu status foi atualizado para <b className="text-teal-300 bg-teal-950/60 border border-teal-500/30 px-2 py-0.5 rounded text-[10px]">QUANTIDADE QUITADO (PAGO)</b>.
+                  Excelente! A transação no valor de <b>R$ {valorTotal.toFixed(2)}</b> foi processada com sucesso pelo Mercado Pago. Seu status foi atualizado para <b className="text-teal-300 bg-teal-950/60 border border-teal-500/30 px-2 py-0.5 rounded text-[10px]">QUITADO (PAGO)</b>.
                 </p>
               </div>
 
-              <div className="bg-teal-950/30 rounded-xl p-3 border border-teal-500/20 w-full text-[10.5px] text-emerald-300 font-mono space-y-1 text-center">
+              <div className="bg-teal-950/30 rounded-xl p-3 border border-teal-500/20 w-full text-[10.5px] text-emerald-300 font-mono space-y-1 text-center shrink-0">
                 <p>Nº Autenticação: <span className="font-bold text-white">MP-{Math.floor(Math.random() * 900000000) + 100000000}</span></p>
                 <p>Status: <span className="text-teal-400 font-bold">APPROVED - CREDITO IMEDIATO</span></p>
               </div>
 
               <button
                 onClick={onClose}
-                className="w-full max-w-xs bg-teal-500 hover:bg-teal-400 text-black font-black text-xs py-3 rounded-xl transition-all shadow-md uppercase scroll-mt-2"
+                className="w-full max-w-xs bg-teal-500 hover:bg-teal-400 text-black font-black text-xs py-3 rounded-xl transition-all shadow-md uppercase cursor-pointer tracking-wider"
               >
-                Voltar ao Painel
+                Concluir e Fechar Tela
               </button>
             </div>
           )}
