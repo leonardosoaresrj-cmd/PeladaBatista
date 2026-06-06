@@ -43,7 +43,7 @@ import HistoricoJogos from './components/HistoricoJogos';
 import { mesclarPartidasAutomáticas } from './utils/partidaHelper';
 import { obterTextoListaCompletaPartida, obterTextoQuitacaoMensalidade, obterStatusMembroEfetivo, obterDebitosDoJogador } from './utils/confirmationRules';
 import logoPelada from './assets/images/logo_pelada_batista_1780453160575.png';
-import { Calendar, Users, DollarSign, ShieldAlert, LogOut, Database, Award, User, Settings, UserCheck, History, CheckSquare, Check, X, Lock, Cake, TrendingUp } from 'lucide-react';
+import { Calendar, Users, DollarSign, ShieldAlert, LogOut, Database, Award, User, Settings, UserCheck, History, CheckSquare, Check, X, Lock, Cake, TrendingUp, UserPlus } from 'lucide-react';
 
 export default function App() {
   // Carregar estados iniciais do banco local simulado
@@ -341,6 +341,23 @@ export default function App() {
   const [mostrarPopUpAlertaMensalista, setMostrarPopUpAlertaMensalista] = useState(false);
   const [mostrarPopUpAlertaDiarista, setMostrarPopUpAlertaDiarista] = useState(false);
   const [diaristaDebitosParaAlerta, setDiaristaDebitosParaAlerta] = useState<any[]>([]);
+  const [mostrarPopUpAlertaAdminAprovacoes, setMostrarPopUpAlertaAdminAprovacoes] = useState(false);
+
+  // Alerta de novos cadastros pendentes para o administrador após login
+  useEffect(() => {
+    if (jogadorAtual && jogadorAtual.role === 'admin') {
+      const sessaoAlertaAdminChave = `alerta_admin_aprovacoes_mostrada_${jogadorAtual.id}`;
+      const jaMostradoAdmin = sessionStorage.getItem(sessaoAlertaAdminChave);
+      
+      const pendentes = jogadores.filter(j => j.status === 'pendente_aprovacao');
+      if (pendentes.length > 0 && !jaMostradoAdmin) {
+        setMostrarPopUpAlertaAdminAprovacoes(true);
+        sessionStorage.setItem(sessaoAlertaAdminChave, 'true');
+      }
+    } else {
+      setMostrarPopUpAlertaAdminAprovacoes(false);
+    }
+  }, [jogadorAtual, jogadores]);
 
   // Helpers de status de membros dinâmicos/efetivos baseados em adimplência
   const jogadorAtualEfetivo = useMemo(() => {
@@ -1010,37 +1027,22 @@ export default function App() {
               title="Lista de Confirmação"
             >
               <CheckSquare className="w-4.5 h-4.5 text-emerald-400 shrink-0" />
-              <span className="whitespace-nowrap text-left">Presenças</span>
+              <span className="whitespace-nowrap text-left">Confirmação</span>
             </button>
 
             <button
-              id="tab-elenco"
+              id="tab-historico"
               type="button"
-              onClick={() => setActiveTab('elenco')}
+              onClick={() => setActiveTab('historico')}
               className={`py-2 md:py-3 px-3 md:px-4 text-xs font-bold transition-all relative flex items-center justify-center md:justify-start gap-2.5 rounded-xl border-l-2 md:border-l-4 shrink-0 leading-none ${
-                activeTab === 'elenco' 
+                activeTab === 'historico' 
                   ? 'text-white font-extrabold bg-white/10 border-teal-400 pl-3' 
                   : 'text-emerald-300 hover:text-white hover:bg-white/5 border-transparent'
               }`}
-              title="Elenco Cadastrado"
+              title="Histórico de Jogos"
             >
-              <Users className="w-4.5 h-4.5 text-emerald-400 shrink-0" />
-              <span className="whitespace-nowrap text-left">Elenco</span>
-            </button>
-
-            <button
-              id="tab-financeiro"
-              type="button"
-              onClick={() => setActiveTab('financeiro')}
-              className={`py-2 md:py-3 px-3 md:px-4 text-xs font-bold transition-all relative flex items-center justify-center md:justify-start gap-2.5 rounded-xl border-l-2 md:border-l-4 shrink-0 leading-none ${
-                activeTab === 'financeiro' 
-                  ? 'text-white font-extrabold bg-white/10 border-teal-400 pl-3' 
-                  : 'text-emerald-300 hover:text-white hover:bg-white/5 border-transparent'
-              }`}
-              title="Pagamentos"
-            >
-              <DollarSign className="w-4.5 h-4.5 text-emerald-400 shrink-0" />
-              <span className="whitespace-nowrap text-left">Pagamentos</span>
+              <History className="w-4.5 h-4.5 text-emerald-400 shrink-0" />
+              <span className="whitespace-nowrap text-left">Histórico</span>
             </button>
 
             <button
@@ -1059,18 +1061,33 @@ export default function App() {
             </button>
 
             <button
-              id="tab-historico"
+              id="tab-elenco"
               type="button"
-              onClick={() => setActiveTab('historico')}
+              onClick={() => setActiveTab('elenco')}
               className={`py-2 md:py-3 px-3 md:px-4 text-xs font-bold transition-all relative flex items-center justify-center md:justify-start gap-2.5 rounded-xl border-l-2 md:border-l-4 shrink-0 leading-none ${
-                activeTab === 'historico' 
+                activeTab === 'elenco' 
                   ? 'text-white font-extrabold bg-white/10 border-teal-400 pl-3' 
                   : 'text-emerald-300 hover:text-white hover:bg-white/5 border-transparent'
               }`}
-              title="Histórico de Jogos"
+              title="Elenco Cadastrado"
             >
-              <History className="w-4.5 h-4.5 text-emerald-400 shrink-0" />
-              <span className="whitespace-nowrap text-left">Histórico</span>
+              <Users className="w-4.5 h-4.5 text-emerald-400 shrink-0" />
+              <span className="whitespace-nowrap text-left">Participantes</span>
+            </button>
+
+            <button
+              id="tab-financeiro"
+              type="button"
+              onClick={() => setActiveTab('financeiro')}
+              className={`py-2 md:py-3 px-3 md:px-4 text-xs font-bold transition-all relative flex items-center justify-center md:justify-start gap-2.5 rounded-xl border-l-2 md:border-l-4 shrink-0 leading-none ${
+                activeTab === 'financeiro' 
+                  ? 'text-white font-extrabold bg-white/10 border-teal-400 pl-3' 
+                  : 'text-emerald-300 hover:text-white hover:bg-white/5 border-transparent'
+              }`}
+              title="Pagamentos"
+            >
+              <DollarSign className="w-4.5 h-4.5 text-emerald-400 shrink-0" />
+              <span className="whitespace-nowrap text-left">Pagamentos</span>
             </button>
 
             {jogadorAtual.role === 'admin' && (
@@ -1120,7 +1137,7 @@ export default function App() {
                 title="Configuração do Sistema"
               >
                 <Settings className="w-4.5 h-4.5 text-emerald-400 shrink-0" />
-                <span className="whitespace-nowrap text-left">Sua Conta / PIX</span>
+                <span className="whitespace-nowrap text-left">Configuração</span>
               </button>
             )}
 
@@ -1412,6 +1429,117 @@ export default function App() {
                 id="btn-popup-fechar-diaria"
                 type="button"
                 onClick={() => setMostrarPopUpAlertaDiarista(false)}
+                className="py-2.5 px-4 rounded-xl border border-white/10 hover:bg-white/5 text-emerald-300 hover:text-white transition-all text-xs cursor-pointer"
+              >
+                Fechar
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {/* POPUP DE ALERTA DE NOVOS CADASTROS PENDENTES PARA O ADMIN APÓS LOGIN */}
+      {mostrarPopUpAlertaAdminAprovacoes && jogadorAtual && jogadorAtual.role === 'admin' && (
+        <div 
+          id="popup-alerta-admin-aprovacoes"
+          className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/80 backdrop-blur-md animate-fade-in"
+        >
+          <div className="bg-emerald-950 border border-teal-500/30 rounded-2xl max-w-lg w-full p-6 text-left shadow-2xl relative animate-scale-up max-h-[90vh] flex flex-col">
+            <div className="flex items-center justify-between border-b border-white/10 pb-3.5 mb-4 shrink-0">
+              <div className="flex items-center gap-3">
+                <div className="w-10 h-10 bg-teal-500/10 border border-teal-500/30 text-teal-400 rounded-xl flex items-center justify-center shrink-0">
+                  <UserPlus className="w-5 h-5 animate-pulse" />
+                </div>
+                <div>
+                  <h3 className="font-display font-black text-sm uppercase tracking-wide text-teal-300">Novos Cadastros Pendentes</h3>
+                  <p className="text-[10px] text-emerald-400/80 font-mono">Solicitações de entrada aguardando aprovação</p>
+                </div>
+              </div>
+              <button
+                type="button"
+                onClick={() => setMostrarPopUpAlertaAdminAprovacoes(false)}
+                className="text-emerald-400 hover:text-white p-1 rounded-lg hover:bg-white/5 transition-colors cursor-pointer"
+                title="Fechar"
+              >
+                <X className="w-5 h-5" />
+              </button>
+            </div>
+            
+            <p className="text-xs text-emerald-200 leading-relaxed font-sans mb-4 shrink-0">
+              Olá, Administrador <b>{jogadorAtual.nome}</b>. Identificamos novos atletas aguardando liberação de acesso para participar da nossa lista de jogos:
+            </p>
+            
+            <div className="flex-grow overflow-y-auto space-y-3 pr-1 mb-5 select-none scrollbar-thin">
+              {jogadores.filter(j => j.status === 'pendente_aprovacao').map((j) => (
+                <div 
+                  key={j.id} 
+                  className="p-3.5 bg-emerald-900/40 rounded-xl border border-white/5 flex flex-col sm:flex-row sm:items-center justify-between gap-3 transition-all hover:bg-emerald-900/60"
+                >
+                  <div className="flex items-center gap-3 min-w-0">
+                    <div 
+                      className="w-9 h-9 rounded-full flex items-center justify-center text-xs font-bold shrink-0 shadow-inner overflow-hidden text-black font-sans"
+                      style={{ 
+                        backgroundColor: getSessaoAvatarProps ? getSessaoAvatarProps(j.foto || '').color : '#10b981',
+                        color: getSessaoAvatarProps && getSessaoAvatarProps(j.foto || '').text === '⚪' ? '#fff' : '#000'
+                      }}
+                    >
+                      {j.foto && (j.foto.startsWith('http') || j.foto.startsWith('data:')) ? (
+                        <img src={j.foto} className="w-full h-full object-cover rounded-full" alt="" referrerPolicy="no-referrer" />
+                      ) : (
+                        j.nome.substring(0, 1).toUpperCase()
+                      )}
+                    </div>
+                    <div className="min-w-0">
+                      <p className="text-xs font-bold text-white truncate leading-tight">{j.nome} {j.sobrenome}</p>
+                      <p className="text-[10px] text-emerald-300/80 mt-0.5 font-sans flex flex-wrap items-center gap-1.5 leading-none">
+                        <span className="bg-emerald-950 text-emerald-400 px-1.5 py-0.5 rounded font-bold">{j.posicao}</span>
+                        <span>•</span>
+                        <span>{j.mensalistaStatus === 'mensalista' ? '🟢 Mensalista' : j.mensalistaStatus === 'isento' ? '⭐ Isento' : '🔵 Diarista'}</span>
+                      </p>
+                    </div>
+                  </div>
+                  
+                  <div className="flex gap-2 shrink-0">
+                    <button
+                      type="button"
+                      onClick={() => handleAprovarJogador(j.id, true)}
+                      className="px-3 py-1.5 bg-teal-500 hover:bg-teal-400 text-emerald-950 font-black text-[10px] uppercase rounded-lg transition-all flex items-center gap-1 cursor-pointer active:scale-95"
+                    >
+                      <Check className="w-3.5 h-3.5" />
+                      Aprovar
+                    </button>
+                    <button
+                      type="button"
+                      onClick={() => handleAprovarJogador(j.id, false)}
+                      className="px-3 py-1.5 bg-rose-500/10 hover:bg-rose-500 border border-rose-500/30 hover:border-transparent text-rose-300 hover:text-white font-bold text-[10px] uppercase rounded-lg transition-all flex items-center gap-1 cursor-pointer active:scale-95"
+                    >
+                      <X className="w-3.5 h-3.5" />
+                      Rejeitar
+                    </button>
+                  </div>
+                </div>
+              ))}
+              {jogadores.filter(j => j.status === 'pendente_aprovacao').length === 0 && (
+                <div className="text-center py-6 text-emerald-400/60 italic text-xs">
+                  Todos os cadastros pendentes já foram processados!
+                </div>
+              )}
+            </div>
+
+            <div className="shrink-0 border-t border-white/10 pt-4 flex gap-3">
+              <button
+                type="button"
+                onClick={() => {
+                  setMostrarPopUpAlertaAdminAprovacoes(false);
+                  setActiveTab('admin');
+                }}
+                className="flex-1 bg-white hover:bg-emerald-100 text-black font-extrabold py-2.5 rounded-xl transition-all shadow-md active:scale-97 text-xs flex items-center justify-center gap-1.5 cursor-pointer"
+              >
+                Painel Completo de Aprovações
+              </button>
+              <button
+                type="button"
+                onClick={() => setMostrarPopUpAlertaAdminAprovacoes(false)}
                 className="py-2.5 px-4 rounded-xl border border-white/10 hover:bg-white/5 text-emerald-300 hover:text-white transition-all text-xs cursor-pointer"
               >
                 Fechar

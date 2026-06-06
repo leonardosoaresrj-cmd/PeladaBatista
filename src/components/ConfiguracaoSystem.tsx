@@ -257,7 +257,11 @@ export default function ConfiguracaoSystem({
                 <button
                   id="btn-enviar-teste-wa"
                   type="button"
-                  onClick={onSendTestAlert}
+                  onClick={() => {
+                    onSendTestAlert();
+                    setSuccessMsg('Alerta de teste enviado com sucesso! Verifique a tabela de Logs abaixo.');
+                    setTimeout(() => setSuccessMsg(''), 4000);
+                  }}
                   className="bg-emerald-950 hover:bg-emerald-900 border border-white/10 text-emerald-300 text-xs px-3.5 rounded-lg flex items-center gap-1.5 transition-colors cursor-pointer"
                   title="Disparar alerta de teste no simulador"
                 >
@@ -272,69 +276,6 @@ export default function ConfiguracaoSystem({
                 </p>
               )}
             </form>
-          </div>
-
-          {/* MANUAL PASSO A PASSO DA CONFIGURAÇÃO DO BOT */}
-          <div className="bg-emerald-900/40 border border-white/10 rounded-2xl p-5 shadow-xl backdrop-blur-sm space-y-4">
-            <h3 className="font-display font-semibold text-xs text-teal-300 flex items-center gap-2 uppercase tracking-wide">
-              <ShieldCheck className="w-4 h-4 text-teal-400 font-bold" />
-              Guia Completo: Instalar Bot de WhatsApp Real
-            </h3>
-            
-            <p className="text-[11px] text-emerald-250 leading-relaxed font-sans">
-              Para fazer o disparo automático e real das confirmações de presença e notificações de depósitos para o grupo de WhatsApp oficial da sua pelada, siga o tutorial de instalação do microsserviço oficial:
-            </p>
-
-            <div className="space-y-4 text-xs">
-              <div className="space-y-1">
-                <p className="font-bold text-white text-[11px] flex items-center gap-1.5 leading-none">
-                  <span className="w-4 h-4 rounded-full bg-emerald-950 border border-teal-500/30 text-[9px] font-mono font-bold flex items-center justify-center text-teal-300">1</span>
-                  Preparar arquivos do Servidor Bot
-                </p>
-                <p className="text-[10.5px] text-emerald-300/80 ml-5 leading-relaxed">
-                  Criamos um script Node autônomo baseado no <strong>whatsapp-web.js (ou Baileys)</strong> pronto para rodar. Crie uma pasta vazia em seu computador ou servidor e salve o arquivo do bot (veja <code>scripts/whatsapp-bot.js</code> no código deste projeto).
-                </p>
-              </div>
-
-              <div className="space-y-1.5">
-                <p className="font-bold text-white text-[11px] flex items-center gap-1.5 leading-none">
-                  <span className="w-4 h-4 rounded-full bg-emerald-950 border border-teal-500/30 text-[9px] font-mono font-bold flex items-center justify-center text-teal-300">2</span>
-                  Instalar Dependências e Executar
-                </p>
-                <p className="text-[10.5px] text-emerald-300/80 ml-5 leading-relaxed">
-                  Abra o terminal do seu computador dentro da pasta do bot e instale os pacotes requeridos rodando:
-                </p>
-                <div className="ml-5 bg-emerald-950/80 border border-white/5 p-2 rounded-lg font-mono text-[9px] text-teal-300 overflow-x-auto select-all">
-                  npm install express body-parser qrcode-terminal whatsapp-web.js
-                </div>
-                <p className="text-[10.5px] text-emerald-300/80 ml-5 leading-relaxed">
-                  Para iniciar e disponibilizar a API local, rode o comando:
-                </p>
-                <div className="ml-5 bg-emerald-950/80 border border-white/5 p-2 rounded-lg font-mono text-[9px] text-teal-300 overflow-x-auto select-all">
-                  node whatsapp-bot.js
-                </div>
-              </div>
-
-              <div className="space-y-1">
-                <p className="font-bold text-white text-[11px] flex items-center gap-1.5 leading-none">
-                  <span className="w-4 h-4 rounded-full bg-emerald-950 border border-teal-500/30 text-[9px] font-mono font-bold flex items-center justify-center text-teal-300">3</span>
-                  Escanear o QR Code de Vinculação
-                </p>
-                <p className="text-[10.5px] text-emerald-300/80 ml-5 leading-relaxed">
-                  Assim que inicializar, um correspondente <strong>QR Code</strong> será impresso no terminal. Abra seu WhatsApp celular &gt; <strong>Aparelhos Conectados</strong> &gt; escanete o QR Code para conectar a conta ativa do Bot.
-                </p>
-              </div>
-
-              <div className="space-y-1">
-                <p className="font-bold text-white text-[11px] flex items-center gap-1.5 leading-none">
-                  <span className="w-4 h-4 rounded-full bg-emerald-950 border border-teal-500/30 text-[9px] font-mono font-bold flex items-center justify-center text-teal-300">4</span>
-                  Acoplar o Webhook acima
-                </p>
-                <p className="text-[10.5px] text-emerald-300/80 ml-5 leading-relaxed">
-                  Copie o endereço local impresso: <code>http://localhost:5000/api/messages/send</code> (ou utilize ngrok para obter link público se hospedado em VPS pública) e cole no input <strong>Webhook URL de Disparo</strong> acima. Salve a configuração e clique em <strong>Alerta Teste</strong>!
-                </p>
-              </div>
-            </div>
           </div>
 
           {/* HISTÓRICO DE LOGS DA AUTOMAÇÃO */}
