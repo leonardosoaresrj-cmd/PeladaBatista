@@ -300,7 +300,7 @@ export default function ControlePagamentos({
               {isGoleiro ? (
                 <div className="text-center w-full max-w-md space-y-2">
                   <p className="text-xs text-teal-200 leading-relaxed font-sans bg-teal-500/10 border border-teal-500/20 p-3 rounded-xl">
-                    ✓ <b>Livre de pendências!</b> Você tem acesso total de goleiro oficial confirmado aos rachas. Não há cobranças emitidas para o seu PIN.
+                    ✓ <b>Livre de pendências!</b> Você tem acesso total de goleiro oficial confirmado aos jogos. Não há cobranças emitidas para o seu PIN.
                   </p>
                 </div>
               ) : debitosPessoais.length === 0 ? (
@@ -312,7 +312,7 @@ export default function ControlePagamentos({
               ) : hasPendenteConfirmacaoOnly ? (
                 <div className="text-center w-full max-w-md space-y-3 pt-1">
                   <p className="text-xs text-amber-200 leading-relaxed font-sans bg-amber-500/10 border border-amber-500/20 p-3 rounded-xl">
-                    ✓ <b>Comprovantes de pagamento informados!</b> Todos os seus débitos (<b>R$ {totalConsolidado.toFixed(2)}</b>) estão sendo analisados pela administração do caixa.
+                    ✓ <b>Comprovantes de pagamento informados!</b> Todos os seus débitos (<b>R$ {totalConsolidado.toFixed(2)}</b>) estão sendo analisados pela administração.
                   </p>
                   
                   <a

@@ -175,7 +175,7 @@ export default function LoginCadastro({ jogadores, onLoginSuccess, onRegistrar }
             <Users className="w-6 h-6" />
           </div>
           <h2 className="text-2xl font-display font-bold text-white tracking-wide">PELADA BATISTA SÁBADO</h2>
-          <p className="text-xs text-emerald-400 font-semibold tracking-widest uppercase mt-0.5">Gestão de Partidas de Futebol e Caixa</p>
+          <p className="text-xs text-emerald-400 font-semibold tracking-widest uppercase mt-0.5">Gestão de Partidas de Futebol e Finanças</p>
         </div>
 
         {/* Abas */}
@@ -386,7 +386,7 @@ export default function LoginCadastro({ jogadores, onLoginSuccess, onRegistrar }
                     <Check className="w-4 h-4" />
                     <span>Cadastro Pré-Registrado!</span>
                   </div>
-                  <p>Sua conta foi criada no portal com sucesso. Para segurança do campeonato, um **administrador do racha** deve aprovar seu cadastro antes de habilitar seu login com este PIN.</p>
+                  <p>Sua conta foi criada no portal com sucesso. Para segurança do campeonato, um **administrador do jogo** deve aprovar seu cadastro antes de habilitar seu login com este PIN.</p>
                 </div>
               )}
 

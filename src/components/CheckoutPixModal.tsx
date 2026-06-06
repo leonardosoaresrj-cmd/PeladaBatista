@@ -391,7 +391,7 @@ export default function CheckoutPixModal({
                     <p className="text-[9.5px] text-emerald-300 mt-0.5 leading-normal">
                       {mpConfiguracao.accessTokenConfigured
                         ? 'Integração de pagamento ativa. Resoluções e checagem de recebimento automáticos.'
-                        : 'O simulador permite a você aprovar o pagamento na hora para testar o sistema racha.'}
+                        : 'O simulador permite a você aprovar o pagamento na hora para testar o sistema de jogo.'}
                     </p>
                   </div>
                 </div>

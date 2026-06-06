@@ -47,7 +47,7 @@ export default function CalendarioJogos({
 
   // Estado para modal de agendamento por clique no calendário (Admin)
   const [showSchedulerModal, setShowSchedulerModal] = useState(false);
-  const [newGameTitulo, setNewGameTitulo] = useState('Pelada Arena Record Oficial');
+  const [newGameTitulo, setNewGameTitulo] = useState('Pelada Batista Sábado');
   const [selectedDateForNewGame, setSelectedDateForNewGame] = useState(() => {
     const hoje = new Date();
     const mm = (hoje.getMonth() + 1).toString().padStart(2, '0');
@@ -206,18 +206,18 @@ export default function CalendarioJogos({
                 return (
                   <div className={`p-4 rounded-xl text-xs flex items-start gap-2.5 border ${
                     isFechado 
-                      ? 'bg-amber-955/45 border-amber-500/20 text-amber-200 shadow' 
+                      ? 'bg-amber-950/45 border-amber-500/20 text-amber-200 shadow' 
                       : 'bg-emerald-950/45 border-emerald-500/25 text-emerald-100 shadow'
                   }`}>
                     <AlertTriangle className={`w-4.5 h-4.5 shrink-0 mt-0.5 ${isFechado ? 'text-amber-400' : 'text-emerald-400'}`} />
                     <div>
                       <h5 className="font-bold uppercase tracking-wide text-[10px] flex items-center gap-1.5">
-                        <span>Regulamento de Confirmação ({proximaPartidaSelec.titulo})</span>
+                        <span>Regulamento de Confirmação</span>
                         <span className={`px-1.5 py-0.5 rounded text-[8px] font-extrabold ${isFechado ? 'bg-amber-500 text-black' : 'bg-emerald-500 text-black animate-pulse'}`}>
                           {isFechado ? 'FECHADO' : 'ABERTO'}
                         </span>
                       </h5>
-                      <p className="mt-1 leading-relaxed text-[11px] text-emerald-250">
+                      <p className="mt-1 leading-relaxed text-[11px] text-emerald-300">
                         Início: Terça-feira (<b>{jan.inicio.toLocaleDateString('pt-BR')}</b>) às 00:00 até Sexta-feira (<b>{jan.fim.toLocaleDateString('pt-BR')}</b>) às 23:59.
                       </p>
                     </div>
@@ -268,7 +268,7 @@ export default function CalendarioJogos({
                     } else if (isAdmin) {
                       // CASO SEJA CLICADO EM UMA DATA SEM JOGO AGENDADO E SEJA ADMIN, ABRIR O POP UP DE CADASTRO DE NOVO JOGO
                       setSelectedDateForNewGame(dataString);
-                      setNewGameTitulo('Pelada Arena Record Oficial');
+                      setNewGameTitulo('Pelada Batista Sábado');
                       setNewGameLocal('Arena Record - Quadra Principal');
                       setNewGameHoraInicio('08:05');
                       setNewGameHoraFim('10:05');
@@ -360,7 +360,7 @@ export default function CalendarioJogos({
               <span className="font-mono text-[10px] text-emerald-450">Código: #{jogoPassadoSelecionado.id.substring(0, 8)}</span>
             </div>
 
-            <div className="grid grid-cols-1 sm:grid-cols-3 gap-2 pt-2 text-[11px] text-emerald-250 border-t border-white/5">
+            <div className="grid grid-cols-1 sm:grid-cols-3 gap-2 pt-2 text-[11px] text-emerald-300 border-t border-white/5">
               <div className="flex items-center gap-1.5">
                 <CalendarIcon className="w-3.5 h-3.5 text-emerald-400 shrink-0" />
                 <span>Dia: <b className="text-white font-mono">{formatarDataAmigavel(jogoPassadoSelecionado.data)}</b></span>
@@ -566,7 +566,7 @@ export default function CalendarioJogos({
                           {isFechado ? 'FECHADO' : 'ABERTO'}
                         </span>
                       </h5>
-                      <p className="mt-1 leading-relaxed text-[11px] text-emerald-250 font-sans">
+                      <p className="mt-1 leading-relaxed text-[11px] text-emerald-300 font-sans">
                         Regulamento: Terça-feira (<b>{jan.inicio.toLocaleDateString('pt-BR')}</b>) às 00:00 até Sexta-feira (<b>{jan.fim.toLocaleDateString('pt-BR')}</b>) às 23:59.
                       </p>
                     </div>
@@ -578,7 +578,7 @@ export default function CalendarioJogos({
               {isFutureMatch && (
                 <div className="bg-emerald-900/10 border border-emerald-500/20 rounded-xl p-4 space-y-3">
                   <div className="flex items-center justify-between">
-                    <span className="text-xs font-bold text-emerald-250 font-sans">Sua Presença neste Jogo:</span>
+                    <span className="text-xs font-bold text-emerald-300 font-sans">Sua Presença neste Jogo:</span>
                     {isConfirmado ? (
                       <span className="text-[10.5px] font-black bg-teal-500 text-emerald-950 px-2 py-0.5 rounded uppercase">
                         ✅ Confirmado
@@ -690,7 +690,7 @@ export default function CalendarioJogos({
                       id="btn-deletar-partida-popup"
                       type="button"
                       onClick={() => setShowConfirmDelete(true)}
-                      className="bg-rose-955/80 hover:bg-rose-700 text-rose-250 hover:text-white border border-rose-500/30 font-bold text-xs px-3 py-2 rounded-xl transition-all flex items-center gap-1.5 cursor-pointer shadow-md"
+                      className="bg-rose-900/80 hover:bg-rose-700 text-rose-200 hover:text-white border border-rose-500/30 font-bold text-xs px-3 py-2 rounded-xl transition-all flex items-center gap-1.5 cursor-pointer shadow-md"
                     >
                       <Trash2 className="w-3.5 h-3.5" />
                       Deletar Jogo (Admin)
@@ -794,7 +794,7 @@ export default function CalendarioJogos({
                   <input
                     type="text"
                     required
-                    placeholder="Ex: Pelada Arena Record Oficial"
+                    placeholder="Ex: Pelada Batista Sábado"
                     value={newGameTitulo}
                     onChange={(e) => setNewGameTitulo(e.target.value)}
                     className="w-full bg-emerald-900 border border-white/10 text-white placeholder-emerald-600 rounded-lg p-2.5 text-xs focus:outline-none focus:border-emerald-500"

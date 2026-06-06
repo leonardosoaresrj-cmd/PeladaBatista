@@ -397,7 +397,7 @@ export default function ConfiguracaoSystem({
           <div className="bg-emerald-900/40 border border-white/10 rounded-2xl p-5 shadow-xl backdrop-blur-sm space-y-4">
             <h3 className="font-display font-semibold text-sm text-white flex items-center gap-2 uppercase tracking-wide">
               <Coins className="w-4 h-4 text-emerald-400" />
-              Parâmetros de Cálculo de Tarifas e Caixa
+              Parâmetros de Cálculo de Tarifas e Finanças
             </h3>
             
             <p className="text-xs text-emerald-300/85 leading-relaxed font-sans">

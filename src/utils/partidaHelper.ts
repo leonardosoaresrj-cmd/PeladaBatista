@@ -43,7 +43,7 @@ export function mesclarPartidasAutomáticas(partidasSalvas: Partida[]): Partida[
       // Criar a partida automática com as configurações padrão
       result.push({
         id: `sat-${sabadoData}`,
-        titulo: 'Racha Arena Record Oficial',
+        titulo: 'Pelada Batista Sábado',
         data: sabadoData,
         horario: '08:00 às 10:00',
         local: 'Campo do Meio do Colégio Batista - Tijuca',

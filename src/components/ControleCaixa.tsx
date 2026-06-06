@@ -653,9 +653,9 @@ export default function ControleCaixa({
         <div className="text-left">
           <h2 id="titulo-caixa" className="font-display font-semibold text-lg text-white flex items-center gap-2 uppercase tracking-wide">
             <TrendingUp className="w-5 h-5 text-teal-400" />
-            Controle de Caixa Geral
+            Controle Financeiro Geral
           </h2>
-          <p className="text-xs text-emerald-300/85 font-sans mt-0.5">Gestão financeira de caixa consolidada, faturamento, rateio e auditorias administradoras.</p>
+          <p className="text-xs text-emerald-300/85 font-sans mt-0.5">Gestão financeira consolidada, faturamento, rateio e auditorias administradoras.</p>
         </div>
 
         {/* CONTROLES DE ESCOPO E FILTROS */}
@@ -1061,17 +1061,17 @@ export default function ControleCaixa({
       {/* SUB-ÁREAS FINANCEIRAS */}
       <div className="grid grid-cols-1 lg:grid-cols-12 gap-6 items-start">
         
-        {/* SUBGERÊNCIA 1: CAIXA E PAGAMENTOS DO JOGO ATUAL (Col: 7/12) */}
+        {/* SUBGERÊNCIA 1: FINANCEIRO E PAGAMENTOS DO JOGO ATUAL (Col: 7/12) */}
         <div className="lg:col-span-7 bg-emerald-900/40 border border-white/10 rounded-2xl p-5 shadow-xl backdrop-blur-sm space-y-4 text-left">
           <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between border-b border-white/10 pb-3.5 gap-2.5">
             <div className="space-y-0.5">
               <h3 className="font-display font-semibold text-sm text-teal-300 flex items-center gap-2 uppercase tracking-wide">
                 <span className="w-2.5 h-2.5 rounded-full bg-teal-400" />
-                1. Caixa do Jogo {visaoEscopo === 'mensal' ? 'Atual' : 'Selecionado'} & Rateios
+                1. Financeiro do Jogo {visaoEscopo === 'mensal' ? 'Atual' : 'Selecionado'} & Rateios
               </h3>
               <p className="text-[10px] text-emerald-300/80 font-sans">
                 {visaoEscopo === 'mensal'
-                  ? 'Selecione uma partida de sábado ou racha avulso para auditar receitas e despesas.'
+                  ? 'Selecione uma partida de sábado ou jogo avulso para auditar receitas e despesas.'
                   : `Demonstrativo de rateio de partidas em todo o ano de ${anoSelecionado}.`}
               </p>
             </div>
@@ -1133,7 +1133,7 @@ export default function ControleCaixa({
               <div className="space-y-2">
                 <h4 className="text-xs font-bold uppercase tracking-wider text-white">Status de Pagamento dos Confirmados ({analiseJogoDetalhes.totalConfirmados})</h4>
                 {analiseJogoDetalhes.listaAtletas.length === 0 ? (
-                  <p className="text-xs font-sans italic text-emerald-500/50 text-center py-4 bg-emerald-950/20 rounded-lg">Nenhum jogador confirmado para este racha no momento.</p>
+                  <p className="text-xs font-sans italic text-emerald-500/50 text-center py-4 bg-emerald-950/20 rounded-lg">Nenhum jogador confirmado para este jogo no momento.</p>
                 ) : (
                   <div className="max-h-72 overflow-y-auto pr-1 space-y-1 font-sans">
                     {analiseJogoDetalhes.listaAtletas.map((atl, index) => {
@@ -1197,8 +1197,8 @@ export default function ControleCaixa({
             </div>
           ) : (
             <div className="text-center py-10 bg-emerald-950/20 border border-white/5 rounded-2xl">
-              <p className="text-emerald-500 font-sans italic text-xs">Nenhum racha / jogo ativo encontrado neste escopo.</p>
-              <p className="text-[10.5px] text-emerald-400 font-sans mt-1">Crie jogos no calendário ou mude filtros para auditar os caixas de partida.</p>
+              <p className="text-emerald-500 font-sans italic text-xs">Nenhum jogo ativo encontrado neste escopo.</p>
+              <p className="text-[10.5px] text-emerald-400 font-sans mt-1">Crie jogos no calendário ou mude filtros para auditar o financeiro das partidas.</p>
             </div>
           )}
         </div>
@@ -1273,7 +1273,7 @@ export default function ControleCaixa({
           <div className="space-y-1">
             <h3 className="font-display font-semibold text-base text-amber-400 flex items-center gap-2 uppercase tracking-wide">
               <span className="w-2.5 h-2.5 rounded-full bg-amber-400 animate-ping" />
-              Aprovações Pendentes de Caixa (Confirmação Financeira)
+              Aprovações Pendentes de Pagamento (Confirmação Financeira)
             </h3>
             <p className="text-xs text-emerald-300/80 font-sans">
               Membros que informaram pagamento próprio. Verifique o comprovante e confirme ou estorne o pagamento.
@@ -1541,7 +1541,7 @@ export default function ControleCaixa({
                   <th className="py-3 px-4 font-bold">Data do Pagamento</th>
                   <th className="py-3 px-4 font-bold">Mês/Dia de Referência</th>
                   <th className="py-3 px-4 font-bold text-right">Valor Pago</th>
-                  <th className="py-3 px-4 font-bold text-center">Status no Caixa</th>
+                  <th className="py-3 px-4 font-bold text-center">Status</th>
                 </tr>
               </thead>
               <tbody className="divide-y divide-white/5">
@@ -1644,7 +1644,7 @@ export default function ControleCaixa({
             <div className="flex items-center justify-between border-b border-white/10 pb-4">
               <div className="space-y-1 text-left">
                 <span className="text-[10px] font-mono tracking-wider font-bold text-teal-400 bg-teal-500/10 px-2.5 py-0.5 rounded-full uppercase">
-                  Auditoria de Caixa
+                  Auditoria Financeira
                 </span>
                 <h3 className="font-display font-black text-lg text-white uppercase tracking-wider">
                   Detalhamento de {statsModal.nomeMesExtenso}

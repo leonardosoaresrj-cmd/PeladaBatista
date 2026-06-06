@@ -576,7 +576,7 @@ export default function ConfirmacaoPresenca({
               return (
                 <div className={`p-4 rounded-2xl text-xs flex items-start gap-2.5 border ${
                   isFechado 
-                    ? 'bg-amber-955/45 border-amber-500/20 text-amber-200 shadow' 
+                    ? 'bg-amber-950/45 border-amber-500/20 text-amber-200 shadow' 
                     : 'bg-emerald-950/45 border-emerald-500/25 text-emerald-100 shadow'
                 }`}>
                   <AlertTriangle className={`w-4.5 h-4.5 shrink-0 mt-0.5 ${isFechado ? 'text-amber-400' : 'text-emerald-400'}`} />
@@ -584,11 +584,11 @@ export default function ConfirmacaoPresenca({
                     <h5 className="font-bold uppercase tracking-wide text-[10px] flex items-center gap-1">
                       {isFechado ? '🚨 Janela de Confirmação Fechada' : '✅ Janela de Confirmação Aberta'}
                     </h5>
-                    <p className="mt-0.5 leading-relaxed text-[11px] text-emerald-250">
+                    <p className="mt-0.5 leading-relaxed text-[11px] text-emerald-300">
                       Regulamento: Terça-feira (<b>{jan.inicio.toLocaleDateString('pt-BR')}</b>) às 00:00 até Sexta-feira (<b>{jan.fim.toLocaleDateString('pt-BR')}</b>) às 23:59.
                     </p>
                     {isFechado && (
-                      <span className="inline-block mt-1.5 text-[8.5px] bg-amber-550 text-black px-2 py-0.5 font-black uppercase rounded tracking-wider">FORA DO PRAZO DE REGULAMENTO</span>
+                      <span className="inline-block mt-1.5 text-[8.5px] bg-amber-500 text-black px-2 py-0.5 font-black uppercase rounded tracking-wider">FORA DO PRAZO DE REGULAMENTO</span>
                     )}
                   </div>
                 </div>
@@ -634,10 +634,10 @@ export default function ConfirmacaoPresenca({
                         Confirmação Bloqueada
                       </div>
                       <p className="text-[11px] text-rose-200 leading-relaxed font-sans">
-                        Você possui diárias pendentes de pagamento. Atletas diaristas com pendências financeiras no caixa estão impedidos de confirmar presença em novos jogos.
+                        Você possui diárias pendentes de pagamento. Atletas diaristas com pendências financeiras estão impedidos de confirmar presença em novos jogos.
                       </p>
                       <div className="text-[10px] text-rose-350 font-mono">
-                        Acesse a aba <b>Mensalidades/Caixa</b> para informar seu pagamento e aguarde a aprovação do administrador.
+                        Acesse a aba <b>Pagamentos</b> para informar seu pagamento e aguarde a aprovação do administrador.
                       </div>
                     </div>
                   ) : (
@@ -1480,7 +1480,7 @@ export default function ConfirmacaoPresenca({
 
             <div className="space-y-3.5 text-left text-xs font-sans text-rose-100">
               <p className="leading-relaxed text-[11.5px]">
-                Prezado(a) <strong className="text-white">{jogadorAtual.nome} {jogadorAtual.sobrenome}</strong>, detectamos débitos pendentes de quitação no caixa.
+                Prezado(a) <strong className="text-white">{jogadorAtual.nome} {jogadorAtual.sobrenome}</strong>, detectamos débitos pendentes de quitação.
               </p>
 
               <div className="bg-black/40 border border-rose-500/15 p-3.5 rounded-xl space-y-2.5 max-h-48 overflow-y-auto font-mono text-[10.5px]">
@@ -1502,8 +1502,8 @@ export default function ConfirmacaoPresenca({
                 </div>
               </div>
 
-              <p className="text-[11px] text-rose-200/80 leading-relaxed italic bg-rose-500/5 p-3 rounded-xl border border-rose-500/10">
-                Por favor, solicitamos a regularização desses débitos no sistema para manter o compromisso com nossa pelada e com o aluguel da quadra. Os débitos encontram-se descritos no seu histórico de mensalidades/caixa.
+              <p className="text-[11px] text-rose-250/80 leading-relaxed italic bg-rose-500/5 p-3 rounded-xl border border-rose-500/10">
+                Por favor, solicitamos a regularização desses débitos no sistema para manter o compromisso com nossa pelada e com o aluguel da quadra. Os débitos encontram-se descritos no seu histórico de mensalidades/pagamentos.
               </p>
             </div>
 

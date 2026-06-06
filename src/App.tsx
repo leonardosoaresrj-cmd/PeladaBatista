@@ -725,7 +725,7 @@ export default function App() {
       const dataString = partidaId.replace('sat-', '');
       partidaExistente = {
         id: partidaId,
-        titulo: 'Pelada Arena Record Oficial',
+        titulo: 'Pelada Batista Sábado',
         data: dataString,
         horario: '08:00 às 10:00',
         local: 'Campo do Meio do Colégio Batista - Tijuca',
@@ -793,7 +793,7 @@ export default function App() {
       const dataString = partidaId.replace('sat-', '');
       partidaExistente = {
         id: partidaId,
-        titulo: 'Pelada Arena Record Oficial',
+        titulo: 'Pelada Batista Sábado',
         data: dataString,
         horario: '08:00 às 10:00',
         local: 'Campo do Meio do Colégio Batista - Tijuca',
@@ -1083,10 +1083,10 @@ export default function App() {
                     ? 'text-white font-extrabold bg-white/10 border-teal-400 pl-3' 
                     : 'text-emerald-300 hover:text-white hover:bg-white/5 border-transparent'
                 }`}
-                title="Controle de Caixa"
+                title="Finanças Gerais"
               >
                 <TrendingUp className="w-4.5 h-4.5 text-emerald-400 shrink-0" />
-                <span className="whitespace-nowrap text-left">Caixa</span>
+                <span className="whitespace-nowrap text-left">Finanças</span>
               </button>
             )}
 
@@ -1318,7 +1318,7 @@ export default function App() {
             </div>
             
             <p className="text-xs text-emerald-250 leading-relaxed font-sans mb-4">
-              Olá, <b className="text-white">{jogadorAtual.nome}</b>. Identificamos que você possui uma <b>mensalidade em aberto ou pendente de confirmação</b> no caixa.
+              Olá, <b className="text-white">{jogadorAtual.nome}</b>. Identificamos que você possui uma <b>mensalidade em aberto ou pendente de confirmação</b>.
             </p>
             
             <div className="bg-amber-955/25 border border-amber-500/20 rounded-xl p-3 mb-5 text-[11px] text-amber-200 leading-relaxed font-sans">
@@ -1369,7 +1369,7 @@ export default function App() {
             </div>
             
             <p className="text-xs text-emerald-250 leading-relaxed font-sans mb-3.5">
-              Olá, <b className="text-white">{jogadorAtual.nome}</b>. Constam em nosso caixa <b>diárias pendentes de pagamento</b> vinculadas ao seu perfil de atleta avulso:
+              Olá, <b className="text-white">{jogadorAtual.nome}</b>. Constam <b>diárias pendentes de pagamento</b> vinculadas ao seu perfil de atleta avulso:
             </p>
 
             <div className="space-y-2 mb-4 max-h-[140px] overflow-y-auto pr-1">
