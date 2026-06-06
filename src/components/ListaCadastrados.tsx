@@ -178,8 +178,14 @@ export default function ListaCadastrados({
           
           {/* Jersey / Visual Avatar */}
           <div 
-            className="w-14 h-14 rounded-full flex flex-col items-center justify-center shrink-0 border border-white/10 relative shadow-inner overflow-hidden"
+            className="w-14 h-14 rounded-full flex flex-col items-center justify-center shrink-0 border border-white/10 relative shadow-inner overflow-hidden cursor-zoom-in hover:scale-105 active:scale-97 transition-all duration-200"
             style={{ backgroundColor: jersey.color }}
+            onClick={() => {
+              if (j.foto && (j.foto.startsWith('http') || j.foto.startsWith('data:'))) {
+                (window as any).ampliarFoto?.(j.foto, `${j.nome} ${j.sobrenome}`);
+              }
+            }}
+            title={j.foto ? "Clique para ampliar a foto" : undefined}
           >
             {j.foto && (j.foto.startsWith('http') || j.foto.startsWith('data:')) ? (
               <img src={j.foto} className="w-full h-full object-cover rounded-full" alt="Avatar" referrerPolicy="no-referrer" />

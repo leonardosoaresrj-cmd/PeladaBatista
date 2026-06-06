@@ -391,8 +391,7 @@ export default function ConfirmacaoPresenca({
                 <div
                   id={`confirmado-pcard-${j.id || index}`}
                   key={j.id || index} 
-                  onClick={() => handlePlayerClick(j)}
-                  className="flex items-center justify-between p-2.5 bg-white/5 rounded-xl group hover:bg-white/10 border border-white/5 hover:border-emerald-500/25 transition-all cursor-pointer"
+                  className="flex items-center justify-between p-2.5 bg-white/5 rounded-xl group hover:bg-white/10 border border-white/5 hover:border-emerald-500/25 transition-all select-none"
                 >
                   <div className="flex items-center gap-2.5 overflow-hidden">
                     {mostrarOrdem && (
@@ -401,8 +400,15 @@ export default function ConfirmacaoPresenca({
                       </span>
                     )}
                     <div 
-                      className="w-7.5 h-7.5 rounded-full flex items-center justify-center text-[10.5px] font-bold shadow shrink-0 overflow-hidden border border-white/10"
+                      className="w-7.5 h-7.5 rounded-full flex items-center justify-center text-[10.5px] font-bold shadow shrink-0 overflow-hidden border border-white/10 cursor-zoom-in hover:scale-110 active:scale-95 transition-all duration-200"
                       style={{ backgroundColor: style.color }}
+                      onClick={(e) => {
+                        e.stopPropagation();
+                        if (j.foto && (j.foto.startsWith('http') || j.foto.startsWith('data:'))) {
+                          (window as any).ampliarFoto?.(j.foto, `${j.nome} ${j.sobrenome}`);
+                        }
+                      }}
+                      title={j.foto ? "Clique para ampliar" : undefined}
                     >
                       {j.foto && (j.foto.startsWith('http') || j.foto.startsWith('data:')) ? (
                         <img src={j.foto} className="w-full h-full object-cover rounded-full" alt="" referrerPolicy="no-referrer" />
@@ -411,7 +417,11 @@ export default function ConfirmacaoPresenca({
                       )}
                     </div>
                     <div className="overflow-hidden min-w-0 text-left">
-                      <p className="text-xs font-semibold text-white truncate flex items-center gap-1 leading-none">
+                      <p 
+                        className="text-xs font-semibold text-white truncate flex items-center gap-1 leading-none cursor-pointer hover:underline hover:text-teal-300"
+                        onClick={() => handlePlayerClick(j)}
+                        title="Clique para ver o perfil"
+                      >
                         <span>{j.nome} {j.sobrenome}</span>
                         {j.isGold && <span className="text-xs select-none" title="Jogador Gold">🏅</span>}
                       </p>
@@ -797,16 +807,22 @@ export default function ConfirmacaoPresenca({
                           <div
                             id={`confirmado-ordem-card-goleiro-${j.id}`}
                             key={j.id}
-                            onClick={() => handlePlayerClick(j)}
-                            className="flex items-center justify-between p-2.5 bg-white/5 rounded-xl group hover:bg-white/10 border border-white/5 hover:border-emerald-500/25 transition-all cursor-pointer"
+                            className="flex items-center justify-between p-2.5 bg-white/5 rounded-xl group hover:bg-white/10 border border-white/5 hover:border-emerald-500/25 transition-all select-none"
                           >
                             <div className="flex items-center gap-2.5 overflow-hidden">
                               <span className="text-xs font-mono font-black text-emerald-400 w-6 text-right shrink-0 select-none">
                                 {index + 1}°
                               </span>
                               <div 
-                                className="w-7.5 h-7.5 rounded-full flex items-center justify-center text-[10.5px] font-bold shadow shrink-0 overflow-hidden border border-white/10"
+                                className="w-7.5 h-7.5 rounded-full flex items-center justify-center text-[10.5px] font-bold shadow shrink-0 overflow-hidden border border-white/10 cursor-zoom-in hover:scale-110 active:scale-95 transition-all duration-200"
                                 style={{ backgroundColor: style.color }}
+                                onClick={(e) => {
+                                  e.stopPropagation();
+                                  if (j.foto && (j.foto.startsWith('http') || j.foto.startsWith('data:'))) {
+                                    (window as any).ampliarFoto?.(j.foto, `${j.nome} ${j.sobrenome}`);
+                                  }
+                                }}
+                                title={j.foto ? "Clique para ampliar" : undefined}
                               >
                                 {j.foto && (j.foto.startsWith('http') || j.foto.startsWith('data:')) ? (
                                   <img src={j.foto} className="w-full h-full object-cover rounded-full" alt="" referrerPolicy="no-referrer" />
@@ -815,7 +831,11 @@ export default function ConfirmacaoPresenca({
                                 )}
                               </div>
                               <div className="overflow-hidden min-w-0">
-                                <p className="text-xs font-semibold text-white truncate flex items-center gap-1 leading-none">
+                                <p 
+                                  className="text-xs font-semibold text-white truncate flex items-center gap-1 leading-none cursor-pointer hover:underline hover:text-teal-300"
+                                  onClick={() => handlePlayerClick(j)}
+                                  title="Clique para ver o perfil"
+                                >
                                   <span>{j.nome} {j.sobrenome}</span>
                                   {j.isGold && <span className="text-xs select-none" title="Jogador Gold">🏅</span>}
                                 </p>
@@ -866,16 +886,22 @@ export default function ConfirmacaoPresenca({
                           <div
                             id={`confirmado-ordem-card-mensalista-${j.id}`}
                             key={j.id}
-                            onClick={() => handlePlayerClick(j)}
-                            className="flex items-center justify-between p-2.5 bg-white/5 rounded-xl group hover:bg-white/10 border border-white/5 hover:border-emerald-500/25 transition-all cursor-pointer"
+                            className="flex items-center justify-between p-2.5 bg-white/5 rounded-xl group hover:bg-white/10 border border-white/5 hover:border-emerald-500/25 transition-all select-none"
                           >
                             <div className="flex items-center gap-2.5 overflow-hidden">
                               <span className="text-xs font-mono font-black text-emerald-400 w-6 text-right shrink-0 select-none">
                                 {index + 1}°
                               </span>
                               <div 
-                                className="w-7.5 h-7.5 rounded-full flex items-center justify-center text-[10.5px] font-bold shadow shrink-0 overflow-hidden border border-white/10"
+                                className="w-7.5 h-7.5 rounded-full flex items-center justify-center text-[10.5px] font-bold shadow shrink-0 overflow-hidden border border-white/10 cursor-zoom-in hover:scale-110 active:scale-95 transition-all duration-200"
                                 style={{ backgroundColor: style.color }}
+                                onClick={(e) => {
+                                  e.stopPropagation();
+                                  if (j.foto && (j.foto.startsWith('http') || j.foto.startsWith('data:'))) {
+                                    (window as any).ampliarFoto?.(j.foto, `${j.nome} ${j.sobrenome}`);
+                                  }
+                                }}
+                                title={j.foto ? "Clique para ampliar" : undefined}
                               >
                                 {j.foto && (j.foto.startsWith('http') || j.foto.startsWith('data:')) ? (
                                   <img src={j.foto} className="w-full h-full object-cover rounded-full" alt="" referrerPolicy="no-referrer" />
@@ -884,7 +910,11 @@ export default function ConfirmacaoPresenca({
                                 )}
                               </div>
                               <div className="overflow-hidden min-w-0">
-                                <p className="text-xs font-semibold text-white truncate flex items-center gap-1 leading-none">
+                                <p 
+                                  className="text-xs font-semibold text-white truncate flex items-center gap-1 leading-none cursor-pointer hover:underline hover:text-teal-300"
+                                  onClick={() => handlePlayerClick(j)}
+                                  title="Clique para ver o perfil"
+                                >
                                   <span>{j.nome} {j.sobrenome}</span>
                                   {j.isGold && <span className="text-xs select-none" title="Jogador Gold">🏅</span>}
                                 </p>
@@ -929,16 +959,22 @@ export default function ConfirmacaoPresenca({
                           <div
                             id={`confirmado-ordem-card-diarista-${j.id}`}
                             key={j.id}
-                            onClick={() => handlePlayerClick(j)}
-                            className="flex items-center justify-between p-2.5 bg-white/5 rounded-xl group hover:bg-white/10 border border-white/5 hover:border-emerald-500/25 transition-all cursor-pointer"
+                            className="flex items-center justify-between p-2.5 bg-white/5 rounded-xl group hover:bg-white/10 border border-white/5 hover:border-emerald-500/25 transition-all select-none"
                           >
                             <div className="flex items-center gap-2.5 overflow-hidden">
                               <span className="text-xs font-mono font-black text-emerald-400 w-6 text-right shrink-0 select-none">
                                 {index + 1}°
                               </span>
                               <div 
-                                className="w-7.5 h-7.5 rounded-full flex items-center justify-center text-[10.5px] font-bold shadow shrink-0 overflow-hidden border border-white/10"
+                                className="w-7.5 h-7.5 rounded-full flex items-center justify-center text-[10.5px] font-bold shadow shrink-0 overflow-hidden border border-white/10 cursor-zoom-in hover:scale-110 active:scale-95 transition-all duration-200"
                                 style={{ backgroundColor: style.color }}
+                                onClick={(e) => {
+                                  e.stopPropagation();
+                                  if (j.foto && (j.foto.startsWith('http') || j.foto.startsWith('data:'))) {
+                                    (window as any).ampliarFoto?.(j.foto, `${j.nome} ${j.sobrenome}`);
+                                  }
+                                }}
+                                title={j.foto ? "Clique para ampliar" : undefined}
                               >
                                 {j.foto && (j.foto.startsWith('http') || j.foto.startsWith('data:')) ? (
                                   <img src={j.foto} className="w-full h-full object-cover rounded-full" alt="" referrerPolicy="no-referrer" />
@@ -947,7 +983,11 @@ export default function ConfirmacaoPresenca({
                                 )}
                               </div>
                               <div className="overflow-hidden min-w-0">
-                                <p className="text-xs font-semibold text-white truncate flex items-center gap-1 leading-none">
+                                <p 
+                                  className="text-xs font-semibold text-white truncate flex items-center gap-1 leading-none cursor-pointer hover:underline hover:text-teal-300"
+                                  onClick={() => handlePlayerClick(j)}
+                                  title="Clique para ver o perfil"
+                                >
                                   <span>{j.nome} {j.sobrenome}</span>
                                   {j.isGold && <span className="text-xs select-none" title="Jogador Gold">🏅</span>}
                                 </p>
@@ -1001,8 +1041,7 @@ export default function ConfirmacaoPresenca({
                       <div
                         id={`espera-card-${j.id || index}`}
                         key={j.id || index}
-                        onClick={() => handlePlayerClick(j)}
-                        className="flex items-center justify-between p-2 bg-black/20 border border-white/5 hover:border-emerald-500/25 rounded-lg group hover:bg-white/5 transition-all font-sans cursor-pointer animate-fade-in"
+                        className="flex items-center justify-between p-2 bg-black/20 border border-white/5 hover:border-emerald-500/25 rounded-lg group hover:bg-white/5 transition-all font-sans select-none animate-fade-in"
                       >
                         <div className="flex items-center gap-2 overflow-hidden">
                           <div
@@ -1011,7 +1050,11 @@ export default function ConfirmacaoPresenca({
                             #{index + 1}
                           </div>
                           <div className="overflow-hidden min-w-0">
-                            <p className="text-xs font-semibold text-white truncate flex items-center gap-1">
+                            <p 
+                              className="text-xs font-semibold text-white truncate flex items-center gap-1 cursor-pointer hover:underline hover:text-teal-300"
+                              onClick={() => handlePlayerClick(j)}
+                              title="Clique para ver o perfil"
+                            >
                               <span>{j.nome} {j.sobrenome}</span>
                               {j.isGold && <span className="text-xs select-none" title="Jogador Gold">🏅</span>}
                             </p>
@@ -1069,14 +1112,20 @@ export default function ConfirmacaoPresenca({
                       <div
                         id={`ausente-card-${j.id || index}`}
                         key={j.id || index}
-                        onClick={() => handlePlayerClick(j)}
-                        className="flex items-center justify-between p-2 bg-rose-955/10 hover:bg-rose-955/20 border border-rose-900/20 hover:border-rose-500/25 rounded-lg group transition-all font-sans cursor-pointer animate-fade-in opacity-80 hover:opacity-100"
+                        className="flex items-center justify-between p-2 bg-rose-955/10 hover:bg-rose-955/20 border border-rose-900/20 hover:border-rose-500/25 rounded-lg group transition-all font-sans select-none animate-fade-in opacity-80 hover:opacity-100"
                         style={{ backgroundColor: 'rgba(159, 18, 57, 0.08)' }}
                       >
                         <div className="flex items-center gap-2 overflow-hidden bg-transparent">
                           <div 
-                            className="w-7.5 h-7.5 rounded-full flex items-center justify-center text-[10.5px] font-bold shadow shrink-0 overflow-hidden border border-white/10"
+                            className="w-7.5 h-7.5 rounded-full flex items-center justify-center text-[10.5px] font-bold shadow shrink-0 overflow-hidden border border-white/10 cursor-zoom-in hover:scale-110 active:scale-95 transition-all duration-200"
                             style={{ backgroundColor: style.color }}
+                            onClick={(e) => {
+                              e.stopPropagation();
+                              if (j.foto && (j.foto.startsWith('http') || j.foto.startsWith('data:'))) {
+                                (window as any).ampliarFoto?.(j.foto, `${j.nome} ${j.sobrenome}`);
+                              }
+                            }}
+                            title={j.foto ? "Clique para ampliar" : undefined}
                           >
                             {j.foto && (j.foto.startsWith('http') || j.foto.startsWith('data:')) ? (
                               <img src={j.foto} className="w-full h-full object-cover rounded-full" alt="" referrerPolicy="no-referrer" />
@@ -1085,7 +1134,11 @@ export default function ConfirmacaoPresenca({
                             )}
                           </div>
                           <div className="overflow-hidden min-w-0">
-                            <p className="text-xs font-semibold text-white/90 truncate flex items-center gap-1 line-through decoration-rose-500/60">
+                            <p 
+                              className="text-xs font-semibold text-white/90 truncate flex items-center gap-1 line-through decoration-rose-500/60 cursor-pointer hover:underline hover:text-teal-300"
+                              onClick={() => handlePlayerClick(j)}
+                              title="Clique para ver o perfil"
+                            >
                               <span>{j.nome} {j.sobrenome}</span>
                               {j.isGold && <span className="text-xs select-none no-underline inline-block" title="Jogador Gold">🏅</span>}
                             </p>

@@ -187,8 +187,14 @@ export default function MensalistasMes({
               >
                 <div className="flex items-center gap-3 min-w-0">
                   <div 
-                    className="w-9 h-9 rounded-full flex items-center justify-center text-xs font-bold shrink-0 border border-white/10"
+                    className="w-9 h-9 rounded-full flex items-center justify-center text-xs font-bold shrink-0 border border-white/10 cursor-zoom-in hover:scale-110 active:scale-95 transition-all duration-200"
                     style={{ backgroundColor: avatar.color }}
+                    onClick={() => {
+                      if (jogador.foto && (jogador.foto.startsWith('http') || jogador.foto.startsWith('data:'))) {
+                        (window as any).ampliarFoto?.(jogador.foto, `${jogador.nome} ${jogador.sobrenome}`);
+                      }
+                    }}
+                    title={jogador.foto ? "Clique para ampliar a foto" : undefined}
                   >
                     {jogador.foto && (jogador.foto.startsWith('http') || jogador.foto.startsWith('data:')) ? (
                       <img src={jogador.foto} className="w-full h-full object-cover rounded-full" alt="" referrerPolicy="no-referrer" />
@@ -344,10 +350,16 @@ export default function MensalistasMes({
                           <div className="flex items-center gap-3">
                             {/* Avatar com bordas douradas para Gold */}
                             <div
-                              className={`w-12 h-12 rounded-full flex items-center justify-center text-xl shrink-0 shadow-lg overflow-hidden relative border-2 ${
+                              className={`w-12 h-12 rounded-full flex items-center justify-center text-xl shrink-0 shadow-lg overflow-hidden relative border-2 cursor-zoom-in hover:scale-110 active:scale-95 transition-all duration-200 ${
                                 isGold ? 'border-amber-400 animate-pulse' : 'border-emerald-500/20'
                               }`}
                               style={{ backgroundColor: avatar.color }}
+                              onClick={() => {
+                                if (jogador.foto && (jogador.foto.startsWith('http') || jogador.foto.startsWith('data:'))) {
+                                  (window as any).ampliarFoto?.(jogador.foto, `${jogador.nome} ${jogador.sobrenome}`);
+                                }
+                              }}
+                              title={jogador.foto ? "Clique para ampliar" : undefined}
                             >
                               {jogador.foto && (jogador.foto.startsWith('http') || jogador.foto.startsWith('data:')) ? (
                                 <img src={jogador.foto} className="w-full h-full object-cover rounded-full" alt="" referrerPolicy="no-referrer" />

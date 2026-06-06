@@ -342,6 +342,17 @@ export default function App() {
   const [mostrarPopUpAlertaDiarista, setMostrarPopUpAlertaDiarista] = useState(false);
   const [diaristaDebitosParaAlerta, setDiaristaDebitosParaAlerta] = useState<any[]>([]);
   const [mostrarPopUpAlertaAdminAprovacoes, setMostrarPopUpAlertaAdminAprovacoes] = useState(false);
+  const [fotoZoomada, setFotoZoomada] = useState<{ url: string; nome?: string } | null>(null);
+
+  // Expor função de zoom globalmente para todos os subcomponentes poderem usá-la
+  useEffect(() => {
+    (window as any).ampliarFoto = (url: string, nome?: string) => {
+      setFotoZoomada({ url, nome });
+    };
+    return () => {
+      delete (window as any).ampliarFoto;
+    };
+  }, []);
 
   // Alerta de novos cadastros pendentes para o administrador após login
   useEffect(() => {
@@ -945,21 +956,28 @@ export default function App() {
             <div className="flex items-center justify-between sm:justify-end gap-3.5 bg-emerald-950/60 p-2 rounded-lg border border-white/10">
               
               <div 
+                className="w-8 h-8 rounded-full flex items-center justify-center text-xs font-bold shrink-0 shadow-inner overflow-hidden cursor-zoom-in hover:scale-110 active:scale-95 transition-all duration-200"
+                style={{ backgroundColor: getSessaoAvatarProps(jogadorAtual.foto).color, color: getSessaoAvatarProps(jogadorAtual.foto).text === '⚪' ? '#fff' : '#000' }}
+                onClick={() => {
+                  if (jogadorAtual.foto && (jogadorAtual.foto.startsWith('http') || jogadorAtual.foto.startsWith('data:'))) {
+                    setFotoZoomada({ url: jogadorAtual.foto, nome: `${jogadorAtual.nome} ${jogadorAtual.sobrenome}` });
+                  }
+                }}
+                title={jogadorAtual.foto ? "Clique para ampliar a foto" : undefined}
+              >
+                {jogadorAtual.foto && (jogadorAtual.foto.startsWith('http') || jogadorAtual.foto.startsWith('data:')) ? (
+                  <img src={jogadorAtual.foto} className="w-full h-full object-cover rounded-full" alt="" referrerPolicy="no-referrer" />
+                ) : (
+                  jogadorAtual.posicao.substring(0, 1)
+                )}
+              </div>
+
+              <div 
                 id="header-perfil-edit-trigger"
                 onClick={abrirModalPerfil}
-                className="flex items-center gap-2.5 cursor-pointer hover:bg-white/5 hover:border-white/20 px-2 py-1 rounded-lg transition-all border border-transparent select-none active:scale-97"
+                className="flex flex-col cursor-pointer hover:bg-white/5 hover:border-white/20 px-2 py-1 rounded-lg transition-all border border-transparent select-none active:scale-97"
                 title="Clique aqui para editar seu perfil"
               >
-                <div 
-                  className="w-8 h-8 rounded-full flex items-center justify-center text-xs font-bold shrink-0 shadow-inner overflow-hidden"
-                  style={{ backgroundColor: getSessaoAvatarProps(jogadorAtual.foto).color, color: getSessaoAvatarProps(jogadorAtual.foto).text === '⚪' ? '#fff' : '#000' }}
-                >
-                  {jogadorAtual.foto && (jogadorAtual.foto.startsWith('http') || jogadorAtual.foto.startsWith('data:')) ? (
-                    <img src={jogadorAtual.foto} className="w-full h-full object-cover rounded-full" alt="" referrerPolicy="no-referrer" />
-                  ) : (
-                    jogadorAtual.posicao.substring(0, 1)
-                  )}
-                </div>
                 <div>
                   <div className="flex items-center gap-1">
                     <span id="nome-usuario-logado" className="text-xs font-bold text-white hover:text-teal-300 transition-colors leading-none decoration-dotted hover:underline underline-offset-2">{jogadorAtual.nome} {jogadorAtual.sobrenome}</span>
@@ -1732,7 +1750,11 @@ export default function App() {
                 {perfilFoto && (
                   <div className="flex items-center gap-2 pt-1">
                     <span className="text-[9px] text-emerald-400">Prévia do Avatar selecionado:</span>
-                    <div className="w-6 h-6 rounded-full overflow-hidden border border-white/10 shrink-0">
+                    <div 
+                      className="w-6 h-6 rounded-full overflow-hidden border border-white/10 shrink-0 cursor-zoom-in hover:scale-110 transition-transform duration-200"
+                      onClick={() => setFotoZoomada({ url: perfilFoto, nome: `${perfilNome} ${perfilSobrenome} (Prévia)` })}
+                      title="Clique para ampliar a prévia"
+                    >
                       <img 
                         src={perfilFoto} 
                         className="w-full h-full object-cover" 
@@ -1767,6 +1789,47 @@ export default function App() {
               </div>
 
             </form>
+          </div>
+        </div>
+      )}
+      {/* POPUP DE ZOOM DE FOTO */}
+      {fotoZoomada && (
+        <div 
+          id="popup-foto-zoom"
+          className="fixed inset-0 z-[100] flex items-center justify-center p-4 bg-black/90 backdrop-blur-md animate-fade-in"
+          onClick={() => setFotoZoomada(null)}
+        >
+          <div 
+            className="relative max-w-md w-full bg-emerald-950 border border-white/10 rounded-2xl p-4 text-center shadow-2xl animate-scale-up"
+            onClick={(e) => e.stopPropagation()}
+          >
+            <button
+              type="button"
+              onClick={() => setFotoZoomada(null)}
+              className="absolute top-3 right-3 bg-black/50 hover:bg-black/70 text-white p-2 rounded-full transition-colors cursor-pointer z-10"
+              title="Fechar"
+            >
+              <X className="w-4 h-4" />
+            </button>
+            
+            {fotoZoomada.nome && (
+              <h4 className="text-xs font-display font-extrabold text-teal-300 mb-3.5 truncate px-8 uppercase tracking-wider">
+                {fotoZoomada.nome}
+              </h4>
+            )}
+            
+            <div className="w-full aspect-square rounded-xl overflow-hidden bg-black/20 border border-white/5 flex items-center justify-center">
+              <img 
+                src={fotoZoomada.url} 
+                className="w-full h-full object-contain" 
+                alt="Foto Ampliada" 
+                referrerPolicy="no-referrer"
+              />
+            </div>
+            
+            <div className="mt-3 text-[10px] text-emerald-400 font-mono tracking-wide">
+              Clique fora ou no botão para fechar
+            </div>
           </div>
         </div>
       )}
