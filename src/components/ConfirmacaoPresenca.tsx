@@ -54,6 +54,10 @@ export default function ConfirmacaoPresenca({
   const [debitosPendentes, setDebitosPendentes] = useState<any[]>([]);
   const [dadosConfirmacaoPendente, setDadosConfirmacaoPendente] = useState<{ id: string; confirmado: boolean } | null>(null);
 
+  // Estados para Fora do Período de Confirmação
+  const [showForaPeriodoModal, setShowForaPeriodoModal] = useState(false);
+  const [foraPeriodoInfo, setForaPeriodoInfo] = useState<{ inicio: string; fim: string; jogoTitulo: string; jogoData: string } | null>(null);
+
   // Controladores do Popup/Modal de informações e edição do jogador
   const [jogadorSelecionadoModal, setJogadorSelecionadoModal] = useState<Jogador | null>(null);
   const [showPlayerModal, setShowPlayerModal] = useState(false);
@@ -222,6 +226,24 @@ export default function ConfirmacaoPresenca({
   };
 
   const handleConfirmarPresencaLocally = (id: string, confirmado: boolean) => {
+    if (partidaSelecionada && jogadorAtual.role !== 'admin') {
+      const jan = getJanelaConfirmacao(partidaSelecionada.data);
+      if (jan.status === 'fechado') {
+        const dataInicioStr = jan.inicio.toLocaleDateString('pt-BR', { weekday: 'long', day: 'numeric', month: 'long', hour: '2-digit', minute: '2-digit' });
+        const dataFimStr = jan.fim.toLocaleDateString('pt-BR', { weekday: 'long', day: 'numeric', month: 'long', hour: '2-digit', minute: '2-digit' });
+        const dataJogoDate = new Date(`${partidaSelecionada.data}T12:00:00`);
+        const dataJogoFormatado = dataJogoDate.toLocaleDateString('pt-BR', { day: 'numeric', month: 'long', year: 'numeric' });
+        setForaPeriodoInfo({ 
+          inicio: dataInicioStr, 
+          fim: dataFimStr,
+          jogoTitulo: partidaSelecionada.titulo,
+          jogoData: dataJogoFormatado
+        });
+        setShowForaPeriodoModal(true);
+        return;
+      }
+    }
+
     if (confirmado) {
       const v4 = parseFloat(localStorage.getItem('racha_valor_4s') || '85');
       const v5 = parseFloat(localStorage.getItem('racha_valor_5s') || '105');
@@ -1585,6 +1607,61 @@ export default function ConfirmacaoPresenca({
                 className="w-full py-2.5 bg-white/5 hover:bg-white/10 text-white font-bold text-xs rounded-xl transition-all text-center cursor-pointer"
               >
                 Cancelar
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {/* MODAL DE FORA DO PERÍODO DE CONFIRMAÇÃO */}
+      {showForaPeriodoModal && foraPeriodoInfo && (
+        <div id="modal-fora-periodo-confirmacao" className="fixed inset-0 bg-black/85 backdrop-blur-sm flex items-center justify-center p-4 z-50 animate-fade-in overflow-y-auto">
+          <div className="bg-emerald-950 border border-amber-500/30 rounded-2xl w-full max-w-md p-6 shadow-2xl space-y-5 backdrop-blur-md">
+            <div className="flex items-center gap-3 border-b border-amber-500/25 pb-3">
+              <div className="w-10 h-10 rounded-full bg-amber-500/10 border border-amber-500/30 flex items-center justify-center text-amber-400">
+                <AlertTriangle className="w-6 h-6 animate-pulse" />
+              </div>
+              <div className="text-left">
+                <h3 className="font-display font-black text-sm text-amber-400 uppercase tracking-wider">
+                  🚨 Fora do Período de Confirmação
+                </h3>
+                <p className="text-[10px] text-amber-300/80 font-mono mt-0.5">
+                  Regulamento de Janela de Confirmações
+                </p>
+              </div>
+            </div>
+
+            <div className="space-y-3.5 text-left text-xs font-sans text-amber-100">
+              <p className="leading-relaxed text-[11.5px]">
+                Olá, <strong className="text-white">{jogadorAtual.nome} {jogadorAtual.sobrenome}</strong>. 
+                Sua solicitação de presença/ausência para a partida <b>{foraPeriodoInfo.jogoTitulo} (Data: {foraPeriodoInfo.jogoData})</b> não pôde ser registrada porque a janela oficial está fechada.
+              </p>
+
+              <div className="bg-black/40 border border-amber-500/15 p-4 rounded-xl space-y-2.5">
+                <p className="font-bold text-amber-400 font-sans uppercase tracking-wider text-[10px] flex items-center gap-1.5">
+                  ⏰ Regra Oficial do Regulamento:
+                </p>
+                <div className="space-y-1 text-[11px] leading-relaxed text-emerald-300">
+                  <p>• <b>Início:</b> Terça-feira às 00:00</p>
+                  <p>• <b>Término:</b> Sexta-feira às 23:59</p>
+                </div>
+              </div>
+
+              <p className="text-[11px] text-amber-200/90 leading-relaxed italic bg-amber-500/5 p-3 rounded-xl border border-amber-500/10">
+                Se você precisar alterar seu status de forma excepcional (por exemplo, contusão de última hora), entre em contato diretamente com a organização que possui acesso de administrador.
+              </p>
+            </div>
+
+            <div className="pt-2">
+              <button
+                type="button"
+                id="btn-fora-periodo-fechar"
+                onClick={() => {
+                  setShowForaPeriodoModal(false);
+                }}
+                className="w-full py-2.5 bg-amber-500 hover:bg-amber-400 text-amber-950 font-black text-xs rounded-xl transition-all shadow-md active:scale-97 text-center cursor-pointer uppercase font-sans"
+              >
+                Entendido
               </button>
             </div>
           </div>
