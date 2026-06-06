@@ -7,7 +7,7 @@ import React, { useState } from 'react';
 import { Partida, Jogador, Pagamento, MembroStatus, PosicaoJogador } from '../types';
 import { AVATAR_PRESETS } from '../data';
 import { Calendar as CalendarIcon, MapPin, Clock, Users, Check, X, ShieldAlert, Award, ChevronLeft, ChevronRight, Share2, AlertTriangle, Send, Copy, Edit2, Trash2 } from 'lucide-react';
-import { getJanelaConfirmacao, gerarLinkCompartilhamento, obterTextoConfirmacaoJogador, obterTextoAlertaSemanal, obterDebitosDoJogador } from '../utils/confirmationRules';
+import { getJanelaConfirmacao, gerarLinkCompartilhamento, obterTextoConfirmacaoJogador, obterTextoAlertaSemanal, obterDebitosDoJogador, obterTextoListaCompletaPartida } from '../utils/confirmationRules';
 
 interface ConfirmacaoPresencaProps {
   partidas: Partida[];
@@ -166,6 +166,17 @@ export default function ConfirmacaoPresenca({
     const parts = dateStr.split('-');
     if (parts.length !== 3) return dateStr;
     return `${parts[2]}/${parts[1]}/${parts[0]}`;
+  };
+
+  const dispararListaWhatsAppAdmin = () => {
+    if (!partidaSelecionada) return;
+    const msg = obterTextoListaCompletaPartida(partidaSelecionada, jogadores, window.location.origin);
+    if (onRegistrarLogAutomacao) {
+      onRegistrarLogAutomacao('Administrador (Manual)', partidaSelecionada.titulo, msg);
+      setAutoToastMsg(`🤖 [BOT DO WHATSAPP]: Convocação/Lista Oficial enviada com sucesso!`);
+      setShowAutoToast(true);
+      setTimeout(() => setShowAutoToast(false), 5000);
+    }
   };
 
   const executarConfirmacaoPresenca = (id: string, confirmado: boolean) => {
@@ -510,32 +521,50 @@ export default function ConfirmacaoPresenca({
               </div>
 
               {jogadorAtual.role === 'admin' && (
-                <div id="admin-actions-partida-cancelamento" className="mt-4 pt-3.5 border-t border-dashed border-white/15 flex flex-col sm:flex-row items-center justify-between gap-3 text-xs w-full">
-                  <div className="flex flex-col text-left">
-                    <span className="font-extrabold text-amber-400 uppercase tracking-wider text-[9.5px] font-mono">🔐 Controle do Administrador</span>
-                    <span className="text-[10px] text-emerald-300">Marque se o jogo foi cancelado por fortuito/chuva.</span>
+                <div className="flex flex-col gap-3 w-full">
+                  <div id="admin-actions-whatsapp" className="mt-4 pt-3.5 border-t border-dashed border-white/15 flex flex-col sm:flex-row items-center justify-between gap-3 text-xs w-full">
+                    <div className="flex flex-col text-left">
+                      <span className="font-extrabold text-teal-400 uppercase tracking-wider text-[9.5px] font-mono">🤖 Automação de WhatsApp</span>
+                      <span className="text-[10px] text-emerald-300">Dispare a lista oficial de convocados / ausentes atualizada no grupo.</span>
+                    </div>
+                    <button
+                      id="btn-admin-disparar-whatsapp-manual"
+                      type="button"
+                      onClick={dispararListaWhatsAppAdmin}
+                      className="w-full sm:w-auto bg-teal-600 hover:bg-teal-500 text-white font-black px-4 py-2 rounded-xl text-[10px] tracking-widest uppercase cursor-pointer transition-all duration-200 shadow border-none inline-flex items-center justify-center gap-1.5"
+                    >
+                      <Send className="w-3.5 h-3.5" />
+                      <span>📢 Disparar Lista Oficial</span>
+                    </button>
                   </div>
-                  {partidaSelecionada.cancelada ? (
-                    <button
-                      id="btn-admin-reativar-jogo"
-                      type="button"
-                      onClick={() => onCancelarPartida && onCancelarPartida(partidaSelecionada.id, false)}
-                      className="w-full sm:w-auto bg-emerald-555 hover:bg-emerald-500 text-bg shadow hover:shadow-lg hover:shadow-emerald-555/10 font-black px-4 py-2 rounded-xl text-[10px] tracking-widest uppercase cursor-pointer transition-all duration-200 border-none inline-flex items-center justify-center gap-1.5"
-                      style={{ backgroundColor: '#10b981', color: '#022c22' }}
-                    >
-                      <span>🔄 Reativar Partida</span>
-                    </button>
-                  ) : (
-                    <button
-                      id="btn-admin-cancelar-jogo"
-                      type="button"
-                      onClick={() => onCancelarPartida && onCancelarPartida(partidaSelecionada.id, true)}
-                      className="w-full sm:w-auto bg-rose-650 hover:bg-rose-600 text-white font-extrabold px-4 py-2 rounded-xl text-[10px] tracking-widest uppercase cursor-pointer transition-all duration-200 shadow border-none inline-flex items-center justify-center gap-1.5"
-                      style={{ backgroundColor: '#e11d48' }}
-                    >
-                      <span>🚫 Cancelar Partida</span>
-                    </button>
-                  )}
+                  
+                  <div id="admin-actions-partida-cancelamento" className="pt-3 flex flex-col sm:flex-row items-center justify-between gap-3 text-xs w-full border-t border-dashed border-white/10">
+                    <div className="flex flex-col text-left">
+                      <span className="font-extrabold text-amber-400 uppercase tracking-wider text-[9.5px] font-mono">🔐 Controle de Partida</span>
+                      <span className="text-[10px] text-emerald-300">Marque se o jogo foi cancelado por fortuito/chuva.</span>
+                    </div>
+                    {partidaSelecionada.cancelada ? (
+                      <button
+                        id="btn-admin-reativar-jogo"
+                        type="button"
+                        onClick={() => onCancelarPartida && onCancelarPartida(partidaSelecionada.id, false)}
+                        className="w-full sm:w-auto bg-emerald-555 hover:bg-emerald-500 text-bg shadow hover:shadow-lg hover:shadow-emerald-555/10 font-black px-4 py-2 rounded-xl text-[10px] tracking-widest uppercase cursor-pointer transition-all duration-200 border-none inline-flex items-center justify-center gap-1.5"
+                        style={{ backgroundColor: '#10b981', color: '#022c22' }}
+                      >
+                        <span>🔄 Reativar Partida</span>
+                      </button>
+                    ) : (
+                      <button
+                        id="btn-admin-cancelar-jogo"
+                        type="button"
+                        onClick={() => onCancelarPartida && onCancelarPartida(partidaSelecionada.id, true)}
+                        className="w-full sm:w-auto bg-rose-650 hover:bg-rose-600 text-white font-extrabold px-4 py-2 rounded-xl text-[10px] tracking-widest uppercase cursor-pointer transition-all duration-200 shadow border-none inline-flex items-center justify-center gap-1.5"
+                        style={{ backgroundColor: '#e11d48' }}
+                      >
+                        <span>🚫 Cancelar Partida</span>
+                      </button>
+                    )}
+                  </div>
                 </div>
               )}
             </div>

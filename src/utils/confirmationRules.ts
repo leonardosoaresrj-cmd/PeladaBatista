@@ -3,7 +3,7 @@
  * SPDX-License-Identifier: Apache-2.0
  */
 
-import { Partida, Pagamento } from '../types';
+import { Partida, Pagamento, Jogador } from '../types';
 
 /**
  * Retorna as datas de início (Terça-feira 00:00) e fim (Sexta-feira 23:59)
@@ -221,4 +221,145 @@ export function obterDebitosDoJogador(
   }
 
   return debitos;
+}
+
+/**
+ * Formata a lista de presença completa com as 5 seções requeridas:
+ * A - Mensalistas por ordem de confirmacao (Nome - Posicao)
+ * B - Diaristas por ordem de confirmacao (Nome - Posicao)
+ * C - Goleiros por ordem de confirmacao (Nome)
+ * D - Jogadores ausentes (Nome - Posição)
+ * E - Lista de espera (Nome - Posicao)
+ */
+export function obterTextoListaCompletaPartida(
+  partida: Partida,
+  jogadores: Jogador[],
+  grupoLinkWeb: string
+): string {
+  const obterJogadorPorId = (id: string) => jogadores.find((j) => j.id === id);
+
+  const rawConfirmados = (partida.confirmados || []).map(obterJogadorPorId).filter(Boolean) as Jogador[];
+  const recusados = (partida.recusados || []).map(obterJogadorPorId).filter(Boolean) as Jogador[];
+
+  // Processar listas usando as regras de prioridade de 25 jogadores de linha
+  const finalConfirmed: Jogador[] = [];
+  const waitingList: Jogador[] = [];
+
+  for (const jogador of rawConfirmados) {
+    if (jogador.posicao === 'Goleiro') {
+      finalConfirmed.push(jogador);
+    } else {
+      const linePlayersConfirmed = finalConfirmed.filter(j => j.posicao !== 'Goleiro');
+
+      if (linePlayersConfirmed.length < 25) {
+        finalConfirmed.push(jogador);
+      } else {
+        if (jogador.membroStatus === 'mensalista') {
+          // Procurar o último diarista de linha nos confirmados para rebaixar para a fila de espera
+          const lastDiaristaLinhaIndex = finalConfirmed.map(j => j.posicao !== 'Goleiro' && j.membroStatus === 'diarista').lastIndexOf(true);
+          
+          if (lastDiaristaLinhaIndex !== -1) {
+            const diaristaParaSair = finalConfirmed[lastDiaristaLinhaIndex];
+            finalConfirmed.splice(lastDiaristaLinhaIndex, 1);
+            finalConfirmed.push(jogador);
+            waitingList.unshift(diaristaParaSair);
+          } else {
+            waitingList.push(jogador);
+          }
+        } else {
+          waitingList.push(jogador);
+        }
+      }
+    }
+  }
+
+  // Filtrar grupos conforme requisitado
+  const mensalistasConfirmados = finalConfirmed.filter(j => j.posicao !== 'Goleiro' && j.membroStatus === 'mensalista');
+  const diaristasConfirmados = finalConfirmed.filter(j => j.posicao !== 'Goleiro' && j.membroStatus === 'diarista');
+  const goleirosConfirmados = finalConfirmed.filter(j => j.posicao === 'Goleiro');
+
+  const formatarLinha = (j: Jogador, index: number) => {
+    const goldSuffix = j.isGold ? ' 🏅' : '';
+    return `${index + 1}. *${j.nome} ${j.sobrenome}* - ${j.posicao}${goldSuffix}`;
+  };
+
+  const formatarLinhaGoleiro = (j: Jogador, index: number) => {
+    const goldSuffix = j.isGold ? ' 🏅' : '';
+    return `${index + 1}. *${j.nome} ${j.sobrenome}*${goldSuffix}`;
+  };
+
+  const strMensalistas = mensalistasConfirmados.length > 0 
+    ? mensalistasConfirmados.map((j, i) => formatarLinha(j, i)).join('\n')
+    : '_Nenhum mensalista confirmado ainda_';
+
+  const strDiaristas = diaristasConfirmados.length > 0
+    ? diaristasConfirmados.map((j, i) => formatarLinha(j, i)).join('\n')
+    : '_Nenhum diarista confirmado ainda_';
+
+  const strGoleiros = goleirosConfirmados.length > 0
+    ? goleirosConfirmados.map((j, i) => formatarLinhaGoleiro(j, i)).join('\n')
+    : '_Nenhum goleiro confirmado ainda_';
+
+  const strAusentes = recusados.length > 0
+    ? recusados.map((j, i) => formatarLinha(j, i)).join('\n')
+    : '_Nenhuma ausência registrada_';
+
+  const strEspera = waitingList.length > 0
+    ? waitingList.map((j, i) => formatarLinha(j, i)).join('\n')
+    : '_Nenhum jogador em lista de espera_';
+
+  const dataJogoDate = new Date(`${partida.data}T12:00:00`);
+  const dataAmigavel = dataJogoDate.toLocaleDateString('pt-BR', { weekday: 'long', day: 'numeric', month: 'long' });
+
+  return `⚽ *PELADA BATISTA SÁBADO* ⚽
+🏆 *CONVOCAÇÃO & PRESENÇA ATUALIZADA* 🏆
+
+📅 Jogo: *${partida.titulo}*
+🗓️ Data: *${dataAmigavel}* às *${partida.horario}h*
+📍 Local: *${partida.local}*
+
+*A - MENSALISTAS:*
+${strMensalistas}
+
+*B - DIARISTAS:*
+${strDiaristas}
+
+*C - GOLEIROS:*
+${strGoleiros}
+
+*D - JOGADORES AUSENTES:*
+${strAusentes}
+
+*E - LISTA DE ESPERA:*
+${strEspera}
+
+----------------------------------------
+📲 Acesse o portal oficial para confirmar ou alterar sua presença:
+${grupoLinkWeb || 'https://pelada-batista.web.app'}`;
+}
+
+/**
+ * Formata mensagem de quitação de mensalidade com ícone de medalha se for gold e contador de mensalistas pagos
+ */
+export function obterTextoQuitacaoMensalidade(
+  jogador: Jogador,
+  mesRef: string,
+  valor: number,
+  totalQuitadosCount: number
+): string {
+  const isGold = !!jogador.isGold;
+  const mesFormatado = mesRef.split('-').reverse().join('/');
+  const medalha = isGold ? ' 🏅' : '';
+  
+  return `💰 *QUITAÇÃO DE MENSALIDADE - PELADA BATISTA SÁBADO* 💰
+
+Atleta: *${jogador.nome} ${jogador.sobrenome}* (${jogador.posicao})${medalha}
+Referência: *${mesFormatado}*
+Valor Quitado: *R$ ${valor.toFixed(2)}*
+Status: *PAGO & CONFIRMADO* ✅
+
+📊 *Informativo Financeiro:*
+- Total de mensalistas quitados neste período: *${totalQuitadosCount}* (Limite regulamentado de 25 mensalistas)
+
+Muito obrigado pelo compromisso em manter o nosso futebol rodando redondo de campo pago e bola cheia! 🤝⚽🏃‍♂️💨`;
 }

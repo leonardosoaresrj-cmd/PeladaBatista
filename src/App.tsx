@@ -41,6 +41,7 @@ import ConfiguracaoSystem from './components/ConfiguracaoSystem';
 import MensalistasMes from './components/MensalistasMes';
 import HistoricoJogos from './components/HistoricoJogos';
 import { mesclarPartidasAutomáticas } from './utils/partidaHelper';
+import { obterTextoListaCompletaPartida, obterTextoQuitacaoMensalidade } from './utils/confirmationRules';
 import logoPelada from './assets/images/logo_pelada_batista_1780453160575.png';
 import { Calendar, Users, DollarSign, ShieldAlert, LogOut, Database, Award, User, Settings, UserCheck, History, CheckSquare, Check, X, Lock, Cake, TrendingUp } from 'lucide-react';
 
@@ -625,6 +626,18 @@ export default function App() {
 
     if (modificado) {
       await salvarPartidaNoSupabase(modificado);
+
+      if (whatsappAutomacaoAtiva) {
+        const jogObj = jogadores.find(j => j.id === jogadorId);
+        const atletaNome = jogObj ? `${jogObj.nome} ${jogObj.sobrenome}` : 'Atleta';
+        const msgCompleta = obterTextoListaCompletaPartida(modificado, jogadores, whatsappGrupoLink);
+        
+        handleRegistrarLogAutomacao(
+          atletaNome,
+          modificado.titulo,
+          msgCompleta
+        );
+      }
     }
   };
 
@@ -717,6 +730,21 @@ export default function App() {
 
     if (pagModificado!) {
       await salvarPagamentoNoSupabase(pagModificado);
+
+      if (status === 'pago' && whatsappAutomacaoAtiva) {
+        const jogObj = jogadores.find(j => j.id === jogadorId);
+        if (jogObj) {
+          const atletaNome = `${jogObj.nome} ${jogObj.sobrenome}`;
+          const totalQuitados = atualizados.filter(p => p.mesRef === mesRef && p.status === 'pago' && !p.partidaId).length;
+          const msgCompleta = obterTextoQuitacaoMensalidade(jogObj, mesRef, valor, totalQuitados);
+          
+          handleRegistrarLogAutomacao(
+            atletaNome,
+            `Mensalidade ${mesRef.split('-').reverse().join('/')}`,
+            msgCompleta
+          );
+        }
+      }
     }
   };
 
