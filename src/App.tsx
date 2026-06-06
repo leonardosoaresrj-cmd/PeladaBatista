@@ -147,6 +147,86 @@ export default function App() {
     saveLancamentos(novos);
   };
 
+  const handleLimparDadosDoMes = async (mesRef: string) => {
+    // 1. Filtrar pagamentos que não pertencem ao mesRef
+    const novosPagamentos = pagamentos.filter(p => p.mesRef !== mesRef);
+    setPagamentos(novosPagamentos);
+    savePagamentos(novosPagamentos);
+
+    const supabase = getSupabase();
+
+    // 2. Apagar do Supabase todos os pagamentos daquele mês
+    try {
+      if (supabase) {
+        await supabase
+          .from('pagamentos')
+          .delete()
+          .eq('mes_ref', mesRef);
+      }
+    } catch (e) {
+      console.error('Erro ao deletar pagamentos do Supabase:', e);
+    }
+
+    // 3. Filtrar lançamentos avulsos que pertencem àquele mês
+    const novosLancamentos = lancamentos.filter(l => !l.data.startsWith(mesRef));
+    setLancamentos(novosLancamentos);
+    saveLancamentos(novosLancamentos);
+
+    // 4. Detetar partidas do mês (reais e sábados automáticos) e apagá-las/ocultá-las
+    try {
+      // Filtrar partidas reais guardadas que começam com o mesRef
+      const partidasDoMesReais = partidas.filter(p => p.data.startsWith(mesRef));
+      const partidasDoMesReaisIds = partidasDoMesReais.map(p => p.id);
+
+      // Calcular sábados automáticos desse mês para adicionar a lista de deletadas
+      const sabadosDoMesIds: string[] = [];
+      const parts = mesRef.split('-');
+      const year = parseInt(parts[0]);
+      const month = parseInt(parts[1]);
+
+      for (let day = 1; day <= 31; day++) {
+        const date = new Date(year, month - 1, day, 12, 0, 0);
+        if (date.getMonth() === month - 1 && date.getDay() === 6) {
+          const yyyy = date.getFullYear();
+          const mm = String(date.getMonth() + 1).padStart(2, '0');
+          const dd = String(date.getDate()).padStart(2, '0');
+          sabadosDoMesIds.push(`sat-${yyyy}-${mm}-${dd}`);
+        }
+      }
+
+      // Combinar os IDs de exclusão (reais e virtuais/automáticos)
+      const todosIdsParaDeletar = Array.from(new Set([...partidasDoMesReaisIds, ...sabadosDoMesIds]));
+
+      // Atualizar partidasDeletadas no estado e localstorage
+      const novasDeletadas = [...partidasDeletadas];
+      todosIdsParaDeletar.forEach(id => {
+        if (!novasDeletadas.includes(id)) {
+          novasDeletadas.push(id);
+        }
+      });
+      setPartidasDeletadas(novasDeletadas);
+      localStorage.setItem('futebol_partidas_deletadas', JSON.stringify(novasDeletadas));
+
+      // Atualizar partidas reais excluindo as deletadas
+      const novasPartidas = partidas.filter(p => !partidasDoMesReaisIds.includes(p.id));
+      setPartidas(novasPartidas);
+      savePartidas(novasPartidas);
+
+      // Sincronizar exclusão de partidas reais e de configuração de deletadas no Supabase
+      if (supabase) {
+        salvarConfiguracaoNoSupabase('partidas_excluidas', JSON.stringify(novasDeletadas))
+          .catch(err => console.error('Erro ao salvar partidas deletadas adicionais em config do Supabase:', err));
+
+        for (const realId of partidasDoMesReaisIds) {
+          deletarPartidaNoSupabase(realId)
+            .catch(err => console.error('Erro ao deletar partida real no Supabase:', err));
+        }
+      }
+    } catch (err) {
+      console.error('Erro ao deletar histórico/partidas do mês:', err);
+    }
+  };
+
   const handleUpdateAluguelCampoBase = (valor: number) => {
     setAluguelCampoBase(valor);
     saveAluguelCampo(valor);
@@ -1062,6 +1142,7 @@ export default function App() {
                   valor5Sabados={valor5Sabados}
                   onRegistrarPagamento={handleRegistrarPagamento}
                   jogadorAtual={jogadorAtual}
+                  onLimparDadosDoMes={handleLimparDadosDoMes}
                 />
               )}
 

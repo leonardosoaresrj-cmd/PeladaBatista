@@ -379,7 +379,6 @@ export default function ListaCadastrados({
             <Calendar className="w-3.5 h-3.5 text-emerald-400" />
             Nasc: {j.dataNascimento ? j.dataNascimento.split('-').reverse().join('/') : '-'} ({calcularIdade(j.dataNascimento)} anos)
           </span>
-          <span>PIN: ••••</span>
         </div>
 
         {/* Área de Ações (Admin ou Próprio Jogador) */}

@@ -23,7 +23,9 @@ import {
   Sliders,
   Sparkles,
   ChevronRight,
-  ShieldAlert
+  ShieldAlert,
+  X,
+  Users
 } from 'lucide-react';
 import { obterDebitosDoJogador } from '../utils/confirmationRules';
 
@@ -41,6 +43,7 @@ interface ControleCaixaProps {
   valor5Sabados: number;
   onRegistrarPagamento?: (jogadorId: string, mesRef: string, status: 'pago' | 'pendente' | 'pendente_confirmacao' | 'cancelado', dataPagamento: string | null, valor: number, partidaId?: string) => void;
   jogadorAtual?: Jogador;
+  onLimparDadosDoMes?: (mesRef: string) => void;
 }
 
 export default function ControleCaixa({
@@ -56,13 +59,18 @@ export default function ControleCaixa({
   valor4Sabados,
   valor5Sabados,
   onRegistrarPagamento,
-  jogadorAtual
+  jogadorAtual,
+  onLimparDadosDoMes
 }: ControleCaixaProps) {
   // Estado para escopo de visualização (Mensal vs Anual Consolidado)
   const [visaoEscopo, setVisaoEscopo] = useState<'mensal' | 'anual'>('mensal');
 
   // Estado para confirmar cancelamento sem window.confirm
   const [cancelarConfirmId, setCancelarConfirmId] = useState<string | null>(null);
+
+  // Estados para exclusão de mês e pop-up de detalhes
+  const [deletarMesConfirmId, setDeletarMesConfirmId] = useState<string | null>(null);
+  const [detalhesMesModal, setDetalhesMesModal] = useState<string | null>(null);
 
   // Estado para Mês de Referência do Caixa Geral
   const [mesSelecionado, setMesSelecionado] = useState('2026-05');
@@ -499,6 +507,121 @@ export default function ControleCaixa({
     };
   }, [partidaAtiva, jogadores, pagamentos, numSabadosPartida, aluguelCampoBase, lancamentos]);
 
+  // --- CÁLCULO E DETALHES DO POPUP DO MÊS ---
+  const ativosM = useMemo(() => {
+    if (!detalhesMesModal) return [];
+    const setAtivos = new Set<string>();
+    const list: Jogador[] = [];
+
+    // 1. Mensalistas ativos (Goleiros não pagam mensalidade mas participam)
+    jogadores.forEach(j => {
+      if (j.membroStatus === 'mensalista' && j.posicao !== 'Goleiro') {
+        if (!setAtivos.has(j.id)) {
+          setAtivos.add(j.id);
+          list.push(j);
+        }
+      }
+    });
+
+    // 2. Pagamentos efetuados ou aguardando confirmação
+    pagamentos.forEach(p => {
+      if (p.mesRef === detalhesMesModal && (p.status === 'pago' || p.status === 'pendente_confirmacao')) {
+        const j = jogadores.find(jg => jg.id === p.jogadorId);
+        if (j && !setAtivos.has(j.id)) {
+          setAtivos.add(j.id);
+          list.push(j);
+        }
+      }
+    });
+
+    // 3. Confirmados em partidas deste mês
+    partidas.forEach(p => {
+      if (!p.cancelada && p.data.startsWith(detalhesMesModal)) {
+        p.confirmados.forEach(cId => {
+          const j = jogadores.find(jg => jg.id === cId);
+          if (j && !setAtivos.has(j.id)) {
+            setAtivos.add(j.id);
+            list.push(j);
+          }
+        });
+      }
+    });
+
+    return list.sort((a, b) => a.nome.localeCompare(b.nome));
+  }, [detalhesMesModal, jogadores, pagamentos, partidas]);
+
+  const statsModal = useMemo(() => {
+    if (!detalhesMesModal) return null;
+
+    const [ano, mes] = detalhesMesModal.split('-');
+    const mesesNomes = [
+      'Janeiro', 'Fevereiro', 'Março', 'Abril', 'Maio', 'Junho',
+      'Julho', 'Agosto', 'Setembro', 'Outubro', 'Novembro', 'Dezembro'
+    ];
+    const nomeMesExtenso = `${mesesNomes[parseInt(mes) - 1]} de ${ano}`;
+
+    const partidasM = partidas.filter(p => !p.cancelada && p.data.startsWith(detalhesMesModal));
+    const lancamentosM = lancamentos.filter(l => l.data.startsWith(detalhesMesModal));
+    
+    const pagamentosM = pagamentos.filter(p => p.mesRef === detalhesMesModal && p.status === 'pago');
+    
+    const recMensalistas = pagamentosM
+      .filter(p => {
+        const j = jogadores.find(jg => jg.id === p.jogadorId);
+        return j && j.membroStatus === 'mensalista';
+      })
+      .reduce((sum, p) => sum + p.valor, 0);
+
+    const recDiaristas = pagamentosM
+      .filter(p => {
+        const j = jogadores.find(jg => jg.id === p.jogadorId);
+        return j && j.membroStatus === 'diarista';
+      })
+      .reduce((sum, p) => sum + p.valor, 0);
+
+    const recAvulsa = lancamentosM
+      .filter(l => l.tipo === 'receita')
+      .reduce((sum, l) => sum + l.valor, 0);
+
+    const receitaTotal = recMensalistas + recDiaristas + recAvulsa;
+
+    const despesaAluguel = partidasM.length * aluguelCampoBase;
+    const despesaAvulsa = lancamentosM
+      .filter(l => l.tipo === 'despesa')
+      .reduce((sum, l) => sum + l.valor, 0);
+
+    const despesaTotal = despesaAluguel + despesaAvulsa;
+
+    const debitosM = todosDebitosPendentes.filter(d => d.mesRef === detalhesMesModal);
+    const totalDebitos = debitosM.reduce((sum, d) => sum + d.valor, 0);
+
+    const pagantesM = pagamentosM
+      .map(p => {
+        const j = jogadores.find(jg => jg.id === p.jogadorId);
+        return { pagamento: p, jogador: j };
+      })
+      .filter((item): item is { pagamento: Pagamento; jogador: Jogador } => item.jogador !== undefined)
+      .sort((a,b) => a.jogador.nome.localeCompare(b.jogador.nome));
+
+    return {
+      nomeMesExtenso,
+      partidasCount: partidasM.length,
+      receitaTotal,
+      recMensalistas,
+      recDiaristas,
+      recAvulsa,
+      despesaTotal,
+      despesaAluguel,
+      despesaAvulsa,
+      saldo: receitaTotal - despesaTotal,
+      debitosM,
+      totalDebitos,
+      pagantesM,
+      ativosCount: ativosM.length,
+      pagantesCount: pagantesM.length,
+    };
+  }, [detalhesMesModal, partidas, lancamentos, pagamentos, jogadores, aluguelCampoBase, todosDebitosPendentes, ativosM]);
+
   const handleSalvarLancamentoAvulso = (e: React.FormEvent) => {
     e.preventDefault();
     if (!avulsoDescricao.trim() || avulsoValor <= 0) return;
@@ -779,13 +902,42 @@ export default function ControleCaixa({
                 return (
                   <div 
                     key={m.id}
-                    className="bg-black/25 hover:bg-black/40 transition-all p-4 rounded-xl border border-white/5 space-y-3 flex flex-col justify-between"
+                    onClick={() => setDetalhesMesModal(m.mesRef)}
+                    className="bg-black/30 hover:bg-black/55 hover:border-teal-500/35 hover:-translate-y-0.5 active:scale-[0.98] transition-all duration-200 p-4 rounded-xl border border-white/5 space-y-3 flex flex-col justify-between cursor-pointer group shadow hover:shadow-teal-550/10"
+                    title="Clique para ver o detalhamento financeiro do mês"
                   >
                     <div className="flex items-center justify-between border-b border-white/5 pb-2">
-                      <span className="font-bold text-xs uppercase tracking-wide text-white">{m.nome}</span>
-                      <span className="text-[10px] bg-teal-500/10 px-2 py-0.5 rounded text-teal-300 font-mono font-bold">
-                        {m.partidasCount} {m.partidasCount === 1 ? 'jogo' : 'jogos'}
-                      </span>
+                      <span className="font-bold text-xs uppercase tracking-wide text-white group-hover:text-teal-300 transition-colors">{m.nome}</span>
+                      <div className="flex items-center gap-1.5 shrink-0 select-none">
+                        <span className="text-[10px] bg-teal-500/10 px-2 py-0.5 rounded text-teal-300 font-mono font-bold">
+                          {m.partidasCount} {m.partidasCount === 1 ? 'jogo' : 'jogos'}
+                        </span>
+                        {jogadorAtual?.role === 'admin' && (
+                          <button
+                            type="button"
+                            onClick={(e) => {
+                              e.stopPropagation(); // Evitar abrir modal de detalhes ao clicar em deletar
+                              if (deletarMesConfirmId === m.mesRef) {
+                                if (onLimparDadosDoMes) {
+                                  onLimparDadosDoMes(m.mesRef);
+                                }
+                                setDeletarMesConfirmId(null);
+                              } else {
+                                setDeletarMesConfirmId(m.mesRef);
+                                setTimeout(() => setDeletarMesConfirmId(prev => prev === m.mesRef ? null : prev), 3500);
+                              }
+                            }}
+                            className={`px-1.5 py-0.5 text-[9px] font-bold rounded transition-all uppercase leading-none font-sans ${
+                              deletarMesConfirmId === m.mesRef
+                                ? 'bg-red-500 text-black font-black animate-pulse border border-red-400'
+                                : 'text-rose-400 hover:text-rose-300 bg-rose-955/20 border border-rose-500/10 hover:bg-rose-955/40 hover:border-rose-500/30'
+                            }`}
+                            title="Limpar todos os registros e mensalidades deste mês"
+                          >
+                            {deletarMesConfirmId === m.mesRef ? 'Confirma?' : 'Deletar'}
+                          </button>
+                        )}
+                      </div>
                     </div>
 
                     <div className="space-y-1.5 text-xs font-mono">
@@ -1480,6 +1632,253 @@ export default function ControleCaixa({
         )}
       </div>
 
+      {/* POPUP DE DETALHAMENTO FINANCEIRO DO MÊS */}
+      {detalhesMesModal && statsModal && (
+        <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/80 backdrop-blur-md animate-fade-in text-white">
+          <div 
+            className="w-full max-w-4xl max-h-[90vh] border border-white/10 rounded-2xl p-6 shadow-2xl flex flex-col justify-between overflow-hidden relative font-sans"
+            onClick={(e) => e.stopPropagation()}
+            style={{ backgroundColor: '#021a14' }}
+          >
+            {/* Header */}
+            <div className="flex items-center justify-between border-b border-white/10 pb-4">
+              <div className="space-y-1 text-left">
+                <span className="text-[10px] font-mono tracking-wider font-bold text-teal-400 bg-teal-500/10 px-2.5 py-0.5 rounded-full uppercase">
+                  Auditoria de Caixa
+                </span>
+                <h3 className="font-display font-black text-lg text-white uppercase tracking-wider">
+                  Detalhamento de {statsModal.nomeMesExtenso}
+                </h3>
+              </div>
+              <button
+                type="button"
+                onClick={() => setDetalhesMesModal(null)}
+                className="w-8 h-8 rounded-lg bg-black/20 hover:bg-white/10 border border-white/10 flex items-center justify-center text-emerald-300 hover:text-white transition-all cursor-pointer"
+                title="Fechar Detalhes"
+              >
+                <X className="w-4 h-4" />
+              </button>
+            </div>
+
+            {/* Modal Body */}
+            <div className="flex-1 overflow-y-auto pr-1 py-4 space-y-6 scrollbar-thin">
+              
+              {/* Row of BIG METRICS CARDS */}
+              <div className="grid grid-cols-1 sm:grid-cols-3 gap-4 text-left">
+                {/* Receitas Box */}
+                <div className="bg-emerald-900/30 border border-white/10 p-4 rounded-xl flex flex-col justify-between">
+                  <div>
+                    <span className="text-[9px] text-emerald-450 uppercase font-mono font-bold tracking-wider">Arrecadação Total</span>
+                    <h4 className="text-xl font-mono font-bold text-teal-300 mt-1">R$ {statsModal.receitaTotal.toFixed(2)}</h4>
+                  </div>
+                  <div className="text-[10px] text-emerald-300/80 border-t border-white/5 pt-2 mt-2.5 space-y-1 font-mono">
+                    <div className="flex justify-between">
+                      <span>Mensalistas:</span>
+                      <span className="text-white">R$ {statsModal.recMensalistas.toFixed(2)}</span>
+                    </div>
+                    <div className="flex justify-between">
+                      <span>Diaristas:</span>
+                      <span className="text-white">R$ {statsModal.recDiaristas.toFixed(2)}</span>
+                    </div>
+                    {statsModal.recAvulsa > 0 && (
+                      <div className="flex justify-between">
+                        <span>Avulsos:</span>
+                        <span className="text-white">R$ {statsModal.recAvulsa.toFixed(2)}</span>
+                      </div>
+                    )}
+                  </div>
+                </div>
+
+                {/* Despesas Box */}
+                <div className="bg-emerald-995 border border-white/10 p-4 rounded-xl flex flex-col justify-between">
+                  <div>
+                    <span className="text-[9px] text-rose-350 uppercase font-mono font-bold tracking-wider">Custo de Operação</span>
+                    <h4 className="text-xl font-mono font-bold text-rose-300 mt-1">R$ {statsModal.despesaTotal.toFixed(2)}</h4>
+                  </div>
+                  <div className="text-[10px] text-rose-300/80 border-t border-white/5 pt-2 mt-2.5 space-y-1 font-mono">
+                    <div className="flex justify-between">
+                      <span>Aluguel ({statsModal.partidasCount} jogos):</span>
+                      <span className="text-white">R$ {statsModal.despesaAluguel.toFixed(2)}</span>
+                    </div>
+                    <div className="flex justify-between">
+                      <span>Outras Despesas:</span>
+                      <span className="text-white">R$ {statsModal.despesaAvulsa.toFixed(2)}</span>
+                    </div>
+                  </div>
+                </div>
+
+                {/* Saldo Líquido Box */}
+                <div className="bg-emerald-900/30 border border-white/10 p-4 rounded-xl flex flex-col justify-between">
+                  <div>
+                    <span className="text-[9px] text-zinc-350 uppercase font-mono font-bold tracking-wider">Resultado Líquido</span>
+                    <h4 className={`text-xl font-mono font-bold mt-1 ${statsModal.saldo >= 0 ? 'text-teal-400' : 'text-rose-455'}`}>
+                      R$ {statsModal.saldo.toFixed(2)}
+                    </h4>
+                  </div>
+                  <div className="text-[10px] border-t border-white/5 pt-2 mt-2.5 space-y-1 font-mono">
+                    <div className="flex justify-between">
+                      <span className="text-zinc-400">Atletas Ativos:</span>
+                      <span className="font-bold text-white">{statsModal.ativosCount}</span>
+                    </div>
+                    <div className="flex justify-between">
+                      <span className="text-zinc-400">Total Pagamentos:</span>
+                      <span className="font-bold text-teal-300">{statsModal.pagantesCount} pagos</span>
+                    </div>
+                  </div>
+                </div>
+              </div>
+
+              {/* Lists detail split inside layout */}
+              <div className="grid grid-cols-1 lg:grid-cols-2 gap-5">
+                
+                {/* List of Quitados */}
+                <div className="bg-black/30 border border-white/5 rounded-xl p-4 flex flex-col h-64 text-left">
+                  <div className="flex items-center justify-between border-b border-white/5 pb-2 mb-2 shrink-0">
+                    <h4 className="text-[10px] font-bold uppercase tracking-wider text-teal-400 flex items-center gap-1.5">
+                      <CheckCircle2 className="w-3.5 h-3.5 text-teal-400" />
+                      Quitados ({statsModal.pagantesCount})
+                    </h4>
+                    <span className="text-[10px] font-bold text-teal-355 font-mono">
+                      R$ {(statsModal.recDiaristas + statsModal.recMensalistas).toFixed(2)}
+                    </span>
+                  </div>
+
+                  {statsModal.pagantesM.length === 0 ? (
+                    <div className="flex-1 flex items-center justify-center text-xs text-emerald-500/50 italic font-sans">
+                      Nenhum pagamento quitado registrado neste mês.
+                    </div>
+                  ) : (
+                    <div className="flex-1 overflow-y-auto pr-1 space-y-1 font-sans">
+                      {statsModal.pagantesM.map((p, idx) => {
+                        const avatar = AVATAR_PRESETS.find(pr => pr.id === p.jogador.foto) || AVATAR_PRESETS[0];
+                        return (
+                          <div key={p.pagamento.id || idx} className="flex items-center justify-between p-2 bg-emerald-955/10 rounded-lg border border-white/5 h-12">
+                            <div className="flex items-center gap-2 overflow-hidden">
+                              <div className="w-6.5 h-6.5 rounded-full flex items-center justify-center text-[10px] font-bold shrink-0 border border-white/5 text-white" style={{ backgroundColor: avatar.color }}>
+                                {p.jogador.nome.substring(0, 1)}
+                              </div>
+                              <div className="truncate">
+                                <p className="text-[11px] font-bold text-white truncate">{p.jogador.nome} {p.jogador.sobrenome}</p>
+                                <p className="text-[9px] text-amber-400/80 uppercase font-black tracking-tighter">{p.jogador.membroStatus}</p>
+                              </div>
+                            </div>
+                            <span className="text-[10px] font-mono text-teal-350 font-extrabold bg-teal-500/10 px-2 py-0.5 rounded shrink-0">
+                              R$ {p.pagamento.valor.toFixed(2)}
+                            </span>
+                          </div>
+                        );
+                      })}
+                    </div>
+                  )}
+                </div>
+
+                {/* List of active roster */}
+                <div className="bg-black/30 border border-white/5 rounded-xl p-4 flex flex-col h-64 text-left">
+                  <div className="flex items-center justify-between border-b border-white/5 pb-2 mb-2 shrink-0">
+                    <h4 className="text-[10px] font-bold uppercase tracking-wider text-emerald-400 flex items-center gap-1.5">
+                      <Users className="w-3.5 h-3.5 text-emerald-400" />
+                      Relação de Atletas Ativos ({statsModal.ativosCount})
+                    </h4>
+                    <span className="text-[9.5px] text-emerald-450 italic font-medium">Faturamento e Rateio Base</span>
+                  </div>
+
+                  {ativosM.length === 0 ? (
+                    <div className="flex-1 flex items-center justify-center text-xs text-emerald-500/50 italic font-sans">
+                      Nenhum atleta listado como ativo para o mês.
+                    </div>
+                  ) : (
+                    <div className="flex-1 overflow-y-auto pr-1 space-y-1 font-sans">
+                      {ativosM.map((at, idx) => {
+                        const avatar = AVATAR_PRESETS.find(pr => pr.id === at.foto) || AVATAR_PRESETS[0];
+                        const jaPago = pagamentos.some(p => p.jogadorId === at.id && p.mesRef === detalhesMesModal && p.status === 'pago');
+                        return (
+                          <div key={at.id || idx} className="flex items-center justify-between p-2 bg-emerald-955/10 rounded-lg border border-white/5 h-12">
+                            <div className="flex items-center gap-2 overflow-hidden">
+                              <div className="w-6.5 h-6.5 rounded-full flex items-center justify-center text-[10px] font-bold shrink-0 border border-white/5 text-white" style={{ backgroundColor: avatar.color }}>
+                                {at.nome.substring(0, 1)}
+                              </div>
+                              <div className="truncate">
+                                <p className="text-[11px] font-bold text-white truncate">{at.nome} {at.sobrenome}</p>
+                                <p className="text-[9px] text-emerald-400/80 font-mono leading-none">{at.posicao}</p>
+                              </div>
+                            </div>
+                            <span className={`text-[9px] font-bold uppercase py-0.5 px-2 rounded-full border shrink-0 ${
+                              jaPago 
+                                ? 'bg-teal-500/15 border-teal-500/30 text-teal-300' 
+                                : 'bg-rose-500/15 border-rose-500/20 text-rose-350'
+                            }`}>
+                              {jaPago ? 'Pago' : 'Pendente'}
+                            </span>
+                          </div>
+                        );
+                      })}
+                    </div>
+                  )}
+                </div>
+
+                {/* List of outstanding debts */}
+                <div className="bg-black/30 border border-white/5 rounded-xl p-4 flex flex-col h-64 text-left lg:col-span-2">
+                  <div className="flex items-center justify-between border-b border-white/5 pb-2 mb-2 shrink-0">
+                    <h4 className="text-[10px] font-bold uppercase tracking-wider text-rose-455 flex items-center gap-1.5 animate-pulse">
+                      <AlertCircle className="w-3.5 h-3.5 text-rose-455" />
+                      Inadimplência de Mensalistas / Diaristas ({statsModal.debitosM.length})
+                    </h4>
+                    <span className="text-[10px] font-bold text-rose-350 font-mono">
+                      R$ {statsModal.totalDebitos.toFixed(2)} pendente
+                    </span>
+                  </div>
+
+                  {statsModal.debitosM.length === 0 ? (
+                    <div className="flex-1 flex flex-col items-center justify-center text-center p-4 bg-teal-555/5 border border-teal-500/20 rounded-xl space-y-1">
+                      <CheckCircle2 className="w-6 h-6 text-teal-400" />
+                      <p className="text-teal-400 text-xs font-bold font-sans">Sem inadimplências!</p>
+                      <p className="text-[10px] text-teal-300/75">Excelente! Todos os atletas assíduos quitaram as pendências do mês.</p>
+                    </div>
+                  ) : (
+                    <div className="flex-1 overflow-y-auto pr-1 space-y-1.5 font-sans">
+                      {statsModal.debitosM.map((deb, idx) => {
+                        const avatar = AVATAR_PRESETS.find(pr => pr.id === deb.jogadorFoto) || AVATAR_PRESETS[0];
+                        return (
+                          <div key={deb.id || idx} className="flex items-center justify-between p-2.5 bg-rose-955/15 hover:bg-rose-955/25 transition-all rounded-lg border border-rose-500/10">
+                            <div className="flex items-center gap-2 overflow-hidden">
+                              <div className="w-7 h-7 rounded-full flex items-center justify-center text-[10px] font-bold shrink-0 border border-white/5 text-white" style={{ backgroundColor: avatar.color }}>
+                                {deb.jogadorNome.substring(0, 1)}
+                              </div>
+                              <div className="truncate">
+                                <p className="text-[11px] font-bold text-white truncate">{deb.jogadorNome} {deb.jogadorSobrenome}</p>
+                                <p className="text-[9px] text-rose-400 font-sans truncate">
+                                  Débito de <span className="uppercase font-semibold">{deb.tipo}</span> • Referência {deb.referencia}
+                                </p>
+                              </div>
+                            </div>
+                            <span className="text-[10px] font-mono text-rose-400 font-black bg-rose-500/10 border border-rose-555/20 px-2 py-0.5 rounded shrink-0">
+                              R$ {deb.valor.toFixed(2)}
+                            </span>
+                          </div>
+                        );
+                      })}
+                    </div>
+                  )}
+                </div>
+
+              </div>
+
+            </div>
+
+            {/* Footer */}
+            <div className="border-t border-white/10 pt-3 mt-4 flex items-center justify-between text-[10px] text-emerald-450 font-sans shrink-0">
+              <span className="font-semibold tracking-wider uppercase">Pelada Batista • Gestão de Elenco</span>
+              <button
+                type="button"
+                onClick={() => setDetalhesMesModal(null)}
+                className="bg-teal-500 hover:bg-teal-400 text-emerald-950 font-extrabold text-xs px-4 py-2 rounded-lg transition-all cursor-pointer"
+              >
+                Voltar
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
     </div>
   );
 }

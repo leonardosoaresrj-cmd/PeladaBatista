@@ -27,6 +27,7 @@ export default function MensalistasMes({
 }: MensalistasMesProps) {
   const [filtroPesquisa, setFiltroPesquisa] = useState('');
   const [mesSelecionado, setMesSelecionado] = useState('2026-06');
+  const [removerConfirmId, setRemoverConfirmId] = useState<string | null>(null);
 
   const opcoesMeses = [
     { value: '2026-05', label: 'Maio / 2026' },
@@ -227,38 +228,63 @@ export default function MensalistasMes({
 
                   {/* Botão de Quitação para ADMINISTRADOR */}
                   {jogadorAtual?.role === 'admin' && (
-                    <div className="min-w-16 flex justify-end">
+                    <div className="flex items-center gap-1.5 shrink-0 select-none">
                       {status === 'cancelado' ? (
                         <button
                           type="button"
                           onClick={() => {
                             onRegistrarPagamento(jogador.id, mesSelecionado, 'pendente', null, valorMensalidadeMês);
                           }}
-                          className="py-1 px-2 bg-emerald-700/80 hover:bg-emerald-600 text-white font-bold text-[9px] rounded transition-all cursor-pointer uppercase"
+                          className="py-1 px-2.5 bg-emerald-700/80 hover:bg-emerald-600 text-white font-bold text-[9px] rounded transition-all cursor-pointer uppercase font-sans"
                         >
                           Reativar
                         </button>
-                      ) : status === 'pendente' || status === 'pendente_confirmacao' ? (
-                        <button
-                          type="button"
-                          onClick={() => {
-                            const hojeStr = new Date().toISOString().split('T')[0];
-                            onRegistrarPagamento(jogador.id, mesSelecionado, 'pago', hojeStr, valorMensalidadeMês);
-                          }}
-                          className="py-1 px-2.5 bg-teal-500 hover:bg-teal-400 text-black font-black text-[10px] rounded transition-all cursor-pointer uppercase tracking-wide active:scale-97"
-                        >
-                          Quitar
-                        </button>
                       ) : (
-                        <button
-                          type="button"
-                          onClick={() => {
-                            onRegistrarPagamento(jogador.id, mesSelecionado, 'pendente', null, valorMensalidadeMês);
-                          }}
-                          className="py-1 px-2 bg-rose-950/50 border border-rose-500/20 hover:bg-rose-900 text-rose-300 font-bold text-[9px] rounded transition-all cursor-pointer uppercase"
-                        >
-                          Estornar
-                        </button>
+                        <div className="flex items-center gap-1.5">
+                          {status === 'pendente' || status === 'pendente_confirmacao' ? (
+                            <button
+                              type="button"
+                              onClick={() => {
+                                const hojeStr = new Date().toISOString().split('T')[0];
+                                onRegistrarPagamento(jogador.id, mesSelecionado, 'pago', hojeStr, valorMensalidadeMês);
+                              }}
+                              className="py-1 px-2.5 bg-teal-500 hover:bg-teal-400 text-black font-black text-[10px] rounded transition-all cursor-pointer uppercase tracking-wide active:scale-97 font-sans"
+                            >
+                              Quitar
+                            </button>
+                          ) : (
+                            <button
+                              type="button"
+                              onClick={() => {
+                                onRegistrarPagamento(jogador.id, mesSelecionado, 'pendente', null, valorMensalidadeMês);
+                              }}
+                              className="py-1 px-2 bg-rose-955/50 border border-rose-500/20 hover:bg-rose-900 text-rose-300 font-bold text-[9px] rounded transition-all cursor-pointer uppercase font-sans"
+                            >
+                              Estornar
+                            </button>
+                          )}
+
+                          <button
+                            type="button"
+                            onClick={() => {
+                              if (removerConfirmId === jogador.id) {
+                                onRegistrarPagamento(jogador.id, mesSelecionado, 'cancelado', null, valorMensalidadeMês);
+                                setRemoverConfirmId(null);
+                              } else {
+                                setRemoverConfirmId(jogador.id);
+                                setTimeout(() => setRemoverConfirmId(prev => prev === jogador.id ? null : prev), 3005);
+                              }
+                            }}
+                            className={`py-1 px-1.5 rounded transition-all cursor-pointer uppercase text-[9px] font-bold font-sans ${
+                              removerConfirmId === jogador.id
+                                ? 'bg-red-500 text-black font-black animate-pulse border border-red-500'
+                                : 'text-rose-400 hover:text-rose-300 bg-rose-955/20 border border-rose-500/10 hover:bg-rose-955/40'
+                            }`}
+                            title="Remover / Cancelar Cobrança"
+                          >
+                            {removerConfirmId === jogador.id ? 'Confirma?' : 'Remover'}
+                          </button>
+                        </div>
                       )}
                     </div>
                   )}
