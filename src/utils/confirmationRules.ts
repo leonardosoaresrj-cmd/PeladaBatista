@@ -169,7 +169,7 @@ export function obterDebitosDoJogador(
           valor: valorMensalidade,
           status: 'pendente'
         });
-      } else if (pag.status !== 'pago') {
+      } else if (pag.status !== 'pago' && pag.status !== 'cancelado') {
         debitos.push({
           id: pag.id,
           tipo: 'mensalidade',
@@ -190,7 +190,7 @@ export function obterDebitosDoJogador(
 
     for (const partida of partidasPassadasConfirmadas) {
       const pag = pagamentos.find(p => {
-        return p.jogadorId === jogadorId && (p.partidaId === partida.id || (p.mesRef === partida.data.substring(0, 7) && !p.partidaId && p.status === 'pago'));
+        return p.jogadorId === jogadorId && (p.partidaId === partida.id || (p.mesRef === partida.data.substring(0, 7) && !p.partidaId && (p.status === 'pago' || p.status === 'cancelado')));
       });
 
       if (!pag) {
@@ -204,7 +204,7 @@ export function obterDebitosDoJogador(
           status: 'pendente',
           partidaId: partida.id
         });
-      } else if (pag.status !== 'pago') {
+      } else if (pag.status !== 'pago' && pag.status !== 'cancelado') {
         debitos.push({
           id: pag.id,
           tipo: 'diaria',

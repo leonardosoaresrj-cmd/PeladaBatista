@@ -26,7 +26,7 @@ interface ControlePagamentosProps {
   pagamentos: Pagamento[];
   jogadores: Jogador[];
   jogadorAtual: Jogador;
-  onRegistrarPagamento: (jogadorId: string, mesRef: string, status: 'pago' | 'pendente' | 'pendente_confirmacao', dataPagamento: string | null, valor: number, partidaId?: string) => void;
+  onRegistrarPagamento: (jogadorId: string, mesRef: string, status: 'pago' | 'pendente' | 'pendente_confirmacao' | 'cancelado', dataPagamento: string | null, valor: number, partidaId?: string) => void;
   valor4Sabados: number;
   valor5Sabados: number;
   valorDiaria: number;
@@ -60,6 +60,9 @@ export default function ControlePagamentos({
 }: ControlePagamentosProps) {
   // Filtro de mês de referência para a cobrança atual
   const [mesSelecionado, setMesSelecionado] = useState('2026-05');
+
+  // Estado para confirmar cancelamento sem window.confirm
+  const [cancelarConfirmId, setCancelarConfirmId] = useState<string | null>(null);
 
   // Controle de estado do pop-up de checkout PIX Mercado Pago
   const [isCheckoutOpen, setIsCheckoutOpen] = useState(false);
@@ -388,20 +391,68 @@ export default function ControlePagamentos({
                     </div>
 
                     {deb.status === 'pendente' ? (
-                      <button
-                        type="button"
-                        onClick={() => {
-                          abrirCheckout([deb]);
-                        }}
-                        className="py-1.5 px-3 bg-rose-500 text-black hover:bg-rose-400 font-black text-[10px] rounded-lg transition-all shadow cursor-pointer uppercase tracking-wider active:scale-97 flex items-center gap-1 font-sans font-bold"
-                      >
-                        <RefreshCw className="w-3 h-3 text-black animate-spin-slow" />
-                        Quitar Débito
-                      </button>
+                      <div className="flex flex-wrap items-center gap-2">
+                        <button
+                          type="button"
+                          onClick={() => {
+                            abrirCheckout([deb]);
+                          }}
+                          className="py-1.5 px-3 bg-rose-500 text-black hover:bg-rose-400 font-black text-[10px] rounded-lg transition-all shadow cursor-pointer uppercase tracking-wider active:scale-97 flex items-center gap-1 font-sans font-bold"
+                        >
+                          <RefreshCw className="w-3 h-3 text-black animate-spin-slow" />
+                          Quitar Débito
+                        </button>
+
+                        {jogadorAtual.role === 'admin' && (
+                          <button
+                            type="button"
+                            onClick={() => {
+                              if (cancelarConfirmId === deb.id) {
+                                onRegistrarPagamento(jogadorAtual.id, deb.mesRef, 'cancelado', null, deb.valor, deb.partidaId);
+                                setCancelarConfirmId(null);
+                              } else {
+                                setCancelarConfirmId(deb.id);
+                                setTimeout(() => setCancelarConfirmId(prev => prev === deb.id ? null : prev), 3000);
+                              }
+                            }}
+                            className={`py-1.5 px-2.5 rounded-lg transition-all cursor-pointer uppercase active:scale-97 text-[10px] font-bold ${
+                              cancelarConfirmId === deb.id
+                                ? 'bg-red-500 text-black font-black animate-pulse border border-red-500'
+                                : 'bg-rose-950/60 border border-rose-500/30 text-rose-300 hover:bg-rose-900'
+                            }`}
+                          >
+                            {cancelarConfirmId === deb.id ? 'Confirmar Cancelamento?' : 'Cancelar Cobrança'}
+                          </button>
+                        )}
+                      </div>
                     ) : (
-                      <span className="text-[10px] font-mono text-emerald-400 bg-emerald-950/40 py-1 px-2.5 rounded border border-emerald-500/20">
-                        Pendente Confirmação
-                      </span>
+                      <div className="flex flex-wrap items-center gap-2">
+                        <span className="text-[10px] font-mono text-emerald-400 bg-emerald-950/40 py-1 px-2.5 rounded border border-emerald-500/20 whitespace-nowrap">
+                          Pendente Confirmação
+                        </span>
+
+                        {jogadorAtual.role === 'admin' && (
+                          <button
+                            type="button"
+                            onClick={() => {
+                              if (cancelarConfirmId === deb.id) {
+                                onRegistrarPagamento(jogadorAtual.id, deb.mesRef, 'cancelado', null, deb.valor, deb.partidaId);
+                                setCancelarConfirmId(null);
+                              } else {
+                                setCancelarConfirmId(deb.id);
+                                setTimeout(() => setCancelarConfirmId(prev => prev === deb.id ? null : prev), 3000);
+                              }
+                            }}
+                            className={`py-1.5 px-2.5 rounded-lg transition-all cursor-pointer uppercase active:scale-97 text-[10px] font-bold ${
+                              cancelarConfirmId === deb.id
+                                ? 'bg-red-500 text-black font-black animate-pulse border border-red-500'
+                                : 'bg-rose-950/60 border border-rose-500/30 text-rose-300 hover:bg-rose-900'
+                            }`}
+                          >
+                            {cancelarConfirmId === deb.id ? 'Confirmar Cancelamento?' : 'Cancelar Cobrança'}
+                          </button>
+                        )}
+                      </div>
                     )}
                   </div>
                 </div>
@@ -421,6 +472,10 @@ export default function ControlePagamentos({
           <div className="bg-black/25 rounded-2xl overflow-hidden border border-white/5 divide-y divide-white/5 font-sans">
             {competencasDisponiveis.map((comp) => {
               const checkPg = obterPagamentoDoJogador(comp.value);
+              
+              // Se o pagamento foi cancelado, ocultamos do histórico (deletado do histórico)
+              if ((checkPg?.status as any) === 'cancelado') return null;
+
               const isGoleiro = jogadorAtual.posicao === 'Goleiro';
               const isCompPaid = isGoleiro || checkPg?.status === 'pago';
 
@@ -447,19 +502,23 @@ export default function ControlePagamentos({
                     <span className={`px-2.5 py-0.5 rounded text-[9px] font-black font-mono uppercase tracking-wider ${
                       isGoleiro 
                         ? 'bg-teal-555/40 border border-teal-500/30 text-teal-400' 
-                        : checkPg?.status === 'pendente_confirmacao'
+                        : (checkPg?.status as any) === 'pendente_confirmacao'
                           ? 'bg-amber-955/70 border border-amber-500/20 text-amber-500'
-                          : isCompPaid 
-                            ? 'bg-teal-900/60 border border-teal-500/30 text-teal-400' 
-                            : 'bg-rose-955/60 border border-rose-500/30 text-rose-455'
+                          : (checkPg?.status as any) === 'cancelado'
+                            ? 'bg-slate-800/60 border border-slate-700/30 text-slate-400 line-through'
+                            : isCompPaid 
+                              ? 'bg-teal-900/60 border border-teal-500/30 text-teal-400' 
+                              : 'bg-rose-955/60 border border-rose-500/30 text-rose-455'
                     }`}>
                       {isGoleiro 
                         ? 'ISENTO' 
-                        : checkPg?.status === 'pendente_confirmacao' 
+                        : (checkPg?.status as any) === 'pendente_confirmacao' 
                           ? 'AGUARDANDO VALID' 
-                          : isCompPaid 
-                            ? 'QUITADO' 
-                            : 'PENDENTE'}
+                          : (checkPg?.status as any) === 'cancelado'
+                            ? 'CANCELADO'
+                            : isCompPaid 
+                              ? 'QUITADO' 
+                              : 'PENDENTE'}
                     </span>
 
                     {checkPg?.dataPagamento && (

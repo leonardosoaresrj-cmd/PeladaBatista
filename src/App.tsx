@@ -675,7 +675,7 @@ export default function App() {
   const handleRegistrarPagamento = async (
     jogadorId: string,
     mesRef: string,
-    status: 'pago' | 'pendente' | 'pendente_confirmacao',
+    status: 'pago' | 'pendente' | 'pendente_confirmacao' | 'cancelado',
     dataPagamento: string | null,
     valor: number,
     partidaId?: string
@@ -802,14 +802,14 @@ export default function App() {
         </div>
       </header>
 
-      {/* ÁREA DE CONTEÚDO PRINCIPAL COM LAYOUT FLEX PARA MENU LATERAL */}
-      <div className={`flex-grow w-full max-w-7xl mx-auto flex ${jogadorAtual ? 'flex-row' : 'flex-col'} items-start p-3 sm:p-4 md:p-6 gap-3 sm:gap-4 md:gap-6 relative z-10`}>
+      {/* ÁREA DE CONTEÚDO PRINCIPAL COM LAYOUT FLEX ADAPTÁVEL PARA CELULAR (flex-col) E DESKTOP (flex-row) */}
+      <div className={`flex-grow w-full max-w-7xl mx-auto flex flex-col md:flex-row items-start p-3 sm:p-4 md:p-6 gap-4 sm:gap-5 md:gap-6 relative z-10`}>
         
-        {/* MENU NAVEGAÇÃO VERTICAL (No lado esquerdo, somente se autenticado) */}
+        {/* MENU NAVEGAÇÃO HORIZONTAL NO CELULAR / VERTICAL NO DESKTOP (Somente se autenticado) */}
         {jogadorAtual && (
-          <aside className="w-14 sm:w-16 md:w-64 shrink-0 p-1.5 md:p-4 rounded-2xl bg-emerald-900/25 border border-white/10 md:sticky md:top-24 gap-2 flex flex-col shadow-xl backdrop-blur-md">
+          <aside className="w-full md:w-64 shrink-0 p-2 md:p-4 rounded-2xl bg-emerald-900/25 border border-white/10 md:sticky md:top-24 gap-1.5 md:gap-2 flex flex-row md:flex-col overflow-x-auto md:overflow-visible shadow-xl backdrop-blur-md select-none whitespace-nowrap [&::-webkit-scrollbar]:hidden [-ms-overflow-style:none] [scrollbar-width:none]">
             
-            <div className="hidden md:block px-3.5 pb-2 border-b border-white/5 text-[10px] font-bold text-emerald-400 uppercase tracking-widest font-mono">
+            <div className="hidden md:block px-3.5 pb-2 border-b border-white/5 text-[10px] font-bold text-emerald-400 uppercase tracking-widest font-mono shrink-0">
               Menu de Acesso
             </div>
 
@@ -817,106 +817,106 @@ export default function App() {
               id="tab-calendario"
               type="button"
               onClick={() => setActiveTab('calendario')}
-              className={`w-full py-3 px-2 md:px-4 text-xs font-bold transition-all relative flex items-center justify-center md:justify-start gap-3 rounded-xl border-l-4 ${
+              className={`py-2 md:py-3 px-3 md:px-4 text-xs font-bold transition-all relative flex items-center justify-center md:justify-start gap-2.5 rounded-xl border-l-2 md:border-l-4 shrink-0 leading-none ${
                 activeTab === 'calendario' 
-                  ? 'text-white font-extrabold bg-white/10 border-teal-400 pl-1.5 md:pl-3' 
+                  ? 'text-white font-extrabold bg-white/10 border-teal-400 pl-3' 
                   : 'text-emerald-300 hover:text-white hover:bg-white/5 border-transparent'
               }`}
               title="Calendário de Jogos"
             >
               <Calendar className="w-4.5 h-4.5 text-emerald-400 shrink-0" />
-              <span className="hidden md:inline whitespace-nowrap text-left flex-grow">Calendário de Jogos</span>
+              <span className="whitespace-nowrap text-left">Calendário</span>
             </button>
 
             <button
               id="tab-confirmacao"
               type="button"
               onClick={() => setActiveTab('confirmacao')}
-              className={`w-full py-3 px-2 md:px-4 text-xs font-bold transition-all relative flex items-center justify-center md:justify-start gap-3 rounded-xl border-l-4 ${
+              className={`py-2 md:py-3 px-3 md:px-4 text-xs font-bold transition-all relative flex items-center justify-center md:justify-start gap-2.5 rounded-xl border-l-2 md:border-l-4 shrink-0 leading-none ${
                 activeTab === 'confirmacao' 
-                  ? 'text-white font-extrabold bg-white/10 border-teal-400 pl-1.5 md:pl-3' 
+                  ? 'text-white font-extrabold bg-white/10 border-teal-400 pl-3' 
                   : 'text-emerald-300 hover:text-white hover:bg-white/5 border-transparent'
               }`}
               title="Lista de Confirmação"
             >
               <CheckSquare className="w-4.5 h-4.5 text-emerald-400 shrink-0" />
-              <span className="hidden md:inline whitespace-nowrap text-left flex-grow">Lista de Confirmação</span>
+              <span className="whitespace-nowrap text-left">Presenças</span>
             </button>
 
             <button
               id="tab-elenco"
               type="button"
               onClick={() => setActiveTab('elenco')}
-              className={`w-full py-3 px-2 md:px-4 text-xs font-bold transition-all relative flex items-center justify-center md:justify-start gap-3 rounded-xl border-l-4 ${
+              className={`py-2 md:py-3 px-3 md:px-4 text-xs font-bold transition-all relative flex items-center justify-center md:justify-start gap-2.5 rounded-xl border-l-2 md:border-l-4 shrink-0 leading-none ${
                 activeTab === 'elenco' 
-                  ? 'text-white font-extrabold bg-white/10 border-teal-400 pl-1.5 md:pl-3' 
+                  ? 'text-white font-extrabold bg-white/10 border-teal-400 pl-3' 
                   : 'text-emerald-300 hover:text-white hover:bg-white/5 border-transparent'
               }`}
               title="Elenco Cadastrado"
             >
               <Users className="w-4.5 h-4.5 text-emerald-400 shrink-0" />
-              <span className="hidden md:inline whitespace-nowrap text-left flex-grow">Elenco Cadastrado</span>
+              <span className="whitespace-nowrap text-left">Elenco</span>
             </button>
 
             <button
               id="tab-financeiro"
               type="button"
               onClick={() => setActiveTab('financeiro')}
-              className={`w-full py-3 px-2 md:px-4 text-xs font-bold transition-all relative flex items-center justify-center md:justify-start gap-3 rounded-xl border-l-4 ${
+              className={`py-2 md:py-3 px-3 md:px-4 text-xs font-bold transition-all relative flex items-center justify-center md:justify-start gap-2.5 rounded-xl border-l-2 md:border-l-4 shrink-0 leading-none ${
                 activeTab === 'financeiro' 
-                  ? 'text-white font-extrabold bg-white/10 border-teal-400 pl-1.5 md:pl-3' 
+                  ? 'text-white font-extrabold bg-white/10 border-teal-400 pl-3' 
                   : 'text-emerald-300 hover:text-white hover:bg-white/5 border-transparent'
               }`}
               title="Pagamentos"
             >
               <DollarSign className="w-4.5 h-4.5 text-emerald-400 shrink-0" />
-              <span className="hidden md:inline whitespace-nowrap text-left flex-grow">Pagamentos</span>
+              <span className="whitespace-nowrap text-left">Pagamentos</span>
             </button>
 
             <button
               id="tab-mensalistas"
               type="button"
               onClick={() => setActiveTab('mensalistas')}
-              className={`w-full py-3 px-2 md:px-4 text-xs font-bold transition-all relative flex items-center justify-center md:justify-start gap-3 rounded-xl border-l-4 ${
+              className={`py-2 md:py-3 px-3 md:px-4 text-xs font-bold transition-all relative flex items-center justify-center md:justify-start gap-2.5 rounded-xl border-l-2 md:border-l-4 shrink-0 leading-none ${
                 activeTab === 'mensalistas' 
-                  ? 'text-white font-extrabold bg-white/10 border-teal-400 pl-1.5 md:pl-3' 
+                  ? 'text-white font-extrabold bg-white/10 border-teal-400 pl-3' 
                   : 'text-emerald-300 hover:text-white hover:bg-white/5 border-transparent'
               }`}
               title="Mensalistas do Mês"
             >
               <UserCheck className="w-4.5 h-4.5 text-emerald-400 shrink-0" />
-              <span className="hidden md:inline whitespace-nowrap text-left flex-grow">Mensalistas do Mês</span>
+              <span className="whitespace-nowrap text-left">Mensalistas</span>
             </button>
 
             <button
               id="tab-historico"
               type="button"
               onClick={() => setActiveTab('historico')}
-              className={`w-full py-3 px-2 md:px-4 text-xs font-bold transition-all relative flex items-center justify-center md:justify-start gap-3 rounded-xl border-l-4 ${
+              className={`py-2 md:py-3 px-3 md:px-4 text-xs font-bold transition-all relative flex items-center justify-center md:justify-start gap-2.5 rounded-xl border-l-2 md:border-l-4 shrink-0 leading-none ${
                 activeTab === 'historico' 
-                  ? 'text-white font-extrabold bg-white/10 border-teal-400 pl-1.5 md:pl-3' 
+                  ? 'text-white font-extrabold bg-white/10 border-teal-400 pl-3' 
                   : 'text-emerald-300 hover:text-white hover:bg-white/5 border-transparent'
               }`}
               title="Histórico de Jogos"
             >
               <History className="w-4.5 h-4.5 text-emerald-400 shrink-0" />
-              <span className="hidden md:inline whitespace-nowrap text-left flex-grow">Histórico de Jogos</span>
+              <span className="whitespace-nowrap text-left">Histórico</span>
             </button>
 
             {jogadorAtual.role === 'admin' && (
               <button
                 id="tab-caixa"
-                type="button; shadow-sm"
+                type="button"
                 onClick={() => setActiveTab('caixa')}
-                className={`w-full py-3 px-2 md:px-4 text-xs font-bold transition-all relative flex items-center justify-center md:justify-start gap-3 rounded-xl border-l-4 ${
+                className={`py-2 md:py-3 px-3 md:px-4 text-xs font-bold transition-all relative flex items-center justify-center md:justify-start gap-2.5 rounded-xl border-l-2 md:border-l-4 shrink-0 leading-none ${
                   activeTab === 'caixa' 
-                    ? 'text-white font-extrabold bg-white/10 border-teal-400 pl-1.5 md:pl-3' 
+                    ? 'text-white font-extrabold bg-white/10 border-teal-400 pl-3' 
                     : 'text-emerald-300 hover:text-white hover:bg-white/5 border-transparent'
                 }`}
                 title="Controle de Caixa"
               >
                 <TrendingUp className="w-4.5 h-4.5 text-emerald-400 shrink-0" />
-                <span className="hidden md:inline whitespace-nowrap text-left flex-grow font-semibold">Controle de Caixa</span>
+                <span className="whitespace-nowrap text-left">Caixa</span>
               </button>
             )}
 
@@ -925,15 +925,15 @@ export default function App() {
                 id="tab-admin"
                 type="button"
                 onClick={() => setActiveTab('admin')}
-                className={`w-full py-3 px-2 md:px-4 text-xs font-bold transition-all relative flex items-center justify-center md:justify-start gap-3 rounded-xl border-l-4 ${
+                className={`py-2 md:py-3 px-3 md:px-4 text-xs font-bold transition-all relative flex items-center justify-center md:justify-start gap-2.5 rounded-xl border-l-2 md:border-l-4 shrink-0 leading-none ${
                   activeTab === 'admin' 
-                    ? 'text-white font-extrabold bg-white/10 border-teal-400 pl-1.5 md:pl-3' 
+                    ? 'text-white font-extrabold bg-white/10 border-teal-400 pl-3' 
                     : 'text-emerald-300 hover:text-white hover:bg-white/5 border-transparent'
                 }`}
                 title="Painel de Aprovações"
               >
                 <Award className="w-4.5 h-4.5 text-emerald-400 shrink-0" />
-                <span className="hidden md:inline whitespace-nowrap text-left flex-grow">Painel de Aprovações</span>
+                <span className="whitespace-nowrap text-left">Aprovações</span>
               </button>
             )}
 
@@ -942,15 +942,15 @@ export default function App() {
                 id="tab-configuracao"
                 type="button"
                 onClick={() => setActiveTab('configuracao')}
-                className={`w-full py-3 px-2 md:px-4 text-xs font-bold transition-all relative flex items-center justify-center md:justify-start gap-3 rounded-xl border-l-4 ${
+                className={`py-2 md:py-3 px-3 md:px-4 text-xs font-bold transition-all relative flex items-center justify-center md:justify-start gap-2.5 rounded-xl border-l-2 md:border-l-4 shrink-0 leading-none ${
                   activeTab === 'configuracao' 
-                    ? 'text-white font-extrabold bg-white/10 border-teal-400 pl-1.5 md:pl-3' 
+                    ? 'text-white font-extrabold bg-white/10 border-teal-400 pl-3' 
                     : 'text-emerald-300 hover:text-white hover:bg-white/5 border-transparent'
                 }`}
                 title="Configuração do Sistema"
               >
                 <Settings className="w-4.5 h-4.5 text-emerald-400 shrink-0" />
-                <span className="hidden md:inline whitespace-nowrap text-left flex-grow font-semibold">Configuração</span>
+                <span className="whitespace-nowrap text-left">Sua Conta / PIX</span>
               </button>
             )}
 

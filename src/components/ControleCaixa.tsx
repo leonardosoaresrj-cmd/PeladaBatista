@@ -39,7 +39,7 @@ interface ControleCaixaProps {
   valorDiaria: number;
   valor4Sabados: number;
   valor5Sabados: number;
-  onRegistrarPagamento?: (jogadorId: string, mesRef: string, status: 'pago' | 'pendente' | 'pendente_confirmacao', dataPagamento: string | null, valor: number, partidaId?: string) => void;
+  onRegistrarPagamento?: (jogadorId: string, mesRef: string, status: 'pago' | 'pendente' | 'pendente_confirmacao' | 'cancelado', dataPagamento: string | null, valor: number, partidaId?: string) => void;
   jogadorAtual?: Jogador;
 }
 
@@ -60,6 +60,9 @@ export default function ControleCaixa({
 }: ControleCaixaProps) {
   // Estado para escopo de visualização (Mensal vs Anual Consolidado)
   const [visaoEscopo, setVisaoEscopo] = useState<'mensal' | 'anual'>('mensal');
+
+  // Estado para confirmar cancelamento sem window.confirm
+  const [cancelarConfirmId, setCancelarConfirmId] = useState<string | null>(null);
 
   // Estado para Mês de Referência do Caixa Geral
   const [mesSelecionado, setMesSelecionado] = useState('2026-05');
@@ -1297,21 +1300,46 @@ export default function ControleCaixa({
                       </span>
                     </div>
 
-                    {/* Botão de quitar débito - só aparece para o ADM */}
+                    {/* Botões administrativos - só aparece para o ADM */}
                     {jogadorAtual?.role === 'admin' && (
-                      <button
-                        type="button"
-                        id={`btn-quitar-debito-adm-${deb.id}`}
-                        onClick={() => {
-                          if (onRegistrarPagamento) {
-                            const hojeStr = new Date().toISOString().split('T')[0];
-                            onRegistrarPagamento(deb.jogadorId, deb.mesRef, 'pago', hojeStr, deb.valor, deb.partidaId);
-                          }
-                        }}
-                        className="py-1.5 px-3 bg-teal-500 hover:bg-teal-400 text-black font-black text-[11px] rounded-lg transition-all shadow cursor-pointer uppercase tracking-wider active:scale-97"
-                      >
-                        Quitar Débito
-                      </button>
+                      <div className="flex flex-wrap items-center gap-2">
+                        <button
+                          type="button"
+                          id={`btn-quitar-debito-adm-${deb.id}`}
+                          onClick={() => {
+                            if (onRegistrarPagamento) {
+                              const hojeStr = new Date().toISOString().split('T')[0];
+                              onRegistrarPagamento(deb.jogadorId, deb.mesRef, 'pago', hojeStr, deb.valor, deb.partidaId);
+                            }
+                          }}
+                          className="py-1.5 px-3 bg-teal-500 hover:bg-teal-400 text-black font-black text-[11px] rounded-lg transition-all shadow cursor-pointer uppercase tracking-wider active:scale-97"
+                        >
+                          Quitar Débito
+                        </button>
+                        
+                        <button
+                          type="button"
+                          id={`btn-cancelar-debito-adm-${deb.id}`}
+                          onClick={() => {
+                            if (onRegistrarPagamento) {
+                              if (cancelarConfirmId === deb.id) {
+                                onRegistrarPagamento(deb.jogadorId, deb.mesRef, 'cancelado', null, deb.valor, deb.partidaId);
+                                setCancelarConfirmId(null);
+                              } else {
+                                setCancelarConfirmId(deb.id);
+                                setTimeout(() => setCancelarConfirmId(prev => prev === deb.id ? null : prev), 3000);
+                              }
+                            }
+                          }}
+                          className={`py-1.5 px-3 rounded-lg transition-all cursor-pointer uppercase active:scale-97 text-[11px] font-bold ${
+                            cancelarConfirmId === deb.id
+                              ? 'bg-red-500 text-black font-black animate-pulse border border-red-500'
+                              : 'bg-rose-950/60 border border-rose-500/40 hover:bg-rose-900 text-rose-300'
+                          }`}
+                        >
+                          {cancelarConfirmId === deb.id ? 'Confirmar?' : 'Cancelar Cobrança'}
+                        </button>
+                      </div>
                     )}
                   </div>
                 </div>

@@ -41,7 +41,7 @@ export interface Pagamento {
   id: string;
   jogadorId: string;
   mesRef: string; // Formato YYYY-MM
-  status: 'pago' | 'pendente' | 'pendente_confirmacao';
+  status: 'pago' | 'pendente' | 'pendente_confirmacao' | 'cancelado';
   dataPagamento: string | null;
   valor: number;
   partidaId?: string;

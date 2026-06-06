@@ -12,7 +12,7 @@ interface MensalistasMesProps {
   jogadores: Jogador[];
   pagamentos: Pagamento[];
   jogadorAtual: Jogador;
-  onRegistrarPagamento: (jogadorId: string, mesRef: string, status: 'pago' | 'pendente' | 'pendente_confirmacao', dataPagamento: string | null, valor: number) => void;
+  onRegistrarPagamento: (jogadorId: string, mesRef: string, status: 'pago' | 'pendente' | 'pendente_confirmacao' | 'cancelado', dataPagamento: string | null, valor: number) => void;
   valor4Sabados: number;
   valor5Sabados: number;
 }
@@ -211,20 +211,34 @@ export default function MensalistasMes({
                         ? 'text-teal-400' 
                         : status === 'pendente_confirmacao' 
                           ? 'text-amber-400 animate-pulse' 
-                          : 'text-rose-400'
+                          : status === 'cancelado'
+                            ? 'text-slate-400 line-through'
+                            : 'text-rose-400'
                     }`}>
                       {status === 'pago' 
                         ? 'Pago ✅' 
                         : status === 'pendente_confirmacao' 
                           ? 'Aguard. Confirmação ⏳' 
-                          : 'Pendente ❌'}
+                          : status === 'cancelado'
+                            ? 'Cancelado/Indevido 🚫'
+                            : 'Pendente ❌'}
                     </span>
                   </div>
 
                   {/* Botão de Quitação para ADMINISTRADOR */}
                   {jogadorAtual?.role === 'admin' && (
                     <div className="min-w-16 flex justify-end">
-                      {status === 'pendente' || status === 'pendente_confirmacao' ? (
+                      {status === 'cancelado' ? (
+                        <button
+                          type="button"
+                          onClick={() => {
+                            onRegistrarPagamento(jogador.id, mesSelecionado, 'pendente', null, valorMensalidadeMês);
+                          }}
+                          className="py-1 px-2 bg-emerald-700/80 hover:bg-emerald-600 text-white font-bold text-[9px] rounded transition-all cursor-pointer uppercase"
+                        >
+                          Reativar
+                        </button>
+                      ) : status === 'pendente' || status === 'pendente_confirmacao' ? (
                         <button
                           type="button"
                           onClick={() => {
