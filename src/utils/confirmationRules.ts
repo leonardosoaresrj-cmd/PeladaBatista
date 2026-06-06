@@ -363,3 +363,24 @@ Status: *PAGO & CONFIRMADO* ✅
 
 Muito obrigado pelo compromisso em manter o nosso futebol rodando redondo de campo pago e bola cheia! 🤝⚽🏃‍♂️💨`;
 }
+
+/**
+ * Retorna o status de membro efetivo do jogador (tratando mensalistas inadimplentes como diaristas)
+ */
+export function obterStatusMembroEfetivo(jogador: Jogador, pagamentos: Pagamento[]): 'mensalista' | 'diarista' | 'isento' {
+  if (jogador.posicao === 'Goleiro') return 'isento';
+  if (jogador.membroStatus !== 'mensalista') return jogador.membroStatus as 'diarista' | 'isento';
+
+  // Se o jogador é cadastrado como mensalista, ele precisa ter pagamentos com status 'pago' para os meses de cobrança ('2026-05' e '2026-06').
+  // Caso tenha algum débito de mensalidade com status diferente de 'pago' em algum destes meses, seu status efetivo passa a ser 'diarista'.
+  const mesesCobranca = ['2026-05', '2026-06'];
+  for (const mes of mesesCobranca) {
+    const pago = pagamentos.some(p => p.jogadorId === jogador.id && p.mesRef === mes && p.status === 'pago');
+    if (!pago) {
+      return 'diarista';
+    }
+  }
+
+  return 'mensalista';
+}
+

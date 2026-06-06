@@ -41,7 +41,7 @@ import ConfiguracaoSystem from './components/ConfiguracaoSystem';
 import MensalistasMes from './components/MensalistasMes';
 import HistoricoJogos from './components/HistoricoJogos';
 import { mesclarPartidasAutomáticas } from './utils/partidaHelper';
-import { obterTextoListaCompletaPartida, obterTextoQuitacaoMensalidade } from './utils/confirmationRules';
+import { obterTextoListaCompletaPartida, obterTextoQuitacaoMensalidade, obterStatusMembroEfetivo, obterDebitosDoJogador } from './utils/confirmationRules';
 import logoPelada from './assets/images/logo_pelada_batista_1780453160575.png';
 import { Calendar, Users, DollarSign, ShieldAlert, LogOut, Database, Award, User, Settings, UserCheck, History, CheckSquare, Check, X, Lock, Cake, TrendingUp } from 'lucide-react';
 
@@ -168,14 +168,14 @@ export default function App() {
     }
 
     // 3. Filtrar lançamentos avulsos que pertencem àquele mês
-    const novosLancamentos = lancamentos.filter(l => !l.data.startsWith(mesRef));
+    const novosLancamentos = lancamentos.filter(l => !l.data || !l.data.startsWith(mesRef));
     setLancamentos(novosLancamentos);
     saveLancamentos(novosLancamentos);
 
     // 4. Detetar partidas do mês (reais e sábados automáticos) e apagá-las/ocultá-las
     try {
       // Filtrar partidas reais guardadas que começam com o mesRef
-      const partidasDoMesReais = partidas.filter(p => p.data.startsWith(mesRef));
+      const partidasDoMesReais = partidas.filter(p => p.data && p.data.startsWith(mesRef));
       const partidasDoMesReaisIds = partidasDoMesReais.map(p => p.id);
 
       // Calcular sábados automáticos desse mês para adicionar a lista de deletadas
@@ -336,6 +336,68 @@ export default function App() {
   // Navegação de Abas
   const [activeTab, setActiveTab] = useState<'calendario' | 'confirmacao' | 'elenco' | 'financeiro' | 'caixa' | 'mensalistas' | 'historico' | 'admin' | 'db'>('calendario');
   const [partidaSelecionadaId, setPartidaSelecionadaId] = useState<string | null>(null);
+
+  // Estados de alertas pós-login (caso haja pendências financeiras)
+  const [mostrarPopUpAlertaMensalista, setMostrarPopUpAlertaMensalista] = useState(false);
+  const [mostrarPopUpAlertaDiarista, setMostrarPopUpAlertaDiarista] = useState(false);
+  const [diaristaDebitosParaAlerta, setDiaristaDebitosParaAlerta] = useState<any[]>([]);
+
+  // Helpers de status de membros dinâmicos/efetivos baseados em adimplência
+  const jogadorAtualEfetivo = useMemo(() => {
+    if (!jogadorAtual) return null;
+    return {
+      ...jogadorAtual,
+      membroStatus: obterStatusMembroEfetivo(jogadorAtual, pagamentos)
+    };
+  }, [jogadorAtual, pagamentos]);
+
+  const jogadoresEfetivos = useMemo(() => {
+    return jogadores.map(j => ({
+      ...j,
+      membroStatus: obterStatusMembroEfetivo(j, pagamentos)
+    }));
+  }, [jogadores, pagamentos]);
+
+  useEffect(() => {
+    if (jogadorAtual) {
+      const sessaoAlertaChave = `alerta_login_mostrado_${jogadorAtual.id}`;
+      const jaMostrado = sessionStorage.getItem(sessaoAlertaChave);
+      
+      if (!jaMostrado) {
+        // Calcular débitos reais do jogador usando status original cadastrado para checar pendências
+        const debs = obterDebitosDoJogador(
+          jogadorAtual.id,
+          jogadorAtual.membroStatus,
+          jogadorAtual.posicao,
+          partidasMescladas,
+          pagamentos,
+          valorDiaria,
+          valor4Sabados,
+          valor5Sabados
+        );
+
+        if (jogadorAtual.membroStatus === 'mensalista') {
+          const temMensalidadePendente = debs.some(d => d.tipo === 'mensalidade' && d.status === 'pendente');
+          if (temMensalidadePendente) {
+            setMostrarPopUpAlertaMensalista(true);
+            sessionStorage.setItem(sessaoAlertaChave, 'true');
+          }
+        } else if (jogadorAtual.membroStatus === 'diarista') {
+          const debsDiarias = debs.filter(d => d.tipo === 'diaria' && d.status === 'pendente');
+          if (debsDiarias.length > 0) {
+            setDiaristaDebitosParaAlerta(debsDiarias);
+            setMostrarPopUpAlertaDiarista(true);
+            sessionStorage.setItem(sessaoAlertaChave, 'true');
+          }
+        }
+      }
+    } else {
+      setMostrarPopUpAlertaMensalista(false);
+      setMostrarPopUpAlertaDiarista(false);
+      setDiaristaDebitosParaAlerta([]);
+    }
+  }, [jogadorAtual, pagamentos, partidasMescladas, valorDiaria, valor4Sabados, valor5Sabados]);
+
 
   // Carregar todos os dados (live Supabase com fallback Offline)
   const fetchTodoDados = async () => {
@@ -1074,9 +1136,9 @@ export default function App() {
               {activeTab === 'calendario' && (
                 <CalendarioJogos
                   partidas={partidasMescladas}
-                  jogadores={jogadores}
+                  jogadores={jogadoresEfetivos}
                   pagamentos={pagamentos}
-                  jogadorAtual={jogadorAtual}
+                  jogadorAtual={jogadorAtualEfetivo}
                   onSelectPartidaForConfirmation={setPartidaSelecionadaId}
                   onNavigateToTab={setActiveTab}
                   onCriarPartida={handleCriarPartida}
@@ -1088,8 +1150,8 @@ export default function App() {
               {activeTab === 'confirmacao' && (
                 <ConfirmacaoPresenca
                   partidas={partidasMescladas}
-                  jogadores={jogadores}
-                  jogadorAtual={jogadorAtual}
+                  jogadores={jogadoresEfetivos}
+                  jogadorAtual={jogadorAtualEfetivo}
                   partidaSelecionadaId={partidaSelecionadaId}
                   setPartidaSelecionadaId={setPartidaSelecionadaId}
                   onActualizarPresenca={handleActualizarPresenca}
@@ -1105,9 +1167,9 @@ export default function App() {
 
               {activeTab === 'elenco' && (
                 <ListaCadastrados
-                  jogadores={jogadores}
+                  jogadores={jogadoresEfetivos}
                   partidas={partidasMescladas}
-                  jogadorAtual={jogadorAtual}
+                  jogadorAtual={jogadorAtualEfetivo}
                   onExcluirJogador={handleExcluirJogador}
                   onEditarJogador={handleEditarJogador}
                 />
@@ -1160,17 +1222,17 @@ export default function App() {
               {activeTab === 'historico' && (
                 <HistoricoJogos
                   partidas={partidasMescladas}
-                  jogadores={jogadores}
-                  jogadorAtual={jogadorAtual}
+                  jogadores={jogadoresEfetivos}
+                  jogadorAtual={jogadorAtualEfetivo}
                   onDeletarPartida={handleDeletarPartida}
                 />
               )}
 
               {activeTab === 'admin' && jogadorAtual.role === 'admin' && (
                 <PainelAdmin
-                  jogadores={jogadores}
+                  jogadores={jogadoresEfetivos}
                   partidas={partidasMescladas}
-                  jogadorAtual={jogadorAtual}
+                  jogadorAtual={jogadorAtualEfetivo}
                   onAprovarJogador={handleAprovarJogador}
                 />
               )}
@@ -1234,6 +1296,127 @@ export default function App() {
             >
               Excelente!
             </button>
+          </div>
+        </div>
+      )}
+
+      {/* POPUP DE ALERTA DE DÉBITO MENSALISTA APÓS LOGIN */}
+      {mostrarPopUpAlertaMensalista && jogadorAtual && (
+        <div 
+          id="popup-alerta-mensalidade-pendente"
+          className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/80 backdrop-blur-md animate-fade-in"
+        >
+          <div className="bg-emerald-950 border border-amber-500/30 rounded-2xl max-w-md w-full p-6 text-left shadow-2xl relative animate-scale-up">
+            <div className="flex items-center gap-3 border-b border-white/10 pb-3.5 mb-4">
+              <div className="w-10 h-10 bg-amber-500/10 border border-amber-500/30 text-amber-400 rounded-xl flex items-center justify-center shrink-0">
+                <ShieldAlert className="w-5 h-5 animate-pulse" />
+              </div>
+              <div>
+                <h3 className="font-display font-black text-sm uppercase tracking-wide text-amber-200">Aviso importante de pendência</h3>
+                <p className="text-[10px] text-emerald-400/80 font-mono">Competência Financeira Pendente</p>
+              </div>
+            </div>
+            
+            <p className="text-xs text-emerald-250 leading-relaxed font-sans mb-4">
+              Olá, <b className="text-white">{jogadorAtual.nome}</b>. Identificamos que você possui uma <b>mensalidade em aberto ou pendente de confirmação</b> no caixa.
+            </p>
+            
+            <div className="bg-amber-955/25 border border-amber-500/20 rounded-xl p-3 mb-5 text-[11px] text-amber-200 leading-relaxed font-sans">
+              <b>⚠️ Regulamento de Mensalistas:</b> No Arena Record, atletas com pendências financeiras de mensalidade passam temporariamente para o status de <b>Diarista</b> até a devida regularização do débito. Desse modo, você perde temporariamente a prioridade automática de mensalistas na lista de chamada oficial.
+            </div>
+
+            <div className="flex gap-2.5">
+              <button
+                id="btn-popup-quitar-mensalidade"
+                type="button"
+                onClick={() => {
+                  setMostrarPopUpAlertaMensalista(false);
+                  setActiveTab('financeiro');
+                }}
+                className="flex-1 bg-amber-500 hover:bg-amber-400 text-black font-extrabold py-2.5 rounded-xl transition-all shadow-md active:scale-97 text-xs flex items-center justify-center gap-1.5 cursor-pointer"
+              >
+                <DollarSign className="w-4 h-4" />
+                Quitar Mensalidade
+              </button>
+              <button
+                id="btn-popup-entendi-mensalidade"
+                type="button"
+                onClick={() => setMostrarPopUpAlertaMensalista(false)}
+                className="py-2.5 px-4 rounded-xl border border-white/10 hover:bg-white/5 text-emerald-300 hover:text-white transition-all text-xs cursor-pointer"
+              >
+                Entendi
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {/* POPUP DE ALERTA DE DÉBITO DIARISTA APÓS LOGIN */}
+      {mostrarPopUpAlertaDiarista && jogadorAtual && (
+        <div 
+          id="popup-alerta-diaria-pendente"
+          className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/80 backdrop-blur-md animate-fade-in"
+        >
+          <div className="bg-emerald-955 border border-rose-500/30 rounded-2xl max-w-md w-full p-6 text-left shadow-2xl relative animate-scale-up">
+            <div className="flex items-center gap-3 border-b border-white/10 pb-3.5 mb-4">
+              <div className="w-10 h-10 bg-rose-500/10 border border-rose-500/30 text-rose-400 rounded-xl flex items-center justify-center shrink-0">
+                <ShieldAlert className="w-5 h-5 animate-pulse" />
+              </div>
+              <div>
+                <h3 className="font-display font-black text-sm uppercase tracking-wide text-rose-300">Alerta de Diária Pendente</h3>
+                <p className="text-[10px] text-rose-400/80 font-mono">Diaristas com pendências financeiras</p>
+              </div>
+            </div>
+            
+            <p className="text-xs text-emerald-250 leading-relaxed font-sans mb-3.5">
+              Olá, <b className="text-white">{jogadorAtual.nome}</b>. Constam em nosso caixa <b>diárias pendentes de pagamento</b> vinculadas ao seu perfil de atleta avulso:
+            </p>
+
+            <div className="space-y-2 mb-4 max-h-[140px] overflow-y-auto pr-1">
+              {diaristaDebitosParaAlerta.map((deb, idx) => {
+                // Formatar data: "yyyy-mm-dd" para "dd/mm"
+                let dataFormatada = 'Diária';
+                if (deb.dataRef) {
+                  const pts = deb.dataRef.split('-');
+                  if (pts.length >= 3) {
+                    dataFormatada = `${pts[2]}/${pts[1]}`;
+                  }
+                }
+                return (
+                  <div key={idx} className="flex justify-between items-center bg-black/25 border border-white/5 rounded-xl px-3.5 py-2 text-xs">
+                    <span className="font-semibold text-emerald-300">📅 Partida de {dataFormatada}</span>
+                    <span className="font-mono font-bold text-rose-400">R$ {deb.valor.toFixed(2)}</span>
+                  </div>
+                );
+              })}
+            </div>
+
+            <div className="bg-rose-950/40 border border-rose-500/20 rounded-xl p-3 mb-5 text-[10px] text-rose-300 leading-relaxed font-sans">
+              <b>⚠️ Regra de Confirmação:</b> Atletas diaristas com pendências financeiras estão impedidos de confirmar presença em novos jogos até a quitação do saldo pendente.
+            </div>
+
+            <div className="flex gap-2.5">
+              <button
+                id="btn-popup-quitar-diaria"
+                type="button"
+                onClick={() => {
+                  setMostrarPopUpAlertaDiarista(false);
+                  setActiveTab('financeiro');
+                }}
+                className="flex-1 bg-rose-500 hover:bg-rose-400 text-white font-extrabold py-2.5 rounded-xl transition-all shadow-md active:scale-97 text-xs flex items-center justify-center gap-1.5 cursor-pointer"
+              >
+                <DollarSign className="w-4 h-4" />
+                Quitar Débito
+              </button>
+              <button
+                id="btn-popup-fechar-diaria"
+                type="button"
+                onClick={() => setMostrarPopUpAlertaDiarista(false)}
+                className="py-2.5 px-4 rounded-xl border border-white/10 hover:bg-white/5 text-emerald-300 hover:text-white transition-all text-xs cursor-pointer"
+              >
+                Fechar
+              </button>
+            </div>
           </div>
         </div>
       )}
