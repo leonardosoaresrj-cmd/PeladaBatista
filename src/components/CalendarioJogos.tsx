@@ -402,8 +402,14 @@ export default function CalendarioJogos({
                             >
                               <div className="flex items-center gap-2 overflow-hidden">
                                 <div
-                                  className="w-7 h-7 rounded-full flex items-center justify-center text-[10px] font-black shrink-0 overflow-hidden"
+                                  className="w-7 h-7 rounded-full flex items-center justify-center text-[10px] font-black shrink-0 overflow-hidden border border-white/5 cursor-zoom-in hover:scale-110 active:scale-95 transition-all duration-200"
                                   style={{ backgroundColor: av.color }}
+                                  onClick={() => {
+                                    if (jogador.foto && (jogador.foto.startsWith('http') || jogador.foto.startsWith('data:'))) {
+                                      (window as any).ampliarFoto?.(jogador.foto, `${jogador.nome} ${jogador.sobrenome}`);
+                                    }
+                                  }}
+                                  title={jogador.foto ? "Clique para ampliar a foto" : undefined}
                                 >
                                   {jogador.foto && (jogador.foto.startsWith('http') || jogador.foto.startsWith('data:')) ? (
                                     <img src={jogador.foto} className="w-full h-full object-cover rounded-full" alt="" referrerPolicy="no-referrer" />

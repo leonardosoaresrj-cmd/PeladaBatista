@@ -237,8 +237,14 @@ export default function ControlePagamentos({
               {/* Status Ring & Foto */}
               <div className="relative">
                 <div 
-                  className="w-16 h-16 rounded-full flex items-center justify-center text-sm font-bold border border-white/10 overflow-hidden shadow-lg"
+                  className="w-16 h-16 rounded-full flex items-center justify-center text-sm font-bold border border-white/10 overflow-hidden shadow-lg cursor-zoom-in hover:scale-110 active:scale-95 transition-all duration-200"
                   style={{ backgroundColor: avatar.color, color: avatar.text === '⚪' ? '#fff' : '#000' }}
+                  onClick={() => {
+                    if (jogadorAtual.foto && (jogadorAtual.foto.startsWith('http') || jogadorAtual.foto.startsWith('data:'))) {
+                      (window as any).ampliarFoto?.(jogadorAtual.foto, `${jogadorAtual.nome} ${jogadorAtual.sobrenome}`);
+                    }
+                  }}
+                  title={jogadorAtual.foto ? "Clique para ampliar a foto" : undefined}
                 >
                   {jogadorAtual.foto && (jogadorAtual.foto.startsWith('http') || jogadorAtual.foto.startsWith('data:')) ? (
                     <img src={jogadorAtual.foto} className="w-full h-full object-cover rounded-full" alt="" referrerPolicy="no-referrer" />

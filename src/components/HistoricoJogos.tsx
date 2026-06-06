@@ -298,8 +298,14 @@ export default function HistoricoJogos({
                               className="flex items-center gap-2.5 bg-black/20 border border-white/5 rounded-xl p-2.5 hover:border-emerald-500/20 transition-all font-sans"
                             >
                               <div
-                                className="w-7 h-7 rounded-full flex items-center justify-center text-[10px] font-black shrink-0 overflow-hidden"
+                                className="w-7 h-7 rounded-full flex items-center justify-center text-[10px] font-black shrink-0 overflow-hidden border border-white/5 cursor-zoom-in hover:scale-110 active:scale-95 transition-all duration-200"
                                 style={{ backgroundColor: av.color }}
+                                onClick={() => {
+                                  if (j.foto && (j.foto.startsWith('http') || j.foto.startsWith('data:'))) {
+                                    (window as any).ampliarFoto?.(j.foto, `${j.nome} ${j.sobrenome}`);
+                                  }
+                                }}
+                                title={j.foto ? "Clique para ampliar a foto" : undefined}
                               >
                                 {j.foto && (j.foto.startsWith('http') || j.foto.startsWith('data:')) ? (
                                   <img src={j.foto} className="w-full h-full object-cover rounded-full" alt="" referrerPolicy="no-referrer" />
@@ -344,8 +350,14 @@ export default function HistoricoJogos({
                               className="flex items-center gap-2.5 bg-black/20 border border-white/5 rounded-xl p-2.5 hover:border-emerald-500/20 transition-all font-sans"
                             >
                               <div
-                                className="w-7 h-7 rounded-full flex items-center justify-center text-[10px] font-black shrink-0 overflow-hidden"
+                                className="w-7 h-7 rounded-full flex items-center justify-center text-[10px] font-black shrink-0 overflow-hidden border border-white/5 cursor-zoom-in hover:scale-110 active:scale-95 transition-all duration-200"
                                 style={{ backgroundColor: av.color }}
+                                onClick={() => {
+                                  if (j.foto && (j.foto.startsWith('http') || j.foto.startsWith('data:'))) {
+                                    (window as any).ampliarFoto?.(j.foto, `${j.nome} ${j.sobrenome}`);
+                                  }
+                                }}
+                                title={j.foto ? "Clique para ampliar a foto" : undefined}
                               >
                                 {j.foto && (j.foto.startsWith('http') || j.foto.startsWith('data:')) ? (
                                   <img src={j.foto} className="w-full h-full object-cover rounded-full" alt="" referrerPolicy="no-referrer" />

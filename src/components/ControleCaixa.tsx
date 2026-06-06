@@ -1149,8 +1149,14 @@ export default function ControleCaixa({
                         >
                           <div className="flex items-center gap-2 overflow-hidden">
                             <div 
-                              className="w-7 h-7 rounded-full flex items-center justify-center text-[10.5px] font-bold shrink-0 border border-white/10"
+                              className="w-7 h-7 rounded-full flex items-center justify-center text-[10.5px] font-bold shrink-0 border border-white/10 cursor-zoom-in hover:scale-110 active:scale-95 transition-all duration-200 overflow-hidden"
                               style={{ backgroundColor: avatar.color }}
+                              onClick={() => {
+                                if (atl.foto && (atl.foto.startsWith('http') || atl.foto.startsWith('data:'))) {
+                                  (window as any).ampliarFoto?.(atl.foto, `${atl.nome} ${atl.sobrenome}`);
+                                }
+                              }}
+                              title={atl.foto ? "Clique para ampliar a foto" : undefined}
                             >
                               {atl.foto && (atl.foto.startsWith('http') || atl.foto.startsWith('data:')) ? (
                                 <img src={atl.foto} className="w-full h-full object-cover rounded-full" alt="" referrerPolicy="no-referrer" />
@@ -1303,8 +1309,14 @@ export default function ControleCaixa({
                 >
                   <div className="flex items-center gap-3">
                     <div 
-                      className="w-10 h-10 rounded-full flex items-center justify-center text-sm font-bold shrink-0 border border-white/15"
+                      className="w-10 h-10 rounded-full flex items-center justify-center text-sm font-bold shrink-0 border border-white/15 cursor-zoom-in hover:scale-110 active:scale-95 transition-all duration-200 overflow-hidden"
                       style={{ backgroundColor: avatar.color }}
+                      onClick={() => {
+                        if (jogador.foto && (jogador.foto.startsWith('http') || jogador.foto.startsWith('data:'))) {
+                          (window as any).ampliarFoto?.(jogador.foto, `${jogador.nome} ${jogador.sobrenome}`);
+                        }
+                      }}
+                      title={jogador.foto ? "Clique para ampliar a foto" : undefined}
                     >
                       {jogador.foto && (jogador.foto.startsWith('http') || jogador.foto.startsWith('data:')) ? (
                         <img src={jogador.foto} className="w-full h-full object-cover rounded-full" alt="" referrerPolicy="no-referrer" />
@@ -1415,8 +1427,14 @@ export default function ControleCaixa({
                 >
                   <div className="flex items-center gap-3">
                     <div 
-                      className="w-10 h-10 rounded-full flex items-center justify-center text-sm font-bold shrink-0 border border-white/15"
+                      className="w-10 h-10 rounded-full flex items-center justify-center text-sm font-bold shrink-0 border border-white/15 cursor-zoom-in hover:scale-110 active:scale-95 transition-all duration-200 overflow-hidden"
                       style={{ backgroundColor: avatar.color }}
+                      onClick={() => {
+                        if (deb.jogadorFoto && (deb.jogadorFoto.startsWith('http') || deb.jogadorFoto.startsWith('data:'))) {
+                          (window as any).ampliarFoto?.(deb.jogadorFoto, `${deb.jogadorNome} ${deb.jogadorSobrenome}`);
+                        }
+                      }}
+                      title={deb.jogadorFoto ? "Clique para ampliar a foto" : undefined}
                     >
                       {deb.jogadorFoto && (deb.jogadorFoto.startsWith('http') || deb.jogadorFoto.startsWith('data:')) ? (
                         <img src={deb.jogadorFoto} className="w-full h-full object-cover rounded-full" alt="" referrerPolicy="no-referrer" />
@@ -1555,8 +1573,14 @@ export default function ControleCaixa({
                       <td className="py-3.5 px-4">
                         <div className="flex items-center gap-2.5">
                           <div 
-                            className="w-8 h-8 rounded-full flex items-center justify-center text-xs font-bold shrink-0 border border-white/10"
+                            className="w-8 h-8 rounded-full flex items-center justify-center text-xs font-bold shrink-0 border border-white/10 cursor-zoom-in hover:scale-110 active:scale-95 transition-all duration-200 overflow-hidden"
                             style={{ backgroundColor: avatar.color }}
+                            onClick={() => {
+                              if (jogador.foto && (jogador.foto.startsWith('http') || jogador.foto.startsWith('data:'))) {
+                                (window as any).ampliarFoto?.(jogador.foto, `${jogador.nome} ${jogador.sobrenome}`);
+                              }
+                            }}
+                            title={jogador.foto ? "Clique para ampliar a foto" : undefined}
                           >
                             {jogador.foto && (jogador.foto.startsWith('http') || jogador.foto.startsWith('data:')) ? (
                               <img src={jogador.foto} className="w-full h-full object-cover rounded-full" alt="" referrerPolicy="no-referrer" />
@@ -1754,8 +1778,21 @@ export default function ControleCaixa({
                         return (
                           <div key={p.pagamento.id || idx} className="flex items-center justify-between p-2 bg-emerald-955/10 rounded-lg border border-white/5 h-12">
                             <div className="flex items-center gap-2 overflow-hidden">
-                              <div className="w-6.5 h-6.5 rounded-full flex items-center justify-center text-[10px] font-bold shrink-0 border border-white/5 text-white" style={{ backgroundColor: avatar.color }}>
-                                {p.jogador.nome.substring(0, 1)}
+                              <div 
+                                className="w-6.5 h-6.5 rounded-full flex items-center justify-center text-[10px] font-bold shrink-0 border border-white/5 text-white overflow-hidden cursor-zoom-in hover:scale-110 active:scale-95 transition-all duration-200" 
+                                style={{ backgroundColor: avatar.color }}
+                                onClick={() => {
+                                  if (p.jogador.foto && (p.jogador.foto.startsWith('http') || p.jogador.foto.startsWith('data:'))) {
+                                    (window as any).ampliarFoto?.(p.jogador.foto, `${p.jogador.nome} ${p.jogador.sobrenome}`);
+                                  }
+                                }}
+                                title={p.jogador.foto ? "Clique para ampliar a foto" : undefined}
+                              >
+                                {p.jogador.foto && (p.jogador.foto.startsWith('http') || p.jogador.foto.startsWith('data:')) ? (
+                                  <img src={p.jogador.foto} className="w-full h-full object-cover rounded-full" alt="" referrerPolicy="no-referrer" />
+                                ) : (
+                                  p.jogador.nome.substring(0, 1)
+                                )}
                               </div>
                               <div className="truncate">
                                 <p className="text-[11px] font-bold text-white truncate">{p.jogador.nome} {p.jogador.sobrenome}</p>
@@ -1794,8 +1831,21 @@ export default function ControleCaixa({
                         return (
                           <div key={at.id || idx} className="flex items-center justify-between p-2 bg-emerald-955/10 rounded-lg border border-white/5 h-12">
                             <div className="flex items-center gap-2 overflow-hidden">
-                              <div className="w-6.5 h-6.5 rounded-full flex items-center justify-center text-[10px] font-bold shrink-0 border border-white/5 text-white" style={{ backgroundColor: avatar.color }}>
-                                {at.nome.substring(0, 1)}
+                              <div 
+                                className="w-6.5 h-6.5 rounded-full flex items-center justify-center text-[10px] font-bold shrink-0 border border-white/5 text-white overflow-hidden cursor-zoom-in hover:scale-110 active:scale-95 transition-all duration-200" 
+                                style={{ backgroundColor: avatar.color }}
+                                onClick={() => {
+                                  if (at.foto && (at.foto.startsWith('http') || at.foto.startsWith('data:'))) {
+                                    (window as any).ampliarFoto?.(at.foto, `${at.nome} ${at.sobrenome}`);
+                                  }
+                                }}
+                                title={at.foto ? "Clique para ampliar a foto" : undefined}
+                              >
+                                {at.foto && (at.foto.startsWith('http') || at.foto.startsWith('data:')) ? (
+                                  <img src={at.foto} className="w-full h-full object-cover rounded-full" alt="" referrerPolicy="no-referrer" />
+                                ) : (
+                                  at.nome.substring(0, 1)
+                                )}
                               </div>
                               <div className="truncate">
                                 <p className="text-[11px] font-bold text-white truncate">{at.nome} {at.sobrenome}</p>
@@ -1841,8 +1891,21 @@ export default function ControleCaixa({
                         return (
                           <div key={deb.id || idx} className="flex items-center justify-between p-2.5 bg-rose-955/15 hover:bg-rose-955/25 transition-all rounded-lg border border-rose-500/10">
                             <div className="flex items-center gap-2 overflow-hidden">
-                              <div className="w-7 h-7 rounded-full flex items-center justify-center text-[10px] font-bold shrink-0 border border-white/5 text-white" style={{ backgroundColor: avatar.color }}>
-                                {deb.jogadorNome.substring(0, 1)}
+                              <div 
+                                className="w-7 h-7 rounded-full flex items-center justify-center text-[10px] font-bold shrink-0 border border-white/5 text-white overflow-hidden cursor-zoom-in hover:scale-110 active:scale-95 transition-all duration-200" 
+                                style={{ backgroundColor: avatar.color }}
+                                onClick={() => {
+                                  if (deb.jogadorFoto && (deb.jogadorFoto.startsWith('http') || deb.jogadorFoto.startsWith('data:'))) {
+                                    (window as any).ampliarFoto?.(deb.jogadorFoto, `${deb.jogadorNome} ${deb.jogadorSobrenome}`);
+                                  }
+                                }}
+                                title={deb.jogadorFoto ? "Clique para ampliar a foto" : undefined}
+                              >
+                                {deb.jogadorFoto && (deb.jogadorFoto.startsWith('http') || deb.jogadorFoto.startsWith('data:')) ? (
+                                  <img src={deb.jogadorFoto} className="w-full h-full object-cover rounded-full" alt="" referrerPolicy="no-referrer" />
+                                ) : (
+                                  deb.jogadorNome.substring(0, 1)
+                                )}
                               </div>
                               <div className="truncate">
                                 <p className="text-[11px] font-bold text-white truncate">{deb.jogadorNome} {deb.jogadorSobrenome}</p>
