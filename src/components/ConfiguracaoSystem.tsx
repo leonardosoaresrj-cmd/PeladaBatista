@@ -203,16 +203,16 @@ export default function ConfiguracaoSystem({
             <form onSubmit={handleSalvarWhatsapp} className="space-y-4 pt-1">
               <div>
                 <label className="block text-[10px] font-bold text-emerald-300 uppercase tracking-widest mb-1.5 font-sans">
-                  Link de Convite do Grupo de WhatsApp
+                  Link de Convite ou ID do Grupo de WhatsApp
                 </label>
                 <input
                   id="input-wa-grupo-link"
-                  type="url"
+                  type="text"
                   required
                   value={localLink}
                   onChange={(e) => setLocalLink(e.target.value)}
-                  placeholder="https://chat.whatsapp.com/..."
-                  className="w-full bg-emerald-950 border border-white/10 text-white font-mono text-xs rounded-lg p-3 focus:outline-none focus:border-white transition-all placeholder:text-emerald-850/60"
+                  placeholder="Link de convite (https://chat.whatsapp.com/...) ou ID do grupo (ex: 120363425601472298@g.us)"
+                  className="w-full bg-emerald-950 border border-white/10 text-white font-mono text-xs rounded-lg p-3 focus:outline-none focus:border-white transition-all placeholder:text-emerald-830"
                 />
               </div>
 

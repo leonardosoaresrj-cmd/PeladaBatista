@@ -58,6 +58,7 @@ export default function App() {
   
   // Controle de Sessão de Usuário
   const [jogadorAtual, setJogadorAtual] = useState<Jogador | null>(null);
+  const [showSessaoExpiradaModal, setShowSessaoExpiradaModal] = useState(false);
 
   // Configuração de Preço Editável para Mensalidade e Diárias
   const [valor4Sabados, setValor4Sabados] = useState<number>(() => {
@@ -494,8 +495,8 @@ export default function App() {
   useEffect(() => {
     fetchTodoDados();
 
-    // Auto-login do admin para excelente experiência de primeira utilização
-    const savedSession = localStorage.getItem('arena_user_session');
+    // Carrega sessao do sessionStorage (ou localStorage anterior caso exista para transição suave)
+    const savedSession = sessionStorage.getItem('arena_user_session') || localStorage.getItem('arena_user_session');
     if (savedSession) {
       const parsed = JSON.parse(savedSession) as Jogador;
       // Validar se o jogador ainda existe no banco
@@ -503,7 +504,11 @@ export default function App() {
       const match = baseJogadores.find(j => j.id === parsed.id && j.status === 'ativo');
       if (match) {
         setJogadorAtual(match);
+        // Migramos para sessionStorage para deslogar ao sair do app (fechar aba/desligar pc)
+        sessionStorage.setItem('arena_user_session', JSON.stringify(match));
+        localStorage.removeItem('arena_user_session');
       } else {
+        sessionStorage.removeItem('arena_user_session');
         localStorage.removeItem('arena_user_session');
       }
     }
@@ -511,14 +516,50 @@ export default function App() {
 
   const handleLoginSuccess = (jogador: Jogador) => {
     setJogadorAtual(jogador);
-    localStorage.setItem('arena_user_session', JSON.stringify(jogador));
+    sessionStorage.setItem('arena_user_session', JSON.stringify(jogador));
+    localStorage.removeItem('arena_user_session'); // Maior segurança limpando do local
     setActiveTab('calendario');
   };
 
   const handleLogout = () => {
     setJogadorAtual(null);
+    sessionStorage.removeItem('arena_user_session');
     localStorage.removeItem('arena_user_session');
   };
+
+  // Controle de inatividade e logout automático após 5 minutos (300.000 ms)
+  useEffect(() => {
+    if (!jogadorAtual) return;
+
+    let timeoutId: NodeJS.Timeout;
+
+    const resetTimer = () => {
+      if (timeoutId) clearTimeout(timeoutId);
+      
+      timeoutId = setTimeout(() => {
+        // Deslogar automaticamente por inatividade de 5 minutos
+        handleLogout();
+        setShowSessaoExpiradaModal(true);
+      }, 5 * 60 * 1000); // 5 minutos
+    };
+
+    // Eventos comuns de interação com a página para renovar o tempo
+    const events = ['mousemove', 'mousedown', 'keydown', 'scroll', 'touchstart', 'click'];
+    
+    events.forEach(event => {
+      window.addEventListener(event, resetTimer, { passive: true });
+    });
+
+    // Inicia o contador
+    resetTimer();
+
+    return () => {
+      if (timeoutId) clearTimeout(timeoutId);
+      events.forEach(event => {
+        window.removeEventListener(event, resetTimer);
+      });
+    };
+  }, [jogadorAtual]);
 
   // ----- OPERAÇÕES DE TABELAS (MUTANTES DE ESTADO COM PERSISTÊNCIA) -----
 
@@ -606,7 +647,7 @@ export default function App() {
     if (jogadorAtual && jogadorAtual.id === id) {
       const sessaoAtualizada = { ...jogadorAtual, ...camposAtualizados };
       setJogadorAtual(sessaoAtualizada);
-      localStorage.setItem('arena_user_session', JSON.stringify(sessaoAtualizada));
+      sessionStorage.setItem('arena_user_session', JSON.stringify(sessaoAtualizada));
     }
   };
 
@@ -1330,6 +1371,32 @@ export default function App() {
               className="w-full bg-white hover:bg-emerald-100 text-black font-bold py-2.5 rounded-xl transition-all shadow-md active:scale-97 text-xs"
             >
               Excelente!
+            </button>
+          </div>
+        </div>
+      )}
+
+      {/* POPUP DE EXPIRAÇÃO DE SESSÃO POR INATIVIDADE */}
+      {showSessaoExpiradaModal && (
+        <div 
+          id="popup-sessao-expirada"
+          className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/90 backdrop-blur-md animate-fade-in text-white font-sans"
+        >
+          <div className="bg-emerald-950 border border-teal-500/30 rounded-2xl max-w-sm w-full p-6 text-center shadow-2xl relative animate-scale-up">
+            <div className="w-16 h-16 bg-teal-500/10 border-2 border-teal-500 text-teal-400 rounded-full flex items-center justify-center mx-auto mb-4">
+              <Lock className="w-8 h-8 animate-pulse" />
+            </div>
+            <h3 className="font-display font-black text-sm uppercase tracking-widest text-teal-400 mb-2">🚨 Sessão Finalizada</h3>
+            <p className="text-xs text-emerald-200/90 leading-relaxed mb-6 font-sans">
+              Você foi desconectado automaticamente por motivos de segurança após <b>5 minutos de inatividade</b>. Por favor, faça login novamente para continuar.
+            </p>
+            <button
+              id="btn-sessao-expirada-entendido"
+              type="button"
+              onClick={() => setShowSessaoExpiradaModal(false)}
+              className="w-full bg-teal-500 hover:bg-teal-400 text-emerald-950 font-black py-2.5 rounded-xl transition-all shadow-md active:scale-97 text-xs uppercase"
+            >
+              Fazer Login Novamente
             </button>
           </div>
         </div>
