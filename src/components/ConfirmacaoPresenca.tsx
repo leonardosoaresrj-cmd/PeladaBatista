@@ -188,14 +188,16 @@ export default function ConfirmacaoPresenca({
     onActualizarPresenca(idPartidaCorrente, id, confirmado);
     
     if (partidaSelecionada) {
-      const dataAmigavel = formatarDataAmigavel(partidaSelecionada.data);
-      const text = obterTextoConfirmacaoJogador(
-        `${jogadorAtual.nome} ${jogadorAtual.sobrenome}`,
-        partidaSelecionada.titulo,
-        dataAmigavel,
-        partidaSelecionada.horario,
-        partidaSelecionada.local
-      );
+      const partidaAtualizada = { ...partidaSelecionada };
+      partidaAtualizada.confirmados = partidaAtualizada.confirmados.filter(jId => jId !== id);
+      partidaAtualizada.recusados = partidaAtualizada.recusados.filter(jId => jId !== id);
+      if (confirmado) {
+        partidaAtualizada.confirmados.push(id);
+      } else {
+        partidaAtualizada.recusados.push(id);
+      }
+
+      const msgAtualizada = obterTextoListaCompletaPartida(partidaAtualizada, jogadores, window.location.origin);
 
       if (whatsappAutomacaoAtiva) {
         // Envio automático via Bot do Racha de Futebol
@@ -203,14 +205,12 @@ export default function ConfirmacaoPresenca({
           onRegistrarLogAutomacao(
             `${jogadorAtual.nome} ${jogadorAtual.sobrenome}`,
             partidaSelecionada.titulo,
-            confirmado 
-              ? `Atleta confirmou presença no jogo do dia ${dataAmigavel}. Bot disparou alerta automático.`
-              : `Atleta declarou ausência no jogo do dia ${dataAmigavel}. Bot disparou rebaixamento de escalação.`
+            msgAtualizada
           );
         }
         
         // Ativar animação/aviso do robô
-        setAutoToastMsg(`🤖 [BOT DO WHATSAPP]: Confirmação registrada e enviada automaticamente para o grupo de WhatsApp!`);
+        setAutoToastMsg(`🤖 [BOT DO WHATSAPP]: Confirmação registrada e lista atualizada enviada ao grupo!`);
         setShowAutoToast(true);
         setTimeout(() => {
           setShowAutoToast(false);
@@ -218,6 +218,14 @@ export default function ConfirmacaoPresenca({
       } else {
         // Modo manual antigo de retransmissão
         if (confirmado) {
+          const dataAmigavel = formatarDataAmigavel(partidaSelecionada.data);
+          const text = obterTextoConfirmacaoJogador(
+            `${jogadorAtual.nome} ${jogadorAtual.sobrenome}`,
+            partidaSelecionada.titulo,
+            dataAmigavel,
+            partidaSelecionada.horario,
+            partidaSelecionada.local
+          );
           setShareText(text);
           setShowShareModal(true);
         }
@@ -579,7 +587,13 @@ export default function ConfirmacaoPresenca({
                       <button
                         id="btn-admin-reativar-jogo"
                         type="button"
-                        onClick={() => onCancelarPartida && onCancelarPartida(partidaSelecionada.id, false)}
+                        onClick={() => {
+                          if (onCancelarPartida) onCancelarPartida(partidaSelecionada.id, false);
+                          if (whatsappAutomacaoAtiva && onRegistrarLogAutomacao) {
+                            const dataAmigavel = formatarDataAmigavel(partidaSelecionada.data);
+                            onRegistrarLogAutomacao('Administrador (Manual)', partidaSelecionada.titulo, `⚽ *BOA NOTÍCIA: PELADA REATIVADA!* ⚽\n\nA partida *${partidaSelecionada.titulo}* do dia ${dataAmigavel} foi reativada e vai acontecer normalmente! A pelada segue viva, não deixe de confirmar sua presença!`);
+                          }
+                        }}
                         className="w-full sm:w-auto bg-emerald-555 hover:bg-emerald-500 text-bg shadow hover:shadow-lg hover:shadow-emerald-555/10 font-black px-4 py-2 rounded-xl text-[10px] tracking-widest uppercase cursor-pointer transition-all duration-200 border-none inline-flex items-center justify-center gap-1.5"
                         style={{ backgroundColor: '#10b981', color: '#022c22' }}
                       >
@@ -589,7 +603,13 @@ export default function ConfirmacaoPresenca({
                       <button
                         id="btn-admin-cancelar-jogo"
                         type="button"
-                        onClick={() => onCancelarPartida && onCancelarPartida(partidaSelecionada.id, true)}
+                        onClick={() => {
+                          if (onCancelarPartida) onCancelarPartida(partidaSelecionada.id, true);
+                          if (whatsappAutomacaoAtiva && onRegistrarLogAutomacao) {
+                            const dataAmigavel = formatarDataAmigavel(partidaSelecionada.data);
+                            onRegistrarLogAutomacao('Administrador (Manual)', partidaSelecionada.titulo, `⚠️ *ATENÇÃO: PELADA CANCELADA!* ⚠️\n\nA partida *${partidaSelecionada.titulo}* do dia ${dataAmigavel} foi oficialmente CANCELADA.\n\nFique atento aos próximos jogos e comunicados da diretoria. Não vá ao campo à toa!`);
+                          }
+                        }}
                         className="w-full sm:w-auto bg-rose-650 hover:bg-rose-600 text-white font-extrabold px-4 py-2 rounded-xl text-[10px] tracking-widest uppercase cursor-pointer transition-all duration-200 shadow border-none inline-flex items-center justify-center gap-1.5"
                         style={{ backgroundColor: '#e11d48' }}
                       >

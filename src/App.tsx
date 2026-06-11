@@ -1286,6 +1286,8 @@ export default function App() {
                   onRegistrarPagamento={handleRegistrarPagamento}
                   valor4Sabados={valor4Sabados}
                   valor5Sabados={valor5Sabados}
+                  whatsappAutomacaoAtiva={whatsappAutomacaoAtiva}
+                  onRegistrarLogAutomacao={handleRegistrarLogAutomacao}
                 />
               )}
 

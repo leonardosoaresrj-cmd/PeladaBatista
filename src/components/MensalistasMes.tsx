@@ -15,6 +15,8 @@ interface MensalistasMesProps {
   onRegistrarPagamento: (jogadorId: string, mesRef: string, status: 'pago' | 'pendente' | 'pendente_confirmacao' | 'cancelado', dataPagamento: string | null, valor: number) => void;
   valor4Sabados: number;
   valor5Sabados: number;
+  whatsappAutomacaoAtiva?: boolean;
+  onRegistrarLogAutomacao?: (atleta: string, partida: string, msg: string) => void;
 }
 
 export default function MensalistasMes({
@@ -24,6 +26,8 @@ export default function MensalistasMes({
   onRegistrarPagamento,
   valor4Sabados,
   valor5Sabados,
+  whatsappAutomacaoAtiva = false,
+  onRegistrarLogAutomacao
 }: MensalistasMesProps) {
   const [filtroPesquisa, setFiltroPesquisa] = useState('');
   const [mesSelecionado, setMesSelecionado] = useState('2026-06');
@@ -90,6 +94,29 @@ export default function MensalistasMes({
     { key: 'Meio', label: 'Meio-Campistas', icon: '🧠', cor: 'from-amber-500/10 to-transparent' },
     { key: 'Ataque', label: 'Atacantes', icon: '🚀', cor: 'from-rose-500/10 to-transparent' },
   ];
+
+  const dispararMensalistasWhatsApp = () => {
+    if (!whatsappAutomacaoAtiva || !onRegistrarLogAutomacao) return;
+
+    const quitados = mensalistasComStatusDoMes.filter(m => m.pagamento?.status === 'pago');
+    const pendentes = mensalistasComStatusDoMes.filter(m => !m.pagamento || m.pagamento?.status === 'pendente' || m.pagamento?.status === 'pendente_confirmacao');
+    
+    let msg = `💰 *MENSALIDADES DO ELENCO - ${mesSelecionado.split('-').reverse().join('/')}* 💰\n\n`;
+    msg += `Valor base: R$ ${valorMensalidadeMês.toFixed(2)}\n\n`;
+    
+    msg += `✅ *QUITADOS (${quitados.length})*\n`;
+    if (quitados.length === 0) msg += `_Nenhum pagamento registrado_\n`;
+    else msg += quitados.map((m, i) => `${i+1}. ${m.jogador.nome} ${m.jogador.sobrenome} 💰`).join('\n') + '\n';
+    
+    msg += `\n⏳ *PENDENTES (${pendentes.length})*\n`;
+    if (pendentes.length === 0) msg += `_Todos em dia!_\n`;
+    else msg += pendentes.map((m, i) => `${i+1}. ${m.jogador.nome} ${m.jogador.sobrenome} ❌`).join('\n') + '\n';
+    
+    msg += `\n_Para realizar o pagamento através da nossa chave PIX, procure a tesouraria. Quem paga em dia garante prioridade no jogo!_`;
+
+    onRegistrarLogAutomacao('Administrador (Manual)', 'Mensalidade', msg);
+    alert('Mensagem enviada para o bot!');
+  };
 
   return (
     <div id="container-mensalistas-mes" className="space-y-6 w-full animate-fade-in">
@@ -164,6 +191,15 @@ export default function MensalistasMes({
             <p className="text-xs text-emerald-300/80">
               Acompanhe quem já quitou a mensalidade deste período ou registre pagamentos diretamente. Valor: <strong className="text-white">R$ {valorMensalidadeMês.toFixed(2)}</strong> ({countSabados} sábados).
             </p>
+            {whatsappAutomacaoAtiva && (
+              <button 
+                type="button"
+                onClick={dispararMensalistasWhatsApp}
+                className="mt-2 text-[10px] uppercase font-bold tracking-widest bg-amber-500 hover:bg-amber-400 text-amber-950 px-3 py-1.5 rounded-lg inline-flex items-center gap-1.5 shadow"
+              >
+                📢 Disparar Lista no WhatsApp
+              </button>
+            )}
           </div>
           <div className="flex items-center gap-2">
             <span className="text-xs font-mono font-bold bg-teal-500/10 border border-teal-500/20 text-teal-300 px-3 py-1 rounded-full whitespace-nowrap">
