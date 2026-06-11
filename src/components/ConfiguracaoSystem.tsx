@@ -219,27 +219,27 @@ export default function ConfiguracaoSystem({
               <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
                 <div>
                   <label className="block text-[10px] font-bold text-emerald-300 uppercase tracking-widest mb-1.5 font-sans">
-                    Webhook URL de Disparo (Opcional - Ex: Baileys/Local Bot)
+                    URL do Robô (ex: https://futebol-bot.onrender.com/teste)
                   </label>
                   <input
                     id="input-wa-webhook-url"
                     type="url"
                     value={localWebhookUrl}
                     onChange={(e) => setLocalWebhookUrl(e.target.value)}
-                    placeholder="http://localhost:5000/api/messages/send"
+                    placeholder="https://seu-bot.onrender.com/teste"
                     className="w-full bg-emerald-950 border border-white/10 text-white font-mono text-xs rounded-lg p-2.5 focus:outline-none focus:border-white transition-all placeholder:text-emerald-850/60"
                   />
                 </div>
                 <div>
                   <label className="block text-[10px] font-bold text-emerald-300 uppercase tracking-widest mb-1.5 font-sans">
-                    Token Bearer de API (Opcional)
+                    WEBHOOK_SECRET (Senha da API)
                   </label>
                   <input
                     id="input-wa-webhook-token"
                     type="text"
                     value={localWebhookToken}
                     onChange={(e) => setLocalWebhookToken(e.target.value)}
-                    placeholder="SuaChaveSecretaJWT..."
+                    placeholder="Sua senha webhook secreta..."
                     className="w-full bg-emerald-950 border border-white/10 text-white font-mono text-xs rounded-lg p-2.5 focus:outline-none focus:border-white transition-all placeholder:text-emerald-850/60"
                   />
                 </div>

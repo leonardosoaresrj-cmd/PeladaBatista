@@ -258,21 +258,15 @@ export default function App() {
             'Content-Type': 'application/json'
           };
           if (whatsappWebhookToken) {
-            headers['Authorization'] = whatsappWebhookToken.startsWith('Bearer ') 
-              ? whatsappWebhookToken 
-              : `Bearer ${whatsappWebhookToken}`;
+            headers['x-webhook-secret'] = whatsappWebhookToken;
           }
 
           const response = await fetch(whatsappWebhookUrl, {
             method: 'POST',
             headers,
             body: JSON.stringify({
-              message: msg,
-              groupLink: whatsappGrupoLink,
-              grupo: 'Pelada Batista Sábado',
-              atleta: atletaNome,
-              partida: partidaTitulo,
-              timestamp: new Date().toISOString()
+              mensagem: msg,
+              grupo_id: whatsappGrupoLink
             })
           });
 
