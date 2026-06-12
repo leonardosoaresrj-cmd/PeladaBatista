@@ -16,12 +16,14 @@ export interface Jogador {
   dataNascimento: string;
   foto: string;
   membroStatus: MembroStatus;
+  membroStatusDb?: MembroStatus;
   email: string;
   senha: string; // PIN de 4 dígitos
   status: StatusJogador;
   role: RoleUsuario;
   createdAt: string;
   isGold?: boolean;
+  isGoldDb?: boolean;
 }
 
 export interface Partida {

@@ -7,7 +7,7 @@ import React, { useState } from 'react';
 import { Partida, Jogador, Pagamento, MembroStatus, PosicaoJogador } from '../types';
 import { AVATAR_PRESETS } from '../data';
 import { Calendar as CalendarIcon, MapPin, Clock, Users, Check, X, ShieldAlert, Award, ChevronLeft, ChevronRight, Share2, AlertTriangle, Send, Copy, Edit2, Trash2 } from 'lucide-react';
-import { getJanelaConfirmacao, gerarLinkCompartilhamento, obterTextoConfirmacaoJogador, obterTextoAlertaSemanal, obterDebitosDoJogador, obterTextoListaCompletaPartida } from '../utils/confirmationRules';
+import { getJanelaConfirmacao, gerarLinkCompartilhamento, obterTextoAlertaSemanal, obterDebitosDoJogador, obterTextoListaCompletaPartida } from '../utils/confirmationRules';
 
 interface ConfirmacaoPresencaProps {
   partidas: Partida[];
@@ -76,8 +76,8 @@ export default function ConfirmacaoPresenca({
     setEditSobrenome(j.sobrenome);
     setEditEmail(j.email || '');
     setEditPosicao(j.posicao);
-    setEditMembro(j.membroStatus || 'mensalista');
-    setEditGold(!!j.isGold);
+    setEditMembro(j.membroStatusDb ?? (j.membroStatus || 'mensalista'));
+    setEditGold(j.isGoldDb !== undefined ? !!j.isGoldDb : !!j.isGold);
     setEditFoto(j.foto || '');
     setEditError('');
     setShowPlayerModal(true);
@@ -216,19 +216,9 @@ export default function ConfirmacaoPresenca({
           setShowAutoToast(false);
         }, 5000);
       } else {
-        // Modo manual antigo de retransmissão
-        if (confirmado) {
-          const dataAmigavel = formatarDataAmigavel(partidaSelecionada.data);
-          const text = obterTextoConfirmacaoJogador(
-            `${jogadorAtual.nome} ${jogadorAtual.sobrenome}`,
-            partidaSelecionada.titulo,
-            dataAmigavel,
-            partidaSelecionada.horario,
-            partidaSelecionada.local
-          );
-          setShareText(text);
-          setShowShareModal(true);
-        }
+        // Modo manual antigo de retransmissão: agora envia a lista completa
+        setShareText(msgAtualizada);
+        setShowShareModal(true);
       }
     }
   };
@@ -589,10 +579,6 @@ export default function ConfirmacaoPresenca({
                         type="button"
                         onClick={() => {
                           if (onCancelarPartida) onCancelarPartida(partidaSelecionada.id, false);
-                          if (whatsappAutomacaoAtiva && onRegistrarLogAutomacao) {
-                            const dataAmigavel = formatarDataAmigavel(partidaSelecionada.data);
-                            onRegistrarLogAutomacao('Administrador (Manual)', partidaSelecionada.titulo, `⚽ *BOA NOTÍCIA: PELADA REATIVADA!* ⚽\n\nA partida *${partidaSelecionada.titulo}* do dia ${dataAmigavel} foi reativada e vai acontecer normalmente! A pelada segue viva, não deixe de confirmar sua presença!`);
-                          }
                         }}
                         className="w-full sm:w-auto bg-emerald-555 hover:bg-emerald-500 text-bg shadow hover:shadow-lg hover:shadow-emerald-555/10 font-black px-4 py-2 rounded-xl text-[10px] tracking-widest uppercase cursor-pointer transition-all duration-200 border-none inline-flex items-center justify-center gap-1.5"
                         style={{ backgroundColor: '#10b981', color: '#022c22' }}
@@ -605,10 +591,6 @@ export default function ConfirmacaoPresenca({
                         type="button"
                         onClick={() => {
                           if (onCancelarPartida) onCancelarPartida(partidaSelecionada.id, true);
-                          if (whatsappAutomacaoAtiva && onRegistrarLogAutomacao) {
-                            const dataAmigavel = formatarDataAmigavel(partidaSelecionada.data);
-                            onRegistrarLogAutomacao('Administrador (Manual)', partidaSelecionada.titulo, `⚠️ *ATENÇÃO: PELADA CANCELADA!* ⚠️\n\nA partida *${partidaSelecionada.titulo}* do dia ${dataAmigavel} foi oficialmente CANCELADA.\n\nFique atento aos próximos jogos e comunicados da diretoria. Não vá ao campo à toa!`);
-                          }
                         }}
                         className="w-full sm:w-auto bg-rose-650 hover:bg-rose-600 text-white font-extrabold px-4 py-2 rounded-xl text-[10px] tracking-widest uppercase cursor-pointer transition-all duration-200 shadow border-none inline-flex items-center justify-center gap-1.5"
                         style={{ backgroundColor: '#e11d48' }}
@@ -1431,7 +1413,7 @@ export default function ConfirmacaoPresenca({
                     ) : (
                       <>
                         <option value="mensalista">Mensalista</option>
-                        <option value="diarista">Diarista (Avulso)</option>
+                        <option value="diarista">Diarista</option>
                       </>
                     )}
                   </select>
@@ -1480,18 +1462,20 @@ export default function ConfirmacaoPresenca({
                     </div>
                   </div>
 
-                  <div className="flex items-center gap-2 pt-1">
-                    <input
-                      id="modal-is-gold-checkbox"
-                      type="checkbox"
-                      checked={editGold}
-                      onChange={(e) => setEditGold(e.target.checked)}
-                      className="w-3.5 h-3.5 accent-emerald-500 cursor-pointer"
-                    />
-                    <label htmlFor="modal-is-gold-checkbox" className="text-[11px] text-emerald-250 font-bold cursor-pointer select-none">
-                      🏅 Conceder Status Gold (Destaque visual especial)
-                    </label>
-                  </div>
+                  {editMembro !== 'diarista' && (
+                    <div className="flex items-center gap-2 pt-1">
+                      <input
+                        id="modal-is-gold-checkbox"
+                        type="checkbox"
+                        checked={editGold}
+                        onChange={(e) => setEditGold(e.target.checked)}
+                        className="w-3.5 h-3.5 accent-emerald-500 cursor-pointer"
+                      />
+                      <label htmlFor="modal-is-gold-checkbox" className="text-[11px] text-emerald-250 font-bold cursor-pointer select-none">
+                        🏅 Conceder Status Gold (Destaque visual especial)
+                      </label>
+                    </div>
+                  )}
                 </div>
               )}
 

@@ -46,33 +46,69 @@ export function isFechamentoMensalistas(data: Date = new Date()): { emPeriodo: b
   const mes = data.getMonth(); // 0-indexed (0 = Jan, 11 = Dez)
   const ano = data.getFullYear();
 
-  // Último dia do mês anterior
-  const ultimoDiaMesAnteriorObj = new Date(ano, mes, 0);
-  const totalDiasMesAnterior = ultimoDiaMesAnteriorObj.getDate();
-
-  // Última semana do mês anterior significa: dias do mês anterior que vão desde (totalDiasMesAnterior - 6) até (totalDiasMesAnterior)
-  // Ou seja, se o dia atual for nos primeiros 7 dias do mês atual, estamos na primeira semana!
-  // E para cair na última semana do mês anterior, estaríamos nela se estivéssemos nos últimos 7 dias daquele mês.
+  // Para saber se estamos no período de renovação, precisamos verificar a janela atual.
+  // A janela de renovação do mês M começa no domingo após o último sábado do mês M-1
+  // e termina na sexta-feira antes do 2º sábado do mês M.
   
-  // Vamos verificar se a dada 'data' está na primeira semana do seu próprio mês (dia <= 7)
-  const isPrimeiraSemana = dia <= 7;
+  // Vamos verificar tanto para o mês corrente como mês de referência, 
+  // quanto para o mes+1 como mês de referência (se estivermos no final do mês corrente).
 
-  // Ou na última semana do seu próprio mês (dia >= (total de dias do próprio mês - 6))
-  const totalDiasMesAtual = new Date(ano, mes + 1, 0).getDate();
-  const isUltimaSemana = dia >= (totalDiasMesAtual - 6);
+  // Função auxiliar para pegar a janela de renovação para um mês de referência
+  const getJanelaParaMesRef = (refAno: number, refMes: number) => {
+    // 1. Encontrar o último sábado do mês anterior (refMes - 1)
+    const ultimoDiaMesAnterior = new Date(refAno, refMes, 0); // O dia 0 do refMes é o último dia do refMes-1
+    let ultimoSabadoAnt = new Date(ultimoDiaMesAnterior);
+    while (ultimoSabadoAnt.getDay() !== 6) {
+      ultimoSabadoAnt.setDate(ultimoSabadoAnt.getDate() - 1);
+    }
+    
+    const inicioRenovacao = new Date(ultimoSabadoAnt);
+    inicioRenovacao.setDate(ultimoSabadoAnt.getDate() + 1); // Domingo seguinte
+    inicioRenovacao.setHours(0, 0, 0, 0);
 
-  const emPeriodo = isPrimeiraSemana || isUltimaSemana;
-  
-  let descricao = '';
-  if (isPrimeiraSemana) {
-    descricao = `Primeira semana do mês corrente (01 a 07 de ${getMesNome(mes)}). Período de FECHAMENTO de mensalistas ativo!`;
-  } else if (isUltimaSemana) {
-    descricao = `Última semana do mês (${(totalDiasMesAtual - 6)} a ${totalDiasMesAtual} de ${getMesNome(mes)}). Antecipação para o próximo mês ativa!`;
-  } else {
-    descricao = 'Janela comum. Período de fechamento ocorre apenas na transição de meses (últimos 7 dias e primeiros 7 dias).';
+    // 2. Encontrar o 2º sábado do mês de referência (refMes)
+    const primeiroDiaRef = new Date(refAno, refMes, 1);
+    let primeiroSabadoRef = new Date(primeiroDiaRef);
+    while (primeiroSabadoRef.getDay() !== 6) {
+      primeiroSabadoRef.setDate(primeiroSabadoRef.getDate() + 1);
+    }
+    const segundoSabadoRef = new Date(primeiroSabadoRef);
+    segundoSabadoRef.setDate(primeiroSabadoRef.getDate() + 7);
+
+    const fimRenovacao = new Date(segundoSabadoRef);
+    fimRenovacao.setDate(segundoSabadoRef.getDate() - 1); // Sexta-feira anterior
+    fimRenovacao.setHours(23, 59, 59, 999);
+
+    return { inicio: inicioRenovacao, fim: fimRenovacao };
+  };
+
+  // Testa a janela usando o mês atual como referência
+  const janelaAtual = getJanelaParaMesRef(ano, mes);
+  // Testa a janela usando o próximo mês como referência (caso estejamos no fim do mês atual)
+  const janelaProximo = getJanelaParaMesRef(ano, mes + 1);
+
+  if (data >= janelaAtual.inicio && data <= janelaAtual.fim) {
+    const nomeMes = getMesNome(mes);
+    return { 
+      emPeriodo: true, 
+      descricao: `Período de RENOVAÇÃO de mensalistas ativo para o mês de ${nomeMes}.` 
+    };
   }
 
-  return { emPeriodo, descricao };
+  if (data >= janelaProximo.inicio && data <= janelaProximo.fim) {
+    // Para resolver a virada de ano no nome do mês
+    const dataProximoMes = new Date(ano, mes + 1, 1);
+    const nomeMes = getMesNome(dataProximoMes.getMonth());
+    return { 
+      emPeriodo: true, 
+      descricao: `Período de RENOVAÇÃO de mensalistas ativo (antecipação para o mês de ${nomeMes}).` 
+    };
+  }
+
+  return { 
+    emPeriodo: false, 
+    descricao: 'Janela comum. O período de renovação ocorre entre o fim e o início de cada mês.' 
+  };
 }
 
 function getMesNome(mesIndex: number): string {
@@ -91,21 +127,35 @@ export function gerarLinkCompartilhamento(texto: string): string {
 }
 
 /**
- * 1. Mensagem de Confirmação de Presença de Jogo
+ * Mensagem de Renovação de Mensalidade
  */
-export function obterTextoConfirmacaoJogador(jogadorNome: string, partidaTitulo: string, dataStr: string, horario: string, local: string): string {
-  return `⚽ *CONFIRMAÇÃO DE PELADA - FC* ⚽\n\nFala galera! O atleta *${jogadorNome}* confirmou presença para a partida:\n\n🏆 *${partidaTitulo}*\n📅 Data: *${dataStr}*\n🕒 Horário: *${horario}h*\n📍 Local: *${local}*\n\n_Bora pro jogo tirar aquela onda!_ 💪🏃‍♂️💨`;
-}
+export function obterTextoListaRenovacao(mesRef: string, jogadores: Jogador[], pagamentos: Pagamento[]): string {
+  const mesFormatado = mesRef.split('-').reverse().join('/');
+  
+  // Pegar todos os mensalistas ativos
+  const mensalistas = jogadores.filter(j => j.membroStatus === 'mensalista');
+  
+  const formatarLinha = (j: Jogador, index: number) => {
+    const pagou = pagamentos.some(p => p.jogadorId === j.id && p.mesRef === mesRef && p.status === 'pago');
+    const statusSign = pagou ? ' 💰' : '';
+    return `${index + 1}. *${j.nome} ${j.sobrenome}*${statusSign}`;
+  };
 
-/**
- * 2. Mensagem de Recebimento de Mensalidade (especialmente no período de fechamento)
- */
-export function obterTextoPagamentoMensalidade(jogadorNome: string, mesRef: string, valor: number, emPeriodoFechamento: boolean): string {
-  const statusMensagem = emPeriodoFechamento 
-    ? `⚠️ *FECHAMENTO DE LISTA ATIVO* ⚠️\n💰 *MENSALIDADE PAGA (DENTRO DO PRAZO)* 💰`
-    : `💰 *PAGAMENTO DE MENSALIDADE RECEBIDO* 💰`;
+  const listaTxt = mensalistas.length > 0 
+    ? mensalistas.map((j, i) => formatarLinha(j, i)).join('\n')
+    : '_Nenhum mensalista cadastrado_';
 
-  return `⚽ *CONTROLE FINANCEIRO - FC* ⚽\n\n${statusMensagem}\n\nAtleta: *${jogadorNome}*\nReferência: *${mesRef}*\nValor: *R$ ${valor.toFixed(2)}*\nStatus: *QUITADO* ✅\n\nTrabalho sério para manter a pelada ativa com campo pago e bola cheia! Agradecemos o compromisso. Edição de mensalistas atualizada no portal! 📈`;
+  return `⚽ *PELADA BATISTA SÁBADO* ⚽
+🔄 *RENOVAÇÃO DE MENSALIDADE - ${mesFormatado}* 🔄
+
+A janela de renovação de mensalidade está aberta!
+Abaixo a situação atual dos mensalistas:
+
+${listaTxt}
+
+----------------------------------------
+📲 Acesse o portal oficial para mais informações:
+https://peladabatista.onrender.com`;
 }
 
 /**
@@ -309,13 +359,15 @@ export function obterTextoListaCompletaPartida(
     : '_Nenhum jogador em lista de espera_';
 
   const dataJogoDate = new Date(`${partida.data}T12:00:00`);
-  const dataAmigavel = dataJogoDate.toLocaleDateString('pt-BR', { weekday: 'long', day: 'numeric', month: 'long' });
+  let dataAmigavel = dataJogoDate.toLocaleDateString('pt-BR', { weekday: 'long', day: 'numeric', month: 'long' });
+  dataAmigavel = dataAmigavel.charAt(0).toUpperCase() + dataAmigavel.slice(1);
+  const horario = partida.horario.split(' ')[0];
 
   return `⚽ *PELADA BATISTA SÁBADO* ⚽
 🏆 *CONVOCAÇÃO & PRESENÇA ATUALIZADA* 🏆
 
 📅 Jogo: *${partida.titulo}*
-🗓️ Data: *${dataAmigavel}* às *${partida.horario}h*
+🗓️ Data: *${dataAmigavel}* às *${horario}*
 📍 Local: *${partida.local}*
 
 *A - MENSALISTAS:*
@@ -335,33 +387,29 @@ ${strEspera}
 
 ----------------------------------------
 📲 Acesse o portal oficial para confirmar ou alterar sua presença:
-${grupoLinkWeb || 'https://pelada-batista.web.app'}`;
+https://peladabatista.onrender.com`;
 }
 
 /**
- * Formata mensagem de quitação de mensalidade com ícone de medalha se for gold e contador de mensalistas pagos
+ * Mensagem de jogo cancelado
  */
-export function obterTextoQuitacaoMensalidade(
-  jogador: Jogador,
-  mesRef: string,
-  valor: number,
-  totalQuitadosCount: number
-): string {
-  const isGold = !!jogador.isGold;
-  const mesFormatado = mesRef.split('-').reverse().join('/');
-  const medalha = isGold ? ' 🏅' : '';
+export function obterTextoPartidaCancelada(partida: Partida): string {
+  const dataJogoDate = new Date(`${partida.data}T12:00:00`);
+  let dataAmigavel = dataJogoDate.toLocaleDateString('pt-BR', { weekday: 'long', day: '2-digit', month: '2-digit', year: 'numeric' });
+  dataAmigavel = dataAmigavel.charAt(0).toUpperCase() + dataAmigavel.slice(1);
   
-  return `💰 *QUITAÇÃO DE MENSALIDADE - PELADA BATISTA SÁBADO* 💰
+  // Limpa o "-feira" se quiser ou apenas usa como vem. Pegando o horário e formatando.
+  const horario = partida.horario.split(' ')[0]; // Pega só o "08:00" do "08:00 às 10:00"
 
-Atleta: *${jogador.nome} ${jogador.sobrenome}* (${jogador.posicao})${medalha}
-Referência: *${mesFormatado}*
-Valor Quitado: *R$ ${valor.toFixed(2)}*
-Status: *PAGO & CONFIRMADO* ✅
+  return `⚽ *PELADA BATISTA SÁBADO* ⚽
+❌ *JOGO CANCELADO!* ❌
 
-📊 *Informativo Financeiro:*
-- Total de mensalistas quitados neste período: *${totalQuitadosCount}* (Limite regulamentado de 25 mensalistas)
+📋 *${partida.titulo}*
+🗓️ Data: *${dataAmigavel} às ${horario}*
+📍 Local: *${partida.local}*
 
-Muito obrigado pelo compromisso em manter o nosso futebol rodando redondo de campo pago e bola cheia! 🤝⚽🏃‍♂️💨`;
+📲 Acesse nosso portal:
+https://peladabatista.onrender.com`;
 }
 
 /**

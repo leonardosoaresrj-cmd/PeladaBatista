@@ -4,7 +4,7 @@
  */
 
 import React, { useState } from 'react';
-import { Jogador, PosicaoJogador, MembroStatus, Partida } from '../types';
+import { Jogador, PosicaoJogador, MembroStatus, Partida, Pagamento } from '../types';
 import { AVATAR_PRESETS } from '../data';
 import { Users, Trash2, Shield, Calendar, Edit2, Check, X, ShieldAlert, Award } from 'lucide-react';
 
@@ -12,6 +12,7 @@ interface ListaCadastradosProps {
   jogadores: Jogador[];
   partidas: Partida[];
   jogadorAtual: Jogador;
+  pagamentos?: Pagamento[];
   onExcluirJogador: (id: string) => void;
   onEditarJogador: (id: string, camposAtualizados: Partial<Jogador>) => void;
 }
@@ -20,6 +21,7 @@ export default function ListaCadastrados({
   jogadores,
   partidas,
   jogadorAtual,
+  pagamentos = [],
   onExcluirJogador,
   onEditarJogador,
 }: ListaCadastradosProps) {
@@ -131,11 +133,6 @@ export default function ListaCadastrados({
   };
 
   const handleSalvarEdicao = (id: string) => {
-    if (editSenha.length !== 4 || isNaN(Number(editSenha))) {
-      alert('O PIN de segurança deve possuir exatamente 4 dígitos numéricos.');
-      return;
-    }
-
     onEditarJogador(id, {
       nome: editNome,
       sobrenome: editSobrenome,
@@ -155,8 +152,8 @@ export default function ListaCadastrados({
     setEditNome(jog.nome);
     setEditSobrenome(jog.sobrenome);
     setEditPosicao(jog.posicao);
-    setEditMembro(jog.membroStatus);
-    setEditIsGold(!!jog.isGold);
+    setEditMembro(jog.membroStatusDb ?? jog.membroStatus);
+    setEditIsGold(jog.isGoldDb !== undefined ? !!jog.isGoldDb : !!jog.isGold);
     setEditFoto(jog.foto || '');
     setEditDataNascimento(jog.dataNascimento || '');
     setEditSenha(jog.senha || '');
@@ -246,84 +243,37 @@ export default function ListaCadastrados({
                     id={`select-edit-membro-${j.id}`}
                     value={editMembro}
                     onChange={(e) => setEditMembro(e.target.value as MembroStatus)}
-                    disabled={jogadorAtual.role !== 'admin' && !janelaInfo.estaAberta && editPosicao !== 'Goleiro'}
+                    disabled={
+                      jogadorAtual.role !== 'admin' && 
+                      (
+                        !janelaInfo.estaAberta || 
+                        pagamentos.some(p => p.jogadorId === j.id && p.mesRef === `${new Date().getFullYear()}-${String(new Date().getMonth() + 1).padStart(2, '0')}` && !p.partidaId && p.status === 'pago')
+                      ) && 
+                      editPosicao !== 'Goleiro'
+                    }
                     className="bg-emerald-950 border border-white/10 text-white text-[11px] rounded px-1.5 py-1 focus:outline-none disabled:opacity-50 disabled:cursor-not-allowed"
                   >
                     {editPosicao === 'Goleiro' ? (
                       <option className="bg-emerald-950 text-white" value="isento">Isento</option>
                     ) : (
                       <>
-                        <option className="bg-emerald-950 text-white" value="mensalista">Mensal</option>
-                        <option className="bg-emerald-950 text-white" value="diarista">Diário</option>
+                        <option className="bg-emerald-950 text-white" value="mensalista">Mensalista</option>
+                        <option className="bg-emerald-950 text-white" value="diarista">Diarista</option>
                       </>
                     )}
                   </select>
                 </div>
 
-                {jogadorAtual.role !== 'admin' && !janelaInfo.estaAberta && (
+                {jogadorAtual.role !== 'admin' && (
+                  !janelaInfo.estaAberta ||
+                  pagamentos.some(p => p.jogadorId === j.id && p.mesRef === `${new Date().getFullYear()}-${String(new Date().getMonth() + 1).padStart(2, '0')}` && !p.partidaId && p.status === 'pago')
+                ) && editPosicao !== 'Goleiro' && (
                   <p className="text-[9px] text-rose-400 font-medium leading-tight">
-                    * Alteração de plano indisponível fora do período de renovação.
+                    * Alteração de plano indisponível fora do período de renovação ou mensalidade já paga.
                   </p>
                 )}
 
-                {/* Configurações do Avatar */}
-                <div className="bg-black/20 p-2 rounded border border-white/5 space-y-1 my-1">
-                  <p className="text-[9px] font-bold text-emerald-400 uppercase tracking-wider">Avatar do Atleta</p>
-                  <div className="flex items-center gap-2">
-                    <input
-                      type="file"
-                      id={`edit-avatar-upload-${j.id}`}
-                      accept="image/*"
-                      onChange={handleEditFileChange}
-                      className="hidden"
-                    />
-                    <label
-                      htmlFor={`edit-avatar-upload-${j.id}`}
-                      className="px-2 py-1 bg-white/10 hover:bg-white/15 border border-white/10 rounded text-[9px] text-white cursor-pointer transition-all"
-                    >
-                      Carregar Foto
-                    </label>
-                    <input
-                      type="text"
-                      placeholder="Ou URL da foto"
-                      value={editFoto.startsWith('data:') ? '' : editFoto}
-                      onChange={(e) => setEditFoto(e.target.value)}
-                      className="flex-1 bg-emerald-950 border border-white/10 text-white text-[10px] rounded px-1.5 py-0.5"
-                    />
-                  </div>
-                </div>
-
-                {/* Data de Nascimento e PIN de Segurança (Alteração Completa para o Usuário) */}
-                <div className="grid grid-cols-2 gap-2 my-1.5 p-1 rounded bg-black/15 border border-white/5">
-                  <div className="space-y-0.5">
-                    <label className="text-[8px] font-bold text-emerald-400 uppercase tracking-wide">Nascimento</label>
-                    <input
-                      type="date"
-                      required
-                      value={editDataNascimento}
-                      onChange={(e) => setEditDataNascimento(e.target.value)}
-                      className="w-full bg-emerald-950/90 border border-white/10 text-white text-[10px] rounded px-1.5 py-0.5 focus:outline-none focus:border-white"
-                    />
-                  </div>
-                  <div className="space-y-0.5">
-                    <label className="text-[8px] font-bold text-emerald-400 uppercase tracking-wide">PIN (4 de Acesso)</label>
-                    <input
-                      type="text"
-                      maxLength={4}
-                      required
-                      placeholder="PIN"
-                      pattern="\d{4}"
-                      value={editSenha}
-                      onChange={(e) => {
-                        const val = e.target.value.replace(/\D/g, '');
-                        setEditSenha(val);
-                      }}
-                      className="w-full bg-emerald-950/90 border border-white/10 text-white text-[10px] text-center font-mono rounded px-1.5 py-0.5 focus:outline-none focus:border-white"
-                    />
-                  </div>
-                </div>
-
-                {jogadorAtual.role === 'admin' && (
+                {jogadorAtual.role === 'admin' && editMembro !== 'diarista' && (
                   <label className="flex items-center gap-2 mt-1.5 text-[11px] font-bold text-amber-400 select-none cursor-pointer p-1 rounded bg-black/20 border border-white/5">
                     <input
                       type="checkbox"

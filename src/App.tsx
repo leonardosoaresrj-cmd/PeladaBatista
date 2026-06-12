@@ -41,7 +41,8 @@ import ConfiguracaoSystem from './components/ConfiguracaoSystem';
 import MensalistasMes from './components/MensalistasMes';
 import HistoricoJogos from './components/HistoricoJogos';
 import { mesclarPartidasAutomáticas } from './utils/partidaHelper';
-import { obterTextoListaCompletaPartida, obterTextoQuitacaoMensalidade, obterStatusMembroEfetivo, obterDebitosDoJogador } from './utils/confirmationRules';
+import { isJogadorFuncionalmenteGold } from './utils/goldRules';
+import { obterTextoListaCompletaPartida, obterTextoListaRenovacao, obterStatusMembroEfetivo, obterDebitosDoJogador, obterTextoPartidaCancelada } from './utils/confirmationRules';
 import logoPelada from './assets/images/logo_pelada_batista_1780453160575.png';
 import { Calendar, Users, DollarSign, ShieldAlert, LogOut, Database, Award, User, Settings, UserCheck, History, CheckSquare, Check, X, Lock, Cake, TrendingUp, UserPlus } from 'lucide-react';
 
@@ -254,19 +255,18 @@ export default function App() {
     if (whatsappAutomacaoAtiva && whatsappWebhookUrl) {
       setTimeout(async () => {
         try {
-          const headers: Record<string, string> = {
-            'Content-Type': 'application/json'
-          };
-          if (whatsappWebhookToken) {
-            headers['x-webhook-secret'] = whatsappWebhookToken;
-          }
-
-          const response = await fetch(whatsappWebhookUrl, {
+          const response = await fetch('/api/bot-proxy', {
             method: 'POST',
-            headers,
+            headers: {
+              'Content-Type': 'application/json'
+            },
             body: JSON.stringify({
-              mensagem: msg,
-              grupo_id: whatsappGrupoLink
+              url: whatsappWebhookUrl,
+              secret: whatsappWebhookToken,
+              payload: {
+                mensagem: msg,
+                grupo_id: whatsappGrupoLink
+              }
             })
           });
 
@@ -300,11 +300,11 @@ export default function App() {
     localStorage.removeItem('racha_whatsapp_logs');
   };
 
-  const handleSendTestAlert = () => {
+  const handleSendTestAlert = (msg?: string) => {
     handleRegistrarLogAutomacao(
       'Automação (Teste)',
-      'Todas as Peladas',
-      '📢 [ALERTA DE TESTE]: Disparo de teste bem-sucedido via painel de controle!'
+      'Teste Painel',
+      msg || '📢 [ALERTA DE TESTE]: Disparo de teste bem-sucedido via painel de controle!'
     );
   };
 
@@ -370,14 +370,18 @@ export default function App() {
     if (!jogadorAtual) return null;
     return {
       ...jogadorAtual,
-      membroStatus: obterStatusMembroEfetivo(jogadorAtual, pagamentos)
+      membroStatus: obterStatusMembroEfetivo(jogadorAtual, pagamentos),
+      isGold: isJogadorFuncionalmenteGold(jogadorAtual, pagamentos)
     };
   }, [jogadorAtual, pagamentos]);
 
   const jogadoresEfetivos = useMemo(() => {
     return jogadores.map(j => ({
       ...j,
-      membroStatus: obterStatusMembroEfetivo(j, pagamentos)
+      membroStatus: obterStatusMembroEfetivo(j, pagamentos),
+      membroStatusDb: j.membroStatus,
+      isGoldDb: j.isGold,
+      isGold: isJogadorFuncionalmenteGold(j, pagamentos)
     }));
   }, [jogadores, pagamentos]);
 
@@ -507,6 +511,38 @@ export default function App() {
       }
     }
   }, []);
+
+  // Alerta de Abertura de Renovação de Mensalidade
+  useEffect(() => {
+    if (!whatsappAutomacaoAtiva || jogadores.length === 0) return;
+
+    const hoje = new Date();
+    const ontem = new Date(hoje);
+    ontem.setDate(hoje.getDate() - 1);
+
+    if (ontem.getDay() === 6) {
+      const proximoSabado = new Date(ontem);
+      proximoSabado.setDate(ontem.getDate() + 7);
+
+      // Se ontem foi o último sábado do seu respectivo mês:
+      if (ontem.getMonth() !== proximoSabado.getMonth()) {
+        const refAno = proximoSabado.getFullYear();
+        const refMesString = String(proximoSabado.getMonth() + 1).padStart(2, '0');
+        const mesRef = `${refAno}-${refMesString}`;
+
+        const key = `renew_alert_sent_${mesRef}`;
+        if (!localStorage.getItem(key)) {
+          const msgCompleta = obterTextoListaRenovacao(mesRef, jogadores, pagamentos);
+          handleRegistrarLogAutomacao(
+            'Sistema', 
+            `Abertura Renovação ${mesRef}`, 
+            msgCompleta
+          );
+          localStorage.setItem(key, 'true');
+        }
+      }
+    }
+  }, [jogadores, pagamentos, whatsappAutomacaoAtiva]);
 
   const handleLoginSuccess = (jogador: Jogador) => {
     setJogadorAtual(jogador);
@@ -886,6 +922,11 @@ export default function App() {
 
     if (modificado) {
       await salvarPartidaNoSupabase(modificado);
+      
+      if (whatsappAutomacaoAtiva && cancelar) {
+        const msgCancelamento = obterTextoPartidaCancelada(modificado);
+        handleRegistrarLogAutomacao('Administrador', 'Cancelamento de Jogo', msgCancelamento);
+      }
     }
   };
 
@@ -940,8 +981,7 @@ export default function App() {
         const jogObj = jogadores.find(j => j.id === jogadorId);
         if (jogObj) {
           const atletaNome = `${jogObj.nome} ${jogObj.sobrenome}`;
-          const totalQuitados = atualizados.filter(p => p.mesRef === mesRef && p.status === 'pago' && !p.partidaId).length;
-          const msgCompleta = obterTextoQuitacaoMensalidade(jogObj, mesRef, valor, totalQuitados);
+          const msgCompleta = obterTextoListaRenovacao(mesRef, jogadores, atualizados);
           
           handleRegistrarLogAutomacao(
             atletaNome,
@@ -1016,6 +1056,9 @@ export default function App() {
                 <div>
                   <div className="flex items-center gap-1">
                     <span id="nome-usuario-logado" className="text-xs font-bold text-white hover:text-teal-300 transition-colors leading-none decoration-dotted hover:underline underline-offset-2">{jogadorAtual.nome} {jogadorAtual.sobrenome}</span>
+                    {jogadorAtualEfetivo?.isGold && (
+                      <span className="text-[9px] bg-gradient-to-r from-amber-400 to-yellow-600 text-black px-1 py-0.5 font-extrabold rounded shadow-sm shadow-amber-500/20 whitespace-nowrap">GOLD 🏅</span>
+                    )}
                     {jogadorAtual.role === 'admin' ? (
                       <span className="text-[8px] bg-amber-500 text-black px-1 font-extrabold rounded">ADM</span>
                     ) : (
@@ -1239,7 +1282,8 @@ export default function App() {
                 <ListaCadastrados
                   jogadores={jogadoresEfetivos}
                   partidas={partidasMescladas}
-                  jogadorAtual={jogadorAtualEfetivo}
+                  jogadorAtual={jogadorAtual}
+                  pagamentos={pagamentos}
                   onExcluirJogador={handleExcluirJogador}
                   onEditarJogador={handleEditarJogador}
                 />
@@ -1248,7 +1292,7 @@ export default function App() {
               {activeTab === 'financeiro' && (
                 <ControlePagamentos
                   pagamentos={pagamentos}
-                  jogadores={jogadores}
+                  jogadores={jogadoresEfetivos}
                   jogadorAtual={jogadorAtual}
                   onRegistrarPagamento={handleRegistrarPagamento}
                   valor4Sabados={valor4Sabados}
@@ -1262,7 +1306,7 @@ export default function App() {
               {activeTab === 'caixa' && jogadorAtual.role === 'admin' && (
                 <ControleCaixa
                   partidas={partidasMescladas}
-                  jogadores={jogadores}
+                  jogadores={jogadoresEfetivos}
                   pagamentos={pagamentos}
                   lancamentos={lancamentos}
                   onAddLancamento={handleAddLancamento}
@@ -1280,7 +1324,7 @@ export default function App() {
 
               {activeTab === 'mensalistas' && (
                 <MensalistasMes
-                  jogadores={jogadores}
+                  jogadores={jogadoresEfetivos}
                   pagamentos={pagamentos}
                   jogadorAtual={jogadorAtual}
                   onRegistrarPagamento={handleRegistrarPagamento}
@@ -1304,7 +1348,7 @@ export default function App() {
                 <PainelAdmin
                   jogadores={jogadoresEfetivos}
                   partidas={partidasMescladas}
-                  jogadorAtual={jogadorAtualEfetivo}
+                  jogadorAtual={jogadorAtual}
                   onAprovarJogador={handleAprovarJogador}
                 />
               )}
@@ -1330,7 +1374,7 @@ export default function App() {
           ) : (
             /* LOGIN / CADASTRO DE ACESSO */
             <LoginCadastro
-              jogadores={jogadores}
+              jogadores={jogadoresEfetivos}
               onLoginSuccess={handleLoginSuccess}
               onRegistrar={handleRegistrarJogador}
             />
@@ -1645,7 +1689,12 @@ export default function App() {
                   <User className="w-4 h-4" />
                 </div>
                 <div>
-                  <h3 className="font-display font-bold text-base text-white">Editar Perfil Atleta</h3>
+                  <div className="flex items-center gap-2">
+                    <h3 className="font-display font-bold text-base text-white">Editar Perfil Atleta</h3>
+                    {jogadorAtualEfetivo?.isGold && (
+                      <span className="text-[10px] bg-gradient-to-r from-amber-400 to-yellow-600 text-black px-1.5 py-0.5 font-extrabold rounded shadow-sm shadow-amber-500/20 whitespace-nowrap">GOLD 🏅</span>
+                    )}
+                  </div>
                   <p className="text-[10px] text-emerald-300">Atualize suas informações gerais de acesso</p>
                 </div>
               </div>
@@ -1715,15 +1764,22 @@ export default function App() {
                   <select
                     value={perfilMembroStatus}
                     onChange={(e) => setPerfilMembroStatus(e.target.value as MembroStatus)}
-                    disabled={jogadorAtual.role !== 'admin' && !checkJanelaRenovacaoGeral().estaAberta && perfilPosicao !== 'Goleiro'}
+                    disabled={
+                      jogadorAtual.role !== 'admin' && 
+                      (
+                        !checkJanelaRenovacaoGeral().estaAberta || 
+                        pagamentos.some(p => p.jogadorId === jogadorAtual.id && p.mesRef === `${new Date().getFullYear()}-${String(new Date().getMonth() + 1).padStart(2, '0')}` && !p.partidaId && p.status === 'pago')
+                      ) && 
+                      perfilPosicao !== 'Goleiro'
+                    }
                     className="w-full bg-emerald-955 border border-white/10 rounded-xl px-2.5 py-2 text-xs text-white focus:outline-none disabled:opacity-50 disabled:cursor-not-allowed"
                   >
                     {perfilPosicao === 'Goleiro' ? (
                       <option className="bg-emerald-955 text-white" value="isento">Isento</option>
                     ) : (
                       <>
-                        <option className="bg-emerald-955 text-white" value="mensalista">Mensalista - R$50</option>
-                        <option className="bg-emerald-955 text-white" value="diarista">Diarista - R$15/jogo</option>
+                        <option className="bg-emerald-955 text-white" value="mensalista">Mensalista</option>
+                        <option className="bg-emerald-955 text-white" value="diarista">Diarista</option>
                       </>
                     )}
                   </select>
@@ -1731,14 +1787,17 @@ export default function App() {
               </div>
 
               {/* Mensagem informativa sobre plano se bloqueado */}
-              {jogadorAtual.role !== 'admin' && !checkJanelaRenovacaoGeral().estaAberta && (
+              {jogadorAtual.role !== 'admin' && (
+                !checkJanelaRenovacaoGeral().estaAberta || 
+                pagamentos.some(p => p.jogadorId === jogadorAtual.id && p.mesRef === `${new Date().getFullYear()}-${String(new Date().getMonth() + 1).padStart(2, '0')}` && !p.partidaId && p.status === 'pago')
+              ) && perfilPosicao !== 'Goleiro' && (
                 <div className="bg-black/20 border border-rose-500/20 p-2 rounded-xl text-[9px] text-rose-350 leading-relaxed font-sans">
-                  * Alteração de plano (Status Membro) indisponível fora do período de renovação mensal estabelecido.
+                  * Alteração de plano (Status Membro) indisponível fora do período de renovação mensal estabelecido ou mensalidade já paga.
                 </div>
               )}
 
               {/* Data Aniversário e PIN de Segurança */}
-              <div className="grid grid-cols-2 gap-3 w-full">
+              <div className="flex flex-col gap-3 w-full">
                 <div className="space-y-1 min-w-0 w-full">
                   <label className="text-[10px] font-bold text-emerald-300 uppercase tracking-wide flex items-center gap-1">
                     <Cake className="w-3 h-3 text-teal-400" />

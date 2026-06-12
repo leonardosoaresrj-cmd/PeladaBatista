@@ -17,7 +17,7 @@ interface ConfiguracaoSystemProps {
   onUpdateWhatsappConfig: (link: string, ativa: boolean, webhookUrl: string, token: string) => void;
   whatsappLogs: any[];
   onClearLogs: () => void;
-  onSendTestAlert: () => void;
+  onSendTestAlert: (msg?: string) => void;
   valor4Sabados: number;
   valor5Sabados: number;
   valorDiaria: number;
@@ -270,7 +270,7 @@ export default function ConfiguracaoSystem({
                 </button>
               </div>
 
-              {successMsg && (
+              {successMsg && !successMsg.includes('teste') && (
                 <p className="text-[10px] text-teal-300 font-bold text-center animate-pulse">
                   ✓ {successMsg}
                 </p>
@@ -327,6 +327,153 @@ export default function ConfiguracaoSystem({
                 ))
               )}
             </div>
+          </div>
+
+          {/* MENSAGENS PADRÕES DO SISTEMA */}
+          <div className="bg-emerald-900/40 border border-white/10 rounded-2xl p-5 shadow-xl backdrop-blur-sm space-y-4">
+            <h3 className="font-display font-semibold text-xs text-white flex items-center gap-2 uppercase tracking-wide">
+              <MessageSquare className="w-3.5 h-3.5 text-emerald-400" />
+              Templates de Mensagens do Robô
+            </h3>
+            
+            <p className="text-[10px] text-emerald-300/80 leading-relaxed font-sans">
+              Testes práticos para checar a automação das 4 mensagens principais.
+            </p>
+
+            {/* MESSAGE 1 */}
+            <div className="bg-emerald-950/70 p-3 rounded-lg border border-white/5 space-y-2">
+              <strong className="text-white text-[10px] block font-sans">1. Novo Jogo Agendado</strong>
+              <div className="font-mono text-[8px] text-emerald-300 whitespace-pre">
+{`⚽ *PELADA BATISTA SÁBADO* ⚽
+🏆 *NOVO JOGO AGENDADO!* 🏆
+
+📋 *[Partida Teste]*
+🗓️ Data: *Sábado, 25/06/2026 às 08:00*
+📍 Local: *Campo do Batista*
+
+⏰ *Janela de confirmação:*
+🗓️ Terça-feira às 00:00 até Sexta-feira às 23:59
+
+📲 Confirme sua presença no portal:
+https://peladabatista.onrender.com`}
+              </div>
+              <button
+                type="button"
+                onClick={() => {
+                  onSendTestAlert(`⚽ *PELADA BATISTA SÁBADO* ⚽\n🏆 *NOVO JOGO AGENDADO!* 🏆\n\n📋 *[Partida Teste]*\n🗓️ Data: *Sábado, 25/06/2026 às 08:00*\n📍 Local: *Campo do Batista*\n\n⏰ *Janela de confirmação:*\n🗓️ Terça-feira às 00:00 até Sexta-feira às 23:59\n\n📲 Confirme sua presença no portal:\nhttps://peladabatista.onrender.com`);
+                  setSuccessMsg('Mensagem 1 disparada!');
+                  setTimeout(() => setSuccessMsg(''), 4000);
+                }}
+                className="w-full bg-emerald-800 hover:bg-emerald-700 text-white font-bold text-[9px] py-1.5 flex items-center justify-center gap-1.5 rounded transition-colors"
+              >
+                <Send className="w-3 h-3 text-teal-300" /> Teste 1: Jogo Agendado
+              </button>
+            </div>
+
+            {/* MESSAGE 2 */}
+            <div className="bg-emerald-950/70 p-3 rounded-lg border border-white/5 space-y-2">
+              <strong className="text-white text-[10px] block font-sans">2. Confirmação de Presença</strong>
+              <div className="font-mono text-[8px] text-emerald-300 whitespace-pre">
+{`⚽ *CONFIRMAÇÃO DE PELADA - FC* ⚽
+
+Fala galera! O atleta *[Nome do Atleta]* confirmou presença para a partida:
+
+🏆 *[Partida Teste]*
+📅 Data: *Sábado, 25/06/2026 às 08:00*
+📍 Local: *Campo do Batista*
+
+_Bora pro jogo tirar aquela onda!_ 💪🏃‍♂️💨`}
+              </div>
+              <button
+                type="button"
+                onClick={() => {
+                  onSendTestAlert(`⚽ *CONFIRMAÇÃO DE PELADA - FC* ⚽\n\nFala galera! O atleta *[Nome do Atleta]* confirmou presença para a partida:\n\n🏆 *[Partida Teste]*\n📅 Data: *Sábado, 25/06/2026 às 08:00*\n📍 Local: *Campo do Batista*\n\n_Bora pro jogo tirar aquela onda!_ 💪🏃‍♂️💨`);
+                  setSuccessMsg('Mensagem 2 disparada!');
+                  setTimeout(() => setSuccessMsg(''), 4000);
+                }}
+                className="w-full bg-emerald-800 hover:bg-emerald-700 text-white font-bold text-[9px] py-1.5 flex items-center justify-center gap-1.5 rounded transition-colors"
+              >
+                <Send className="w-3 h-3 text-teal-300" /> Teste 2: Confirmação Presença
+              </button>
+            </div>
+
+            {/* MESSAGE 3 */}
+            <div className="bg-emerald-950/70 p-3 rounded-lg border border-white/5 space-y-2">
+              <strong className="text-white text-[10px] block font-sans">3. Quitação de Mensalidade</strong>
+              <div className="font-mono text-[8px] text-emerald-300 whitespace-pre">
+{`💰 *QUITAÇÃO DE MENSALIDADE - PELADA BATISTA SÁBADO* 💰
+
+Atleta: *[Nome do Atleta]* (Ataque) 🏅
+Referência: *06/2026*
+Valor Quitado: *R$ 60.00*
+Status: *PAGO & CONFIRMADO* ✅
+
+📊 *Informativo Financeiro:*
+- Total de mensalistas quitados neste período: *15* (Limite regulamentado de 25 mensalistas)
+
+Muito obrigado pelo compromisso em manter o nosso futebol rodando redondo de campo pago e bola cheia! 🤝⚽🏃‍♂️💨`}
+              </div>
+              <button
+                type="button"
+                onClick={() => {
+                  onSendTestAlert(`💰 *QUITAÇÃO DE MENSALIDADE - PELADA BATISTA SÁBADO* 💰\n\nAtleta: *[Nome do Atleta]* (Ataque) 🏅\nReferência: *06/2026*\nValor Quitado: *R$ 60.00*\nStatus: *PAGO & CONFIRMADO* ✅\n\n📊 *Informativo Financeiro:*\n- Total de mensalistas quitados neste período: *15* (Limite regulamentado de 25 mensalistas)\n\nMuito obrigado pelo compromisso em manter o nosso futebol rodando redondo de campo pago e bola cheia! 🤝⚽🏃‍♂️💨`);
+                  setSuccessMsg('Mensagem 3 disparada!');
+                  setTimeout(() => setSuccessMsg(''), 4000);
+                }}
+                className="w-full bg-emerald-800 hover:bg-emerald-700 text-white font-bold text-[9px] py-1.5 flex items-center justify-center gap-1.5 rounded transition-colors"
+              >
+                <Send className="w-3 h-3 text-teal-300" /> Teste 3: Quitação Pagamento
+              </button>
+            </div>
+
+            {/* MESSAGE 4 */}
+            <div className="bg-emerald-950/70 p-3 rounded-lg border border-white/5 space-y-2">
+              <strong className="text-white text-[10px] block font-sans">4. Convocação & Presença Atualizada</strong>
+              <div className="font-mono text-[8px] text-emerald-300 whitespace-pre">
+{`⚽ *PELADA BATISTA SÁBADO* ⚽
+🏆 *CONVOCAÇÃO & PRESENÇA ATUALIZADA* 🏆
+
+📅 Jogo: *[Partida Teste]*
+🗓️ Data: *Sábado, 25 de junho* às *08:00*
+📍 Local: *Campo do Batista*
+
+*A - MENSALISTAS:*
+1. *[Nome Mensalista]* - Meio 🏅
+
+*B - DIARISTAS:*
+_Nenhum diarista confirmado ainda_
+
+*C - GOLEIROS:*
+1. *[Nome Goleiro]*
+
+*D - JOGADORES AUSENTES:*
+_Nenhuma ausência registrada_
+
+*E - LISTA DE ESPERA:*
+_Nenhum jogador em lista de espera_
+
+----------------------------------------
+📲 Acesse o portal oficial para confirmar ou alterar sua presença:
+https://peladabatista.onrender.com`}
+              </div>
+              <button
+                type="button"
+                onClick={() => {
+                  onSendTestAlert(`⚽ *PELADA BATISTA SÁBADO* ⚽\n🏆 *CONVOCAÇÃO & PRESENÇA ATUALIZADA* 🏆\n\n📅 Jogo: *[Partida Teste]*\n🗓️ Data: *Sábado, 25 de junho* às *08:00*\n📍 Local: *Campo do Batista*\n\n*A - MENSALISTAS:*\n1. *[Nome Mensalista]* - Meio 🏅\n\n*B - DIARISTAS:*\n_Nenhum diarista confirmado ainda_\n\n*C - GOLEIROS:*\n1. *[Nome Goleiro]*\n\n*D - JOGADORES AUSENTES:*\n_Nenhuma ausência registrada_\n\n*E - LISTA DE ESPERA:*\n_Nenhum jogador em lista de espera_\n\n----------------------------------------\n📲 Acesse o portal oficial para confirmar ou alterar sua presença:\nhttps://peladabatista.onrender.com`);
+                  setSuccessMsg('Mensagem 4 disparada!');
+                  setTimeout(() => setSuccessMsg(''), 4000);
+                }}
+                className="w-full bg-emerald-800 hover:bg-emerald-700 text-white font-bold text-[9px] py-1.5 flex items-center justify-center gap-1.5 rounded transition-colors"
+              >
+                <Send className="w-3 h-3 text-teal-300" /> Teste 4: Convocação Consolidada
+              </button>
+            </div>
+
+            {successMsg && successMsg.includes('Mensagem') && (
+              <p className="text-[10px] text-teal-300 font-bold text-center animate-pulse mt-1">
+                ✓ {successMsg} Verifique os logs.
+              </p>
+            )}
           </div>
 
         </div>
@@ -519,88 +666,6 @@ export default function ConfiguracaoSystem({
                 </p>
               )}
             </form>
-          </div>
-          
-          {/* BANCO DE DADOS SUPABASE */}
-          <div className="bg-emerald-900/40 border border-white/10 rounded-2xl p-5 shadow-xl backdrop-blur-sm space-y-4">
-            <h3 className="font-display font-semibold text-sm text-white flex items-center gap-2 uppercase tracking-wide">
-              <Share2 className="w-4 h-4 text-emerald-400" />
-              Credenciais Supabase API
-            </h3>
-            
-            <p className="text-xs text-emerald-300/80 leading-relaxed font-sans">
-              Para sincronizar os dados da pelada de forma remota em vez de simulação offline por LocalStorage, insira as chaves da sua API Supabase abaixo:
-            </p>
-
-            <form onSubmit={handleSalvarSupabase} className="space-y-4">
-              <div>
-                <label className="block text-[10px] font-bold text-emerald-300 uppercase tracking-widest mb-1.5 font-sans">SUPABASE_URL</label>
-                <input
-                  id="input-supa-url-config"
-                  type="url"
-                  value={supaUrl}
-                  onChange={(e) => setSupaUrl(e.target.value)}
-                  placeholder="https://your-project.supabase.co"
-                  className="w-full bg-emerald-950 border border-white/10 text-white font-mono text-xs rounded-lg p-2.5 focus:outline-none focus:border-white"
-                />
-              </div>
-
-              <div>
-                <label className="block text-[10px] font-bold text-emerald-300 uppercase tracking-widest mb-1.5 font-sans">SUPABASE_ANON_KEY (CLIENT)</label>
-                <textarea
-                  id="input-supa-key-config"
-                  rows={2}
-                  value={supaKey}
-                  placeholder="eyJhbGciOi..."
-                  onChange={(e) => setSupaKey(e.target.value)}
-                  className="w-full bg-emerald-950 border border-white/10 text-white font-mono text-[10px] rounded-lg p-2.5 focus:outline-none focus:border-white resize-none"
-                />
-              </div>
-
-              <button
-                id="btn-salvar-supa-config-system"
-                type="submit"
-                className="w-full bg-emerald-950 hover:bg-emerald-900 hover:text-white text-emerald-300 border border-white/10 font-bold text-xs py-2.5 rounded-lg transition-all shadow-sm cursor-pointer"
-              >
-                Conectar ao Supabase Live
-              </button>
-
-              {configSalva && (
-                <p className="text-[10px] text-teal-300 font-bold text-center animate-pulse">
-                  ✓ Configuração integrada! Chaves de acesso salvas com sucesso.
-                </p>
-              )}
-            </form>
-          </div>
-
-          {/* SCRIPT SQL EXPORT */}
-          <div className="bg-emerald-900/40 border border-white/10 rounded-2xl p-5 shadow-xl backdrop-blur-sm space-y-4">
-            <div className="flex items-center justify-between border-b border-white/10 pb-2 flex-wrap gap-2">
-              <h3 className="font-display font-semibold text-xs text-white flex items-center gap-2 uppercase tracking-wide">
-                <Database className="w-3.5 h-3.5 text-emerald-400" />
-                Criação de Tabelas SQL (Postgres)
-              </h3>
-              
-              <button
-                id="btn-copiar-sql-config"
-                type="button"
-                onClick={copiarSql}
-                className="bg-emerald-950 hover:bg-emerald-900/80 text-emerald-300 font-bold text-[10px] px-2.5 py-1 rounded transition-all flex items-center gap-1 border border-white/10 cursor-pointer"
-              >
-                {copied ? <Check className="w-3 h-3 text-teal-400" /> : <Copy className="w-3 h-3" />}
-                {copied ? 'Copiado!' : 'Copiar SQL'}
-              </button>
-            </div>
-
-            <p className="text-[11px] text-emerald-300/80 font-sans leading-relaxed">
-              Crie tabelas, privilégios RLS na sua instância do Supabase colando este script no console.
-            </p>
-
-            <div className="w-full bg-emerald-950 border border-white/10 rounded-xl p-3 max-h-[140px] overflow-auto">
-              <pre className="text-[9px] leading-relaxed font-mono text-emerald-400/80 whitespace-pre">
-                {DATABASE_SQL_SCHEMA}
-              </pre>
-            </div>
           </div>
 
         </div>
