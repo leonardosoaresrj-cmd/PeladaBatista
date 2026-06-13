@@ -2,6 +2,10 @@ import express from "express";
 import path from "path";
 import { createServer as createViteServer } from "vite";
 import nodemailer from "nodemailer";
+import dns from "dns";
+
+// Forçar uso do IPv4 por padrão devido a bloqueios de IPv6 via porta de email (Render/GCP)
+dns.setDefaultResultOrder("ipv4first");
 
 async function startServer() {
   const app = express();
@@ -26,9 +30,11 @@ async function startServer() {
         });
       }
 
-      // Configuração do Nodemailer (usando Gmail como padrão, mas funciona com outros)
+      // Configuração do Nodemailer
       const transporter = nodemailer.createTransport({
-        service: 'gmail', // ou host: 'smtp.gmail.com', port: 465, secure: true
+        host: 'smtp.gmail.com',
+        port: 465,
+        secure: true,
         auth: {
           user: process.env.SMTP_USER,
           pass: process.env.SMTP_PASS, // Senha de App do Gmail
