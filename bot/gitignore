@@ -1,0 +1,24 @@
+# ⚠️ Arquivos sensíveis — NUNCA envie para o GitHub
+.env
+*.env
+.env.local
+
+# Sessão local do WhatsApp (temporária — salva no Supabase)
+/tmp/
+baileys-session/
+baileys_store.json
+auth_info_baileys/
+
+# Node.js
+node_modules/
+npm-debug.log*
+yarn-debug.log*
+yarn-error.log*
+
+# Logs
+logs/
+*.log
+
+# Sistema operacional
+.DS_Store
+Thumbs.db
