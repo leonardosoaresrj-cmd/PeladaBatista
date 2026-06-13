@@ -30,15 +30,34 @@ async function startServer() {
         });
       }
 
-      // Configuração do Nodemailer
+      // Configuração do Nodemailer com forçamento de IPv4 (Render block workaround)
+      const resolveIpv4 = (host: string): Promise<string> => {
+        return new Promise((resolve, reject) => {
+          dns.lookup(host, { family: 4 }, (err, address) => {
+            if (err) reject(err);
+            else resolve(address);
+          });
+        });
+      };
+
+      let smtpHost = 'smtp.gmail.com';
+      try {
+        smtpHost = await resolveIpv4('smtp.gmail.com');
+      } catch(e) {
+        console.warn('Fallback: não foi possível resolver o IP de smtp.gmail.com');
+      }
+
       const transporter = nodemailer.createTransport({
-        host: 'smtp.gmail.com',
+        host: smtpHost,
         port: 465,
         secure: true,
         auth: {
           user: process.env.SMTP_USER,
           pass: process.env.SMTP_PASS, // Senha de App do Gmail
         },
+        tls: {
+          servername: 'smtp.gmail.com', // Necessário para validação de certificado TLS
+        }
       });
 
       const mailOptions = {

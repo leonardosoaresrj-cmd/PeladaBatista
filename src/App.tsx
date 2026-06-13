@@ -550,6 +550,12 @@ export default function App() {
     setActiveTab('calendario');
   };
 
+  const performLogout = () => {
+    setJogadorAtual(null);
+    sessionStorage.removeItem('arena_user_session');
+    localStorage.removeItem('arena_user_session');
+  };
+
   const [showLogoutConfirm, setShowLogoutConfirm] = useState(false);
 
   const handleLogoutClick = () => {
@@ -557,9 +563,7 @@ export default function App() {
   };
 
   const handleConfirmLogout = () => {
-    setJogadorAtual(null);
-    sessionStorage.removeItem('arena_user_session');
-    localStorage.removeItem('arena_user_session');
+    performLogout();
     setShowLogoutConfirm(false);
   };
 
@@ -578,7 +582,7 @@ export default function App() {
       
       timeoutId = setTimeout(() => {
         // Deslogar automaticamente por inatividade de 5 minutos
-        handleLogout();
+        performLogout();
         setShowSessaoExpiradaModal(true);
       }, 5 * 60 * 1000); // 5 minutos
     };
@@ -662,7 +666,7 @@ export default function App() {
     }
 
     if (jogadorAtual && jogadorAtual.id === id) {
-      handleLogout();
+      performLogout();
     }
   };
 
