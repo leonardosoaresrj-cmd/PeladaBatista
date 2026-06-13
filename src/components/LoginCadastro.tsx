@@ -77,16 +77,23 @@ export default function LoginCadastro({ jogadores, onLoginSuccess, onRegistrar }
         })
       });
 
-      const data = await response.json();
+      let data;
+      const textResponse = await response.text();
+      try {
+        data = JSON.parse(textResponse);
+      } catch (err) {
+        console.error('Resposta não-JSON do servidor:', textResponse);
+        throw new Error('Servidor retornou uma resposta inesperada. Verifique os logs.');
+      }
 
       if (response.ok) {
         setRecoverySuccess(true);
       } else {
-        setRecoveryError(data.error || 'Erro ao tentar enviar o e-mail pela API.');
+        setRecoveryError(data?.error || data?.details || 'Erro ao tentar enviar o e-mail pela API.');
       }
-    } catch (error) {
-      console.error(error);
-      setRecoveryError('Erro de conexão com o servidor na tentativa de enviar o e-mail de recuperação.');
+    } catch (error: any) {
+      console.error('Erro no envio de recuperação:', error);
+      setRecoveryError(`Falha na requisição: ${error.message || 'Erro de conexão.'}`);
     } finally {
       setIsSending(false);
     }
