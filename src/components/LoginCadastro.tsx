@@ -67,7 +67,7 @@ export default function LoginCadastro({ jogadores, onLoginSuccess, onRegistrar }
     setIsSending(true);
 
     try {
-      const response = await fetch('/api/recover-password', {
+      const response = await fetch('https://gqasacnaubkhokqyrpwc.supabase.co/functions/v1/recover-password'), {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({
