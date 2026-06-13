@@ -1750,12 +1750,13 @@ export default function App() {
                         setPerfilMembroStatus('mensalista');
                       }
                     }}
-                    className="w-full bg-emerald-955 border border-white/10 rounded-xl px-2.5 py-2 text-xs text-white focus:outline-none"
+                    className="w-full bg-emerald-900 border border-white/10 rounded-xl px-2.5 py-2 text-xs text-white focus:outline-none"
+                    style={{ backgroundColor: '#064e3b' }}
                   >
-                    <option className="bg-emerald-955 text-white" value="Goleiro">Goleiro 🧤</option>
-                    <option className="bg-emerald-955 text-white" value="Defesa">Defesa 🛡️</option>
-                    <option className="bg-emerald-955 text-white" value="Meio">Meio Campo 🧠</option>
-                    <option className="bg-emerald-955 text-white" value="Ataque">Ataque 🚀</option>
+                    <option style={{ backgroundColor: '#064e3b' }} className="bg-emerald-900 text-white" value="Goleiro">Goleiro 🧤</option>
+                    <option style={{ backgroundColor: '#064e3b' }} className="bg-emerald-900 text-white" value="Defesa">Defesa 🛡️</option>
+                    <option style={{ backgroundColor: '#064e3b' }} className="bg-emerald-900 text-white" value="Meio">Meio Campo 🧠</option>
+                    <option style={{ backgroundColor: '#064e3b' }} className="bg-emerald-900 text-white" value="Ataque">Ataque 🚀</option>
                   </select>
                 </div>
 
@@ -1772,14 +1773,15 @@ export default function App() {
                       ) && 
                       perfilPosicao !== 'Goleiro'
                     }
-                    className="w-full bg-emerald-955 border border-white/10 rounded-xl px-2.5 py-2 text-xs text-white focus:outline-none disabled:opacity-50 disabled:cursor-not-allowed"
+                    className="w-full bg-emerald-900 border border-white/10 rounded-xl px-2.5 py-2 text-xs text-white focus:outline-none disabled:opacity-50 disabled:cursor-not-allowed"
+                    style={{ backgroundColor: '#064e3b' }}
                   >
                     {perfilPosicao === 'Goleiro' ? (
-                      <option className="bg-emerald-955 text-white" value="isento">Isento</option>
+                      <option style={{ backgroundColor: '#064e3b' }} className="bg-emerald-900 text-white" value="isento">Isento</option>
                     ) : (
                       <>
-                        <option className="bg-emerald-955 text-white" value="mensalista">Mensalista</option>
-                        <option className="bg-emerald-955 text-white" value="diarista">Diarista</option>
+                        <option style={{ backgroundColor: '#064e3b' }} className="bg-emerald-900 text-white" value="mensalista">Mensalista</option>
+                        <option style={{ backgroundColor: '#064e3b' }} className="bg-emerald-900 text-white" value="diarista">Diarista</option>
                       </>
                     )}
                   </select>

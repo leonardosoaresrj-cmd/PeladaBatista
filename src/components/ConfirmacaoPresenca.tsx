@@ -6,7 +6,7 @@
 import React, { useState } from 'react';
 import { Partida, Jogador, Pagamento, MembroStatus, PosicaoJogador } from '../types';
 import { AVATAR_PRESETS } from '../data';
-import { Calendar as CalendarIcon, MapPin, Clock, Users, Check, X, ShieldAlert, Award, ChevronLeft, ChevronRight, Share2, AlertTriangle, Send, Copy, Edit2, Trash2 } from 'lucide-react';
+import { Calendar as CalendarIcon, MapPin, Clock, Users, Check, X, ShieldAlert, Award, ChevronLeft, ChevronRight, Share2, AlertTriangle, Send, Copy, Edit2, Trash2, Shield } from 'lucide-react';
 import { getJanelaConfirmacao, gerarLinkCompartilhamento, obterTextoAlertaSemanal, obterDebitosDoJogador, obterTextoListaCompletaPartida } from '../utils/confirmationRules';
 
 interface ConfirmacaoPresencaProps {
@@ -1454,11 +1454,30 @@ export default function ConfirmacaoPresenca({
                             onEditarJogador(jogadorSelecionadoModal.id, { role: e.target.value as any });
                           }
                         }}
-                        className="w-full bg-neutral-950 border border-white/10 rounded-lg p-2 text-xs text-white focus:outline-none"
+                        className="w-full bg-neutral-950 border border-white/10 rounded-lg p-2 text-xs text-white focus:outline-none mb-1.5"
                       >
                         <option value="jogador">Jogador Comum</option>
                         <option value="admin">Administrador Geral</option>
                       </select>
+
+                      <button
+                        type="button"
+                        onClick={() => {
+                          if (onEditarJogador) {
+                            const newRole = jogadorSelecionadoModal.role === 'admin' ? 'jogador' : 'admin';
+                            onEditarJogador(jogadorSelecionadoModal.id, { role: newRole });
+                            jogadorSelecionadoModal.role = newRole;
+                          }
+                        }}
+                        className={`w-full py-1.5 px-2 rounded-lg text-[9px] font-extrabold uppercase tracking-wider transition-all duration-200 flex items-center justify-center gap-1 border shadow-xs ${
+                          jogadorSelecionadoModal.role === 'admin'
+                            ? 'bg-amber-500/10 border-amber-500/40 text-amber-400 hover:bg-amber-500/20'
+                            : 'bg-emerald-600/10 border-emerald-500/40 text-emerald-300 hover:bg-emerald-600/20 hover:text-white'
+                        }`}
+                      >
+                        <Shield className="w-3.2 h-3.2 shrink-0" />
+                        {jogadorSelecionadoModal.role === 'admin' ? '🛡️ Rebaixar para Jogador' : '🛡️ Promover a Admin'}
+                      </button>
                     </div>
                   </div>
 

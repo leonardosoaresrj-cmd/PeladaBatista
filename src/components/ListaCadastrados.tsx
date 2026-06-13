@@ -4,7 +4,7 @@
  */
 
 import React, { useState } from 'react';
-import { Jogador, PosicaoJogador, MembroStatus, Partida, Pagamento } from '../types';
+import { Jogador, PosicaoJogador, MembroStatus, Partida, Pagamento, RoleUsuario } from '../types';
 import { AVATAR_PRESETS } from '../data';
 import { Users, Trash2, Shield, Calendar, Edit2, Check, X, ShieldAlert, Award } from 'lucide-react';
 
@@ -43,6 +43,7 @@ export default function ListaCadastrados({
   const [editFoto, setEditFoto] = useState('');
   const [editDataNascimento, setEditDataNascimento] = useState('');
   const [editSenha, setEditSenha] = useState('');
+  const [editRole, setEditRole] = useState<RoleUsuario>('jogador');
   const [showConfirmacaoCadastrados, setShowConfirmacaoCadastrados] = useState(false);
 
   // Função para verificar a janela de renovação mensal
@@ -142,6 +143,7 @@ export default function ListaCadastrados({
       foto: editFoto,
       dataNascimento: editDataNascimento,
       senha: editSenha,
+      role: editRole,
     });
     setJogadorEditandoId(null);
     setShowConfirmacaoCadastrados(true);
@@ -157,6 +159,7 @@ export default function ListaCadastrados({
     setEditFoto(jog.foto || '');
     setEditDataNascimento(jog.dataNascimento || '');
     setEditSenha(jog.senha || '');
+    setEditRole(jog.role || 'jogador');
   };
 
   // Helper para renderizar um card de jogador
@@ -283,6 +286,21 @@ export default function ListaCadastrados({
                     />
                     <span>🏅 Jogador Gold</span>
                   </label>
+                )}
+
+                {jogadorAtual.role === 'admin' && (
+                  <button
+                    type="button"
+                    onClick={() => setEditRole(editRole === 'admin' ? 'jogador' : 'admin')}
+                    className={`w-full py-1.5 px-3 rounded-lg text-[9px] font-black uppercase tracking-wider transition-all duration-200 mt-2 flex items-center justify-center gap-1 border shadow ${
+                      editRole === 'admin'
+                        ? 'bg-amber-500/10 border-amber-500 text-amber-400 hover:bg-amber-500/20'
+                        : 'bg-emerald-600 hover:bg-emerald-500 text-white border-emerald-700'
+                    }`}
+                  >
+                    <Shield className="w-3.5 h-3.5 shrink-0" />
+                    {editRole === 'admin' ? '🛡️ Admin do Site (Verificado)' : '🛡️ Promover a Admin'}
+                  </button>
                 )}
               </div>
             ) : (

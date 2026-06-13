@@ -19,7 +19,7 @@ import {
   Sparkles,
   RefreshCw
 } from 'lucide-react';
-import { isFechamentoMensalistas, obterTextoPagamentoMensalidade, obterDebitosDoJogador } from '../utils/confirmationRules';
+import { isFechamentoMensalistas, obterDebitosDoJogador } from '../utils/confirmationRules';
 import CheckoutPixModal from './CheckoutPixModal';
 
 interface ControlePagamentosProps {
