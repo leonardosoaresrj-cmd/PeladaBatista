@@ -70,6 +70,9 @@ export default function ConfirmacaoPresenca({
   const [editFoto, setEditFoto] = useState('');
   const [editError, setEditError] = useState('');
 
+  // Confirmation state for canceling game
+  const [showCancelConfirm, setShowCancelConfirm] = useState(false);
+
   const handlePlayerClick = (j: Jogador) => {
     setJogadorSelecionadoModal(j);
     setEditNome(j.nome);
@@ -201,13 +204,7 @@ export default function ConfirmacaoPresenca({
 
       if (whatsappAutomacaoAtiva) {
         // Envio automático via Bot do Racha de Futebol
-        if (onRegistrarLogAutomacao) {
-          onRegistrarLogAutomacao(
-            `${jogadorAtual.nome} ${jogadorAtual.sobrenome}`,
-            partidaSelecionada.titulo,
-            msgAtualizada
-          );
-        }
+        // O Supabase Webhook vai interceptar a tabela "presencas" e cuidar de enviar WhatsApp automaticamente.
         
         // Ativar animação/aviso do robô
         setAutoToastMsg(`🤖 [BOT DO WHATSAPP]: Confirmação registrada e lista atualizada enviada ao grupo!`);
@@ -590,7 +587,7 @@ export default function ConfirmacaoPresenca({
                         id="btn-admin-cancelar-jogo"
                         type="button"
                         onClick={() => {
-                          if (onCancelarPartida) onCancelarPartida(partidaSelecionada.id, true);
+                          setShowCancelConfirm(true);
                         }}
                         className="w-full sm:w-auto bg-rose-650 hover:bg-rose-600 text-white font-extrabold px-4 py-2 rounded-xl text-[10px] tracking-widest uppercase cursor-pointer transition-all duration-200 shadow border-none inline-flex items-center justify-center gap-1.5"
                         style={{ backgroundColor: '#e11d48' }}
@@ -1685,6 +1682,42 @@ export default function ConfirmacaoPresenca({
                 className="w-full py-2.5 bg-amber-500 hover:bg-amber-400 text-amber-950 font-black text-xs rounded-xl transition-all shadow-md active:scale-97 text-center cursor-pointer uppercase font-sans"
               >
                 Entendido
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {/* MODAL DE CONFIRMAÇÃO DE CANCELAMENTO */}
+      {showCancelConfirm && (
+        <div className="fixed inset-0 bg-black/85 backdrop-blur-sm flex items-center justify-center p-4 z-50 animate-fade-in">
+          <div className="bg-emerald-950 border border-rose-500/30 rounded-2xl w-full max-w-sm p-6 shadow-2xl relative text-center">
+            <div className="w-12 h-12 bg-rose-500/10 border border-rose-500/30 text-rose-400 rounded-full flex items-center justify-center mx-auto mb-4">
+              <ShieldAlert className="w-6 h-6" />
+            </div>
+            <h3 className="font-display font-black text-lg uppercase tracking-wide text-white mb-2">Cancelar a Partida</h3>
+            <p className="text-xs text-emerald-200 leading-relaxed font-sans mb-6">
+              Você tem certeza que deseja cancelar essa partida?
+            </p>
+            <div className="flex gap-3">
+              <button
+                type="button"
+                onClick={() => {
+                  if (onCancelarPartida && partidaSelecionada) {
+                    onCancelarPartida(partidaSelecionada.id, true);
+                  }
+                  setShowCancelConfirm(false);
+                }}
+                className="flex-1 bg-rose-500 hover:bg-rose-400 text-white font-extrabold py-3 rounded-xl transition-all shadow-md active:scale-97 text-xs flex items-center justify-center gap-1.5 cursor-pointer uppercase tracking-wider"
+              >
+                Sim, Cancelar
+              </button>
+              <button
+                type="button"
+                onClick={() => setShowCancelConfirm(false)}
+                className="flex-1 py-3 px-4 rounded-xl border border-white/10 hover:bg-white/5 text-emerald-300 hover:text-white transition-all text-xs cursor-pointer font-bold uppercase tracking-wider"
+              >
+                Voltar
               </button>
             </div>
           </div>

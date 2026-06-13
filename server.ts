@@ -1,6 +1,7 @@
 import express from "express";
 import path from "path";
 import { createServer as createViteServer } from "vite";
+import nodemailer from "nodemailer";
 
 async function startServer() {
   const app = express();
@@ -8,6 +9,68 @@ async function startServer() {
 
   // Usa middleware JSON para APIs criadas aqui
   app.use(express.json());
+
+  // Rota de recuperação de senha via E-mail
+  app.post("/api/recover-password", async (req, res) => {
+    try {
+      const { email, nome, senha } = req.body;
+
+      if (!email || !nome || !senha) {
+        return res.status(400).json({ error: "Dados incompletos para envio de e-mail." });
+      }
+
+      // Verifica se as configurações de SMTP estão preenchidas
+      if (!process.env.SMTP_USER || !process.env.SMTP_PASS) {
+        return res.status(500).json({ 
+          error: "Servidor de e-mail não configurado. Por favor, adicione SMTP_USER e SMTP_PASS nas variáveis de ambiente." 
+        });
+      }
+
+      // Configuração do Nodemailer (usando Gmail como padrão, mas funciona com outros)
+      const transporter = nodemailer.createTransport({
+        service: 'gmail', // ou host: 'smtp.gmail.com', port: 465, secure: true
+        auth: {
+          user: process.env.SMTP_USER,
+          pass: process.env.SMTP_PASS, // Senha de App do Gmail
+        },
+      });
+
+      const mailOptions = {
+        from: `"Pelada Batista" <${process.env.SMTP_USER}>`,
+        to: email,
+        subject: "Recuperação de Acesso (PIN) - Pelada Batista",
+        html: `
+          <div style="font-family: Arial, sans-serif; background-color: #f4f4f4; padding: 20px;">
+            <div style="max-w: 500px; margin: 0 auto; background-color: #ffffff; padding: 30px; border-radius: 8px; box-shadow: 0 4px 6px rgba(0,0,0,0.1);">
+              <h2 style="color: #064e3b; text-align: center; font-size: 24px; margin-bottom: 20px;">Pelada Batista</h2>
+              <p style="color: #333333; font-size: 16px;">Olá <b>${nome}</b>,</p>
+              <p style="color: #333333; font-size: 16px;">Você solicitou a recuperação do seu PIN de acesso ao portal do nosso racha.</p>
+              
+              <div style="background-color: #ecfdf5; border: 1px dashed #10b981; padding: 15px; text-align: center; margin: 25px 0;">
+                <p style="color: #064e3b; font-size: 14px; margin: 0 0 5px 0; text-transform: uppercase; letter-spacing: 1px;">Sua Senha / PIN é:</p>
+                <p style="color: #047857; font-size: 32px; font-weight: bold; font-family: monospace; letter-spacing: 5px; margin: 0;">${senha}</p>
+              </div>
+              
+              <p style="color: #666666; font-size: 14px;">Se você não solicitou esta recuperação, por favor ignore este e-mail.</p>
+              <br/>
+              <p style="color: #666666; font-size: 14px;">Um abraço,<br/>Equipe Pelada Batista</p>
+            </div>
+          </div>
+        `,
+      };
+
+      await transporter.sendMail(mailOptions);
+
+      return res.status(200).json({ success: true, message: "E-mail enviado com sucesso" });
+
+    } catch (error: any) {
+      console.error("[RECOVERY EMAIL ERROR]", error);
+      return res.status(500).json({ 
+        error: "Falha ao enviar o e-mail",
+        details: error.message 
+      });
+    }
+  });
 
   // Rota de Proxy: Front-end -> Nosso Servidor -> Robô do Render
   // Isso resolve os problemas de CORS quando o site roda do nosso lado

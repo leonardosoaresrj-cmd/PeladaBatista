@@ -48,7 +48,7 @@ export default function LoginCadastro({ jogadores, onLoginSuccess, onRegistrar }
   const [recoveredPin, setRecoveredPin] = useState('');
   const [isSending, setIsSending] = useState(false);
 
-  const handleRecoverySubmit = (e: React.FormEvent) => {
+  const handleRecoverySubmit = async (e: React.FormEvent) => {
     e.preventDefault();
     setRecoveryError('');
     setRecoverySuccess(false);
@@ -65,12 +65,31 @@ export default function LoginCadastro({ jogadores, onLoginSuccess, onRegistrar }
     }
 
     setIsSending(true);
-    // Simular o tempo de resposta do servidor de correio
-    setTimeout(() => {
+
+    try {
+      const response = await fetch('/api/recover-password', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          email: found.email,
+          nome: `${found.nome} ${found.sobrenome}`,
+          senha: found.senha
+        })
+      });
+
+      const data = await response.json();
+
+      if (response.ok) {
+        setRecoverySuccess(true);
+      } else {
+        setRecoveryError(data.error || 'Erro ao tentar enviar o e-mail pela API.');
+      }
+    } catch (error) {
+      console.error(error);
+      setRecoveryError('Erro de conexão com o servidor na tentativa de enviar o e-mail de recuperação.');
+    } finally {
       setIsSending(false);
-      setRecoveredPin(found.senha);
-      setRecoverySuccess(true);
-    }, 1200);
+    }
   };
 
   const handleFileChange = (e: React.ChangeEvent<HTMLInputElement>) => {

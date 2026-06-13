@@ -182,14 +182,44 @@ export async function salvarPartidaNoSupabase(partida: Partida): Promise<boolean
     }
 
     // Sincronizar as presenças confirmadas e recusadas
-    if (partidaId) {
-      await sincronizarPresencasNoSupabase(partidaId, partida.confirmados, true);
-      await sincronizarPresencasNoSupabase(partidaId, partida.recusados, false);
-    }
+    // DELETADO PARA EVITAR BULK UPSERTS EXPLODINDO WEBHOOKS DO BOT
+    // if (partidaId) {
+    //   await sincronizarPresencasNoSupabase(partidaId, partida.confirmados, true);
+    //   await sincronizarPresencasNoSupabase(partidaId, partida.recusados, false);
+    // }
     return true;
   } catch (error) {
     console.error('Erro ao salvar partida no Supabase:', error);
     return false;
+  }
+}
+
+/**
+ * Atualiza o status de presenca de um unico jogador (Ideal para Webhooks)
+ */
+export async function atualizarStatusPresencaUsuario(partidaId: string, jogadorId: string, confirmado: boolean | null) {
+  const supabase = getSupabase();
+  if (!supabase) return;
+
+  try {
+    if (confirmado === null) {
+      await supabase.from('presencas')
+        .delete()
+        .eq('partida_id', partidaId)
+        .eq('jogador_id', jogadorId);
+    } else {
+      await supabase.from('presencas')
+        .upsert({
+          partida_id: partidaId,
+          jogador_id: jogadorId,
+          confirmado: confirmado,
+          updated_at: new Date().toISOString()
+        }, {
+          onConflict: 'partida_id,jogador_id'
+        });
+    }
+  } catch (err) {
+    console.error('Erro ao atualizar presenca individual:', err);
   }
 }
 
@@ -291,6 +321,7 @@ export async function salvarPagamentoNoSupabase(pagamento: Pagamento): Promise<b
     }
 
     const record = {
+      ...(pagamento.id && !pagamento.id.startsWith('pag-') ? { id: pagamento.id } : {}),
       jogador_id: pagamento.jogadorId,
       mes_ref: pagamento.mesRef,
       status: pagamento.status,
@@ -301,7 +332,7 @@ export async function salvarPagamentoNoSupabase(pagamento: Pagamento): Promise<b
     const { error } = await supabase
       .from('pagamentos')
       .upsert(record, {
-        onConflict: 'jogador_id,mes_ref' // De acordo com restrição do schema SQL
+        onConflict: 'id'
       });
 
     if (error) throw error;

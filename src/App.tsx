@@ -30,7 +30,8 @@ import {
   obterConfiguracaoDoSupabase,
   salvarConfiguracaoNoSupabase,
   carregarBotLogsDoSupabase,
-  limparBotLogsDoSupabase
+  limparBotLogsDoSupabase,
+  atualizarStatusPresencaUsuario
 } from './supabaseClient';
 import LoginCadastro from './components/LoginCadastro';
 import CalendarioJogos from './components/CalendarioJogos';
@@ -239,18 +240,18 @@ export default function App() {
     if (whatsappAutomacaoAtiva && whatsappWebhookUrl) {
       setTimeout(async () => {
         try {
-          // CORREÇÃO: chama o bot DIRETAMENTE (sem proxy /api/bot-proxy)
-          // O site roda em Docker+Nginx (arquivos estáticos) — não há backend Node.
-          // O bot tem CORS liberado: Access-Control-Allow-Origin: *
-          const response = await fetch(whatsappWebhookUrl, {
+          const response = await fetch('/api/bot-proxy', {
             method: 'POST',
             headers: {
-              'Content-Type': 'application/json',
-              'x-webhook-secret': whatsappWebhookToken
+              'Content-Type': 'application/json'
             },
             body: JSON.stringify({
-              mensagem: msg,
-              grupo_id: whatsappGrupoLink
+              url: whatsappWebhookUrl,
+              secret: whatsappWebhookToken,
+              payload: {
+                mensagem: msg,
+                grupo_id: whatsappGrupoLink
+              }
             })
           });
 
@@ -549,10 +550,21 @@ export default function App() {
     setActiveTab('calendario');
   };
 
-  const handleLogout = () => {
+  const [showLogoutConfirm, setShowLogoutConfirm] = useState(false);
+
+  const handleLogoutClick = () => {
+    setShowLogoutConfirm(true);
+  };
+
+  const handleConfirmLogout = () => {
     setJogadorAtual(null);
     sessionStorage.removeItem('arena_user_session');
     localStorage.removeItem('arena_user_session');
+    setShowLogoutConfirm(false);
+  };
+
+  const handleCancelLogout = () => {
+    setShowLogoutConfirm(false);
   };
 
   // Controle de inatividade e logout automático após 5 minutos (300.000 ms)
@@ -865,18 +877,7 @@ export default function App() {
 
     if (modificado) {
       await salvarPartidaNoSupabase(modificado);
-
-      if (whatsappAutomacaoAtiva) {
-        const jogObj = jogadores.find(j => j.id === jogadorId);
-        const atletaNome = jogObj ? `${jogObj.nome} ${jogObj.sobrenome}` : 'Atleta';
-        const msgCompleta = obterTextoListaCompletaPartida(modificado, jogadores, whatsappGrupoLink);
-        
-        handleRegistrarLogAutomacao(
-          atletaNome,
-          modificado.titulo,
-          msgCompleta
-        );
-      }
+      await atualizarStatusPresencaUsuario(partidaId, jogadorId, confirmado);
     }
   };
 
@@ -1072,7 +1073,7 @@ export default function App() {
               <button
                 id="btn-header-logout"
                 type="button"
-                onClick={handleLogout}
+                onClick={handleLogoutClick}
                 className="p-1.5 rounded-md hover:bg-white/10 text-emerald-300 hover:text-rose-400 transition-colors"
                 title="Sair do Portal"
               >
@@ -1951,6 +1952,38 @@ export default function App() {
             
             <div className="mt-3 text-[10px] text-emerald-400 font-mono tracking-wide">
               Clique fora ou no botão para fechar
+            </div>
+          </div>
+        </div>
+      )}
+
+      {showLogoutConfirm && (
+        <div 
+          className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/80 backdrop-blur-md animate-fade-in"
+        >
+          <div className="bg-emerald-955 border border-teal-500/30 rounded-2xl max-w-sm w-full p-6 text-center shadow-2xl relative animate-scale-up">
+            <div className="w-12 h-12 bg-rose-500/10 border border-rose-500/30 text-rose-400 rounded-full flex items-center justify-center mx-auto mb-4">
+              <LogOut className="w-6 h-6" />
+            </div>
+            <h3 className="font-display font-black text-lg uppercase tracking-wide text-white mb-2">Sair do Sistema</h3>
+            <p className="text-xs text-emerald-200 leading-relaxed font-sans mb-6">
+              Você tem certeza que deseja sair do portal da Pelada Batista?
+            </p>
+            <div className="flex gap-3">
+              <button
+                type="button"
+                onClick={handleConfirmLogout}
+                className="flex-1 bg-rose-500 hover:bg-rose-400 text-white font-extrabold py-3 rounded-xl transition-all shadow-md active:scale-97 text-xs flex items-center justify-center gap-1.5 cursor-pointer uppercase"
+              >
+                Sim, Quero Sair
+              </button>
+              <button
+                type="button"
+                onClick={handleCancelLogout}
+                className="flex-1 py-3 px-4 rounded-xl border border-white/10 hover:bg-white/5 text-emerald-300 hover:text-white transition-all text-xs cursor-pointer font-bold uppercase"
+              >
+                Permanecer
+              </button>
             </div>
           </div>
         </div>
