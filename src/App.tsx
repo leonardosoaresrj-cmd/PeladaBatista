@@ -58,6 +58,12 @@ export default function App() {
     const list = mesclarPartidasAutomáticas(partidas);
     return list.filter(p => !partidasDeletadas.includes(p.id));
   }, [partidas, partidasDeletadas]);
+
+  const proximaPartida = useMemo(() => {
+    if (!partidasMescladas || partidasMescladas.length === 0) return null;
+    const filtradas = partidasMescladas.filter(p => !p.cancelada && p.data >= '2026-05-31');
+    return filtradas.sort((a, b) => a.data.localeCompare(b.data))[0] || partidasMescladas[0];
+  }, [partidasMescladas]);
   const [pagamentos, setPagamentos] = useState<Pagamento[]>([]);
   
   // Controle de Sessão de Usuário
@@ -1289,6 +1295,9 @@ export default function App() {
                   pagamentos={pagamentos}
                   onExcluirJogador={handleExcluirJogador}
                   onEditarJogador={handleEditarJogador}
+                  proximaPartida={proximaPartida}
+                  onActualizarPresenca={handleActualizarPresenca}
+                  whatsappAutomacaoAtiva={whatsappAutomacaoAtiva}
                 />
               )}
 

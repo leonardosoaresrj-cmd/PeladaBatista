@@ -6,7 +6,8 @@
 import React, { useState } from 'react';
 import { Jogador, PosicaoJogador, MembroStatus, Partida, Pagamento, RoleUsuario } from '../types';
 import { AVATAR_PRESETS } from '../data';
-import { Users, Trash2, Shield, Calendar, Edit2, Check, X, ShieldAlert, Award } from 'lucide-react';
+import { Users, Trash2, Shield, Calendar, Edit2, Check, X, ShieldAlert, Award, Share2, Send, Copy } from 'lucide-react';
+import { obterTextoListaCompletaPartida, gerarLinkCompartilhamento } from '../utils/confirmationRules';
 
 interface ListaCadastradosProps {
   jogadores: Jogador[];
@@ -15,6 +16,9 @@ interface ListaCadastradosProps {
   pagamentos?: Pagamento[];
   onExcluirJogador: (id: string) => void;
   onEditarJogador: (id: string, camposAtualizados: Partial<Jogador>) => void;
+  proximaPartida?: Partida | null;
+  onActualizarPresenca?: (partidaId: string, jogadorId: string, confirmado: boolean | null) => void;
+  whatsappAutomacaoAtiva?: boolean;
 }
 
 export default function ListaCadastrados({
@@ -24,6 +28,9 @@ export default function ListaCadastrados({
   pagamentos = [],
   onExcluirJogador,
   onEditarJogador,
+  proximaPartida,
+  onActualizarPresenca,
+  whatsappAutomacaoAtiva = true,
 }: ListaCadastradosProps) {
   // Filtrar apenas jogadores "Ativo" para a área pública de cadastrados
   const jogadoresAtivos = jogadores.filter(j => j.status === 'ativo');
@@ -45,6 +52,45 @@ export default function ListaCadastrados({
   const [editSenha, setEditSenha] = useState('');
   const [editRole, setEditRole] = useState<RoleUsuario>('jogador');
   const [showConfirmacaoCadastrados, setShowConfirmacaoCadastrados] = useState(false);
+
+  // Estados para Whatsapp e Compartilhamento Manual (Automação de Admin)
+  const [showShareModal, setShowShareModal] = useState(false);
+  const [shareText, setShareText] = useState('');
+  const [copiedShare, setCopiedShare] = useState(false);
+  const [showAutoToast, setShowAutoToast] = useState(false);
+  const [autoToastMsg, setAutoToastMsg] = useState('');
+
+  const handlePresencaAdminClick = async (jog: Jogador, confirmado: boolean) => {
+    if (!proximaPartida || !onActualizarPresenca) return;
+    
+    // Confirma ou nega a presença para a próxima partida
+    onActualizarPresenca(proximaPartida.id, jog.id, confirmado);
+    
+    // Gerar objeto de partida atualizada de forma otimista para a mensagem
+    const partidaAtualizada = { ...proximaPartida };
+    partidaAtualizada.confirmados = partidaAtualizada.confirmados.filter(jId => jId !== jog.id);
+    partidaAtualizada.recusados = partidaAtualizada.recusados.filter(jId => jId !== jog.id);
+    if (confirmado) {
+      partidaAtualizada.confirmados.push(jog.id);
+    } else {
+      partidaAtualizada.recusados.push(jog.id);
+    }
+
+    const msgAtualizada = obterTextoListaCompletaPartida(partidaAtualizada, jogadores, window.location.origin);
+
+    if (whatsappAutomacaoAtiva) {
+      const statusTermo = confirmado ? 'CONFIRMAÇÃO' : 'AUSÊNCIA';
+      setAutoToastMsg(`🤖 [BOT DO WHATSAPP]: ${statusTermo} de ${jog.nome} registrado! Lista atualizada enviada ao grupo!`);
+      setShowAutoToast(true);
+      setTimeout(() => {
+        setShowAutoToast(false);
+      }, 5000);
+    } else {
+      // Abre o modal de compartilhamento manual caso a automação do WhatsApp esteja inativa
+      setShareText(msgAtualizada);
+      setShowShareModal(true);
+    }
+  };
 
   // Função para verificar a janela de renovação mensal
   const checkJanelaRenovacao = () => {
@@ -355,6 +401,72 @@ export default function ListaCadastrados({
           </span>
         </div>
 
+        {/* Status para a próxima partida e botões rápidos para Administrador */}
+        {proximaPartida && (
+          <div className="px-4 py-3 bg-emerald-950/30 border-b border-white/10 flex flex-col gap-2">
+            <div className="flex items-center justify-between gap-2 overflow-hidden">
+              <span className="text-[9px] uppercase font-bold tracking-wider text-emerald-400/80 shrink-0">
+                Próxima Partida:
+              </span>
+              <span className="text-[9px] font-mono font-bold text-white/50 truncate max-w-[140px]" title={proximaPartida.titulo}>
+                {proximaPartida.data.split('-').reverse().slice(0, 2).join('/')} - {proximaPartida.titulo}
+              </span>
+            </div>
+            
+            <div className="flex items-center justify-between gap-1 mt-1">
+              <div className="flex items-center gap-1.5 text-xs font-semibold">
+                {proximaPartida.confirmados.includes(j.id) ? (
+                  <span className="inline-flex items-center gap-1 text-emerald-400 bg-emerald-500/10 px-2 py-0.5 rounded-md border border-emerald-500/20 text-[10px] font-bold">
+                    <Check className="w-3 h-3 stroke-[3]" /> Confirmado
+                  </span>
+                ) : proximaPartida.recusados.includes(j.id) ? (
+                  <span className="inline-flex items-center gap-1 text-rose-400 bg-rose-500/10 px-2 py-0.5 rounded-md border border-rose-500/20 text-[10px] font-bold">
+                    <X className="w-3 h-3 stroke-[3]" /> Ausência
+                  </span>
+                ) : (
+                  <span className="inline-flex items-center gap-1 text-amber-400 bg-amber-500/5 px-2 py-0.5 rounded-md border border-amber-500/15 text-[10px] font-bold">
+                    <span className="w-1.5 h-1.5 rounded-full bg-amber-400 animate-pulse"></span> Responder
+                  </span>
+                )}
+              </div>
+
+              {/* Botões rápidos apenas para admin */}
+              {jogadorAtual.role === 'admin' && !isEditing && (
+                <div id={`admin-fast-presence-${j.id}`} className="flex items-center gap-1.5 shrink-0">
+                  <button
+                    id={`btn-admin-confirmar-presenca-${j.id}`}
+                    type="button"
+                    onClick={() => handlePresencaAdminClick(j, true)}
+                    disabled={proximaPartida.confirmados.includes(j.id)}
+                    className={`px-2 py-1 rounded-lg border text-[10px] font-black uppercase tracking-wider transition-all cursor-pointer flex items-center justify-center gap-1 ${
+                      proximaPartida.confirmados.includes(j.id)
+                        ? 'bg-emerald-500/10 border-emerald-500/20 text-emerald-300 opacity-50 cursor-not-allowed shadow-none'
+                        : 'bg-emerald-950/60 border-emerald-500/40 hover:bg-emerald-500 hover:text-emerald-950 text-emerald-400 hover:scale-103'
+                    }`}
+                    title="Confirmar Presença do Atleta"
+                  >
+                    Confirmar
+                  </button>
+                  <button
+                    id={`btn-admin-confirmar-ausencia-${j.id}`}
+                    type="button"
+                    onClick={() => handlePresencaAdminClick(j, false)}
+                    disabled={proximaPartida.recusados.includes(j.id)}
+                    className={`px-2 py-1 rounded-lg border text-[10px] font-black uppercase tracking-wider transition-all cursor-pointer flex items-center justify-center gap-1 ${
+                      proximaPartida.recusados.includes(j.id)
+                        ? 'bg-rose-500/10 border-rose-500/20 text-rose-300 opacity-50 cursor-not-allowed shadow-none'
+                        : 'bg-emerald-950/60 border-rose-500/40 hover:bg-rose-500 hover:text-white text-rose-450 hover:scale-103'
+                    }`}
+                    title="Confirmar Ausência / Falta do Atleta"
+                  >
+                    Falta
+                  </button>
+                </div>
+              )}
+            </div>
+          </div>
+        )}
+
         {/* Área de Ações (Admin ou Próprio Jogador) */}
         {(jogadorAtual.role === 'admin' || jogadorAtual.id === j.id) && (
           <div className="p-3 bg-emerald-950/40 border-t border-white/10 flex items-center justify-end gap-2 shrink-0">
@@ -534,13 +646,99 @@ export default function ListaCadastrados({
               As informações cadastrais do atleta foram gravadas e atualizadas com sucesso!
             </p>
             <button
-              id="btn-confirmar-edicao-cadastrados"
-              type="button"
-              onClick={() => setShowConfirmacaoCadastrados(false)}
-              className="w-full bg-white hover:bg-emerald-100 text-black font-bold py-2.5 rounded-xl transition-all shadow-md active:scale-97 text-xs"
+               id="btn-confirmar-edicao-cadastrados"
+               type="button"
+               onClick={() => setShowConfirmacaoCadastrados(false)}
+               className="w-full bg-white hover:bg-emerald-100 text-black font-bold py-2.5 rounded-xl transition-all shadow-md active:scale-97 text-xs"
             >
-              Entendido
+               Entendido
             </button>
+          </div>
+        </div>
+      )}
+
+      {/* MODAL DE COMPARTILHAMENTO WHATSAPP (Abertura Manual para Admin se automação desativada) */}
+      {showShareModal && (
+        <div className="fixed inset-0 bg-black/85 backdrop-blur-sm flex items-center justify-center p-4 z-50 animate-fade-in">
+          <div className="bg-emerald-950 border border-white/20 rounded-2xl w-full max-w-lg p-6 shadow-2xl space-y-4">
+            <div className="flex items-center justify-between border-b border-white/10 pb-3">
+              <h3 className="font-display font-bold text-base text-white flex items-center gap-2">
+                <Share2 className="w-5 h-5 text-emerald-400" />
+                Compartilhar no WhatsApp
+              </h3>
+              <button
+                type="button"
+                onClick={() => {
+                  setShowShareModal(false);
+                  setCopiedShare(false);
+                }}
+                className="text-white/60 hover:text-white bg-white/5 hover:bg-white/10 rounded-full p-1.5 transition-all text-sm font-bold cursor-pointer"
+              >
+                ✕
+              </button>
+            </div>
+
+            <div className="space-y-2">
+              <label className="text-[10px] text-emerald-300 font-bold uppercase tracking-wider block">Mensagem Gerada:</label>
+              <textarea
+                className="w-full h-44 p-3 text-xs font-mono bg-black/40 border border-white/10 rounded-xl text-white resize-none focus:outline-none focus:border-emerald-500"
+                readOnly
+                value={shareText}
+              />
+            </div>
+
+            <div className="grid grid-cols-1 sm:grid-cols-2 gap-3 pt-2">
+              <button
+                type="button"
+                onClick={() => {
+                  navigator.clipboard.writeText(shareText);
+                  setCopiedShare(true);
+                  setTimeout(() => setCopiedShare(false), 2500);
+                }}
+                className="flex items-center justify-center gap-2 py-2.5 px-4 text-xs font-bold rounded-xl border border-white/10 bg-white/5 text-white hover:bg-white/10 transition-all cursor-pointer"
+              >
+                {copiedShare ? (
+                  <>
+                    <Check className="w-4 h-4 text-teal-400" />
+                    Copiado!
+                  </>
+                ) : (
+                  <>
+                    <Copy className="w-4 h-4 text-emerald-400" />
+                    Copiar Mensagem
+                  </>
+                )}
+              </button>
+
+              <a
+                href={gerarLinkCompartilhamento(shareText)}
+                target="_blank"
+                rel="noreferrer"
+                onClick={() => {
+                  setShowShareModal(false);
+                  setCopiedShare(false);
+                }}
+                className="flex items-center justify-center gap-2 py-2.5 px-4 text-xs font-bold bg-teal-500 hover:bg-teal-400 text-emerald-950 font-extrabold transition-all text-center rounded-xl"
+              >
+                <Send className="w-4 h-4" />
+                Ir para o WhatsApp
+              </a>
+            </div>
+
+            <p className="text-[9px] text-emerald-400/80 text-center font-mono leading-relaxed">
+              O link abrirá o WhatsApp Web ou App oficial com o texto pré-carregado. Caso o seu navegador bloqueie, copie o texto manualmente.
+            </p>
+          </div>
+        </div>
+      )}
+
+      {/* AUTO TOAST NOTIFICATION FOR ROBOT/AUTOMATION STATUS */}
+      {showAutoToast && (
+        <div className="fixed bottom-6 right-6 bg-teal-500 text-emerald-950 font-extrabold px-5 py-4 rounded-2xl shadow-2xl border border-teal-300 z-50 flex items-center gap-3 animate-bounce max-w-sm sm:max-w-md">
+          <span className="text-xl">🤖</span>
+          <div className="text-left font-sans">
+            <h5 className="text-[10px] font-black uppercase tracking-wider text-emerald-950">Bot de Automação Pelada</h5>
+            <p className="text-[11px] font-bold mt-0.5 leading-snug">{autoToastMsg}</p>
           </div>
         </div>
       )}
