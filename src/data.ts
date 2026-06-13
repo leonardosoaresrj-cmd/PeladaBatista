@@ -180,27 +180,29 @@ create policy "Admins gerenciam todos os pagamentos" on pagamentos
     )
   );
 
--- 8. Tabela de Logs e Histórico do Bot de WhatsApp (MIGRAÇÃO)
-create table if not exists whatsapp_logs (
-  id uuid primary key default uuid_generate_v4(),
-  data timestamp with time zone default timezone('utc'::text, now()) not null,
-  atleta varchar(150),
-  partida varchar(150),
-  mensagem text not null,
-  status varchar(20) default 'sucesso' not null
+-- 8. Tabelas de Integração do Robô WhatsApp v2.2 (MIGRAÇÃO)
+create table if not exists bot_session (
+  id           TEXT PRIMARY KEY DEFAULT 'main',
+  session_data TEXT NOT NULL,
+  updated_at   TIMESTAMPTZ DEFAULT NOW()
 );
 
-alter table whatsapp_logs enable row level security;
+alter table bot_session enable row level security;
+create policy "Service role total na bot_session" on bot_session using (true) with check (true);
 
-create policy "Qualquer pessoa vê os logs do bot" on whatsapp_logs
-  for select using (true);
+create table if not exists bot_logs (
+  id uuid primary key default uuid_generate_v4(),
+  evento varchar(100),
+  tabela varchar(100),
+  mensagem text not null,
+  enviado_em timestamp with time zone default timezone('utc'::text, now()) not null
+);
 
-create policy "Admins gerenciam logs do bot" on whatsapp_logs
-  for all using (
-    exists (
-      select 1 from jogadores where id = auth.uid() and role = 'admin'
-    )
-  );
+alter table bot_logs enable row level security;
+create policy "Qualquer pessoa vê os logs do bot" on bot_logs for select using (true);
+create policy "Admins gerenciam logs do bot" on bot_logs for all using (
+  exists (select 1 from jogadores where id = auth.uid() and role = 'admin')
+);
 
 -- 9. Tabela de Configurações Globais (MIGRAÇÃO)
 create table if not exists racha_configuracoes (
