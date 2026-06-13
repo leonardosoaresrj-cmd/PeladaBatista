@@ -239,18 +239,18 @@ export default function App() {
     if (whatsappAutomacaoAtiva && whatsappWebhookUrl) {
       setTimeout(async () => {
         try {
-          const response = await fetch('/api/bot-proxy', {
+          // CORREÇÃO: chama o bot DIRETAMENTE (sem proxy /api/bot-proxy)
+          // O site roda em Docker+Nginx (arquivos estáticos) — não há backend Node.
+          // O bot tem CORS liberado: Access-Control-Allow-Origin: *
+          const response = await fetch(whatsappWebhookUrl, {
             method: 'POST',
             headers: {
-              'Content-Type': 'application/json'
+              'Content-Type': 'application/json',
+              'x-webhook-secret': whatsappWebhookToken
             },
             body: JSON.stringify({
-              url: whatsappWebhookUrl,
-              secret: whatsappWebhookToken,
-              payload: {
-                mensagem: msg,
-                grupo_id: whatsappGrupoLink
-              }
+              mensagem: msg,
+              grupo_id: whatsappGrupoLink
             })
           });
 
