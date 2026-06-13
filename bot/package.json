@@ -1,7 +1,7 @@
 {
   "name": "pelada-batista-bot",
-  "version": "2.3.0",
-  "description": "Robô WhatsApp Pelada Batista — fix loop conexão 440",
+  "version": "2.2.0",
+  "description": "Robô WhatsApp Pelada Batista — 3 regras automáticas",
   "main": "bot-pelada-batista-v2.js",
   "engines": { "node": ">=18.0.0" },
   "scripts": {

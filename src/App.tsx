@@ -4,7 +4,7 @@
  */
 
 import React, { useState, useEffect, useMemo } from 'react';
-import { Jogador, Partida, Pagamento, PosicaoJogador, MembroStatus, LancamentoAvulso } from './types';
+import { Jogador, Partida, Pagamento, PosicaoJogador, MembroStatus, LancamentoAvulso, BotLog } from './types';
 import {
   getSavedJogadores,
   saveJogadores,
@@ -28,7 +28,9 @@ import {
   salvarPagamentoNoSupabase,
   deletarPartidaNoSupabase,
   obterConfiguracaoDoSupabase,
-  salvarConfiguracaoNoSupabase
+  salvarConfiguracaoNoSupabase,
+  carregarBotLogsDoSupabase,
+  limparBotLogsDoSupabase
 } from './supabaseClient';
 import LoginCadastro from './components/LoginCadastro';
 import CalendarioJogos from './components/CalendarioJogos';
@@ -93,26 +95,7 @@ export default function App() {
     return localStorage.getItem('racha_whatsapp_webhook_token') || '';
   });
 
-  const [whatsappLogs, setWhatsappLogs] = useState<any[]>(() => {
-    const saved = localStorage.getItem('racha_whatsapp_logs');
-    if (saved) {
-      try {
-        return JSON.parse(saved);
-      } catch (e) {
-        return [];
-      }
-    }
-    return [
-      {
-        id: 'log-1',
-        data: new Date().toLocaleString('pt-BR'),
-        atleta: 'Sistema Automação',
-        partida: 'Pelada Arena Record',
-        mensagem: '🤖 Bot do WhatsApp carregado e monitorando confirmações no portal.',
-        status: 'sucesso'
-      }
-    ];
-  });
+  const [whatsappLogs, setWhatsappLogs] = useState<any[]>([]);
 
   const handleUpdateWhatsappConfig = (link: string, ativa: boolean, webhookUrl: string = '', token: string = '') => {
     setWhatsappGrupoLink(link);
@@ -234,24 +217,25 @@ export default function App() {
     saveAluguelCampo(valor);
   };
 
-  const handleRegistrarLogAutomacao = (atletaNome: string, partidaTitulo: string, msg: string) => {
+  const handleRegistrarLogAutomacao = async (atletaNome: string, partidaTitulo: string, msg: string) => {
+    // Insere o evento de teste inicial
     const logId = `log-${Date.now()}-${Math.random().toString(36).substr(2, 4)}`;
-    const novoLog = {
+    const novoLog: BotLog = {
       id: logId,
-      data: new Date().toLocaleString('pt-BR'),
-      atleta: atletaNome,
-      partida: partidaTitulo,
+      tabela: atletaNome,
+      evento: 'TESTE_PAINEL',
       mensagem: msg,
-      status: 'sucesso' as const
+      enviado_em: new Date().toISOString()
     };
+    
+    // Atualização otimista apenas da UI temporária, o real load vem do supabase
+    setWhatsappLogs(currentLogs => [novoLog, ...currentLogs].slice(0, 50));
+    
+    const supabase = getSupabase();
+    if (supabase) {
+       await supabase.from('bot_logs').insert(novoLog);
+    }
 
-    setWhatsappLogs(currentLogs => {
-      const logsAtualizados = [novoLog, ...currentLogs].slice(0, 50);
-      localStorage.setItem('racha_whatsapp_logs', JSON.stringify(logsAtualizados));
-      return logsAtualizados;
-    });
-
-    // Se a automação de WhatsApp estiver ativa e com webhook preenchido, dispara a requisição real
     if (whatsappAutomacaoAtiva && whatsappWebhookUrl) {
       setTimeout(async () => {
         try {
@@ -273,31 +257,39 @@ export default function App() {
           if (!response.ok) {
             const respTxt = await response.text().catch(() => '');
             const falhaMsg = `[FALHA DISPARO] Status ${response.status} - ${respTxt.substring(0, 80)}`;
-            setWhatsappLogs(currentLogs => {
-              const logsAtualizados = currentLogs.map(l => 
-                l.id === logId ? { ...l, status: 'falha' as const, mensagem: `${l.mensagem} | ⚠️ ${falhaMsg}` } : l
-              );
-              localStorage.setItem('racha_whatsapp_logs', JSON.stringify(logsAtualizados));
-              return logsAtualizados;
-            });
+            if (supabase) {
+               await supabase.from('bot_logs').insert({
+                 tabela: atletaNome,
+                 evento: 'FALHA_DISPARO',
+                 mensagem: `${msg} | ⚠️ ${falhaMsg}`,
+                 enviado_em: new Date().toISOString()
+               });
+            }
           }
         } catch (error: any) {
           const falhaMsg = `[FALHA CONEXÃO] ${error.message || error}`;
-          setWhatsappLogs(currentLogs => {
-            const logsAtualizados = currentLogs.map(l => 
-              l.id === logId ? { ...l, status: 'falha' as const, mensagem: `${l.mensagem} | ⚠️ ${falhaMsg}` } : l
-            );
-            localStorage.setItem('racha_whatsapp_logs', JSON.stringify(logsAtualizados));
-            return logsAtualizados;
-          });
+          if (supabase) {
+             await supabase.from('bot_logs').insert({
+               tabela: atletaNome,
+               evento: 'FALHA_CONEXAO',
+               mensagem: `${msg} | ⚠️ ${falhaMsg}`,
+               enviado_em: new Date().toISOString()
+             });
+          }
+        }
+        
+        // Recarregar os logs reais da base para manter consistência
+        if (supabase) {
+           const bLogs = await carregarBotLogsDoSupabase();
+           if (bLogs) setWhatsappLogs(bLogs as any[]);
         }
       }, 50);
     }
   };
 
-  const handleClearWhatsappLogs = () => {
+  const handleClearWhatsappLogs = async () => {
     setWhatsappLogs([]);
-    localStorage.removeItem('racha_whatsapp_logs');
+    await limparBotLogsDoSupabase();
   };
 
   const handleSendTestAlert = (msg?: string) => {
@@ -475,6 +467,12 @@ export default function App() {
           } catch (e) {
             console.error(e);
           }
+        }
+
+        // Carregar logs do bot
+        const bLogs = await carregarBotLogsDoSupabase();
+        if (bLogs) {
+          setWhatsappLogs(bLogs as any[]);
         }
       } catch (err) {
         console.warn('Erro ao ler dados do Supabase. Usando local:', err);

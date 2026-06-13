@@ -58,3 +58,11 @@ export interface LancamentoAvulso {
   categoria: string; // 'mensalidade' | 'diaria' | 'aluguel' | 'goleiro' | 'outros_receita' | 'outros_despesa'
 }
 
+export interface BotLog {
+  id?: string;
+  evento: string;
+  tabela: string;
+  mensagem: string;
+  enviado_em?: string;
+}
+

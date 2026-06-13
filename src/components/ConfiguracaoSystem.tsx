@@ -245,7 +245,7 @@ export default function ConfiguracaoSystem({
                 </div>
               </div>
 
-              <div className="flex gap-2">
+              <div className="flex gap-2 flex-wrap">
                 <button
                   id="btn-salvar-wa-config"
                   type="submit"
@@ -253,6 +253,17 @@ export default function ConfiguracaoSystem({
                 >
                   Salvar Configurações do WhatsApp
                 </button>
+                
+                {localWebhookUrl && (
+                  <a 
+                    href={localWebhookUrl.replace(/\/teste\/?$/, '/qr')} 
+                    target="_blank" 
+                    rel="noopener noreferrer"
+                    className="bg-emerald-800 hover:bg-emerald-700 border border-emerald-500 text-teal-100 text-xs px-3.5 rounded-lg flex items-center justify-center gap-1.5 transition-colors cursor-pointer"
+                  >
+                    Abrir QR do Robô
+                  </a>
+                )}
 
                 <button
                   id="btn-enviar-teste-wa"
@@ -287,15 +298,27 @@ export default function ConfiguracaoSystem({
               </h3>
 
               {whatsappLogs.length > 0 && (
-                <button
-                  id="btn-limpar-wa-logs"
-                  type="button"
-                  onClick={onClearLogs}
-                  className="text-[9px] font-bold text-rose-300 hover:text-rose-400 flex items-center gap-0.5"
-                >
-                  <Trash2 className="w-3 h-3 text-rose-400" />
-                  Limpar Logs
-                </button>
+                <div className="flex items-center gap-3">
+                  {onConfigUpdated && (
+                     <button
+                       id="btn-recarregar-wa-logs"
+                       type="button"
+                       onClick={onConfigUpdated}
+                       className="text-[9px] font-bold text-teal-300 hover:text-teal-400 flex items-center gap-0.5"
+                     >
+                       ⟳ Atualizar
+                     </button>
+                  )}
+                  <button
+                    id="btn-limpar-wa-logs"
+                    type="button"
+                    onClick={onClearLogs}
+                    className="text-[9px] font-bold text-rose-300 hover:text-rose-400 flex items-center gap-0.5"
+                  >
+                    <Trash2 className="w-3 h-3 text-rose-400" />
+                    Limpar Logs
+                  </button>
+                </div>
               )}
             </div>
 
@@ -306,16 +329,16 @@ export default function ConfiguracaoSystem({
                   <p className="text-[11px]">Nenhum disparo de bot registrado até o momento.</p>
                 </div>
               ) : (
-                whatsappLogs.map((log) => (
+                whatsappLogs.map((log: any) => (
                   <div key={log.id} className="bg-emerald-950/70 p-2 rounded-lg border border-white/5 space-y-1">
                     <div className="flex items-center justify-between text-[8px] text-emerald-500">
-                      <span>{log.data}</span>
+                      <span>{log.enviado_em ? new Date(log.enviado_em).toLocaleString('pt-BR') : log.data}</span>
                       <span className="px-1.5 py-0.2 bg-emerald-900 border border-emerald-500/20 text-emerald-300 rounded uppercase text-[7px] font-black">
-                        {log.status === 'sucesso' ? 'sucesso' : 'falha'}
+                        {log.evento || 'DISPARO'}
                       </span>
                     </div>
                     <div className="text-[10px] text-white leading-relaxed">
-                      <span className="font-bold text-teal-300 font-sans mr-1">[{log.atleta}]</span>
+                      <span className="font-bold text-teal-300 font-sans mr-1">[{log.tabela || log.atleta || ''}]</span>
                       {log.mensagem}
                     </div>
                     {whatsappGrupoLink && (

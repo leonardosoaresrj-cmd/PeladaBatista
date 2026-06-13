@@ -4,7 +4,7 @@
  */
 
 import { createClient, SupabaseClient } from '@supabase/supabase-js';
-import { Jogador, Partida, Pagamento } from './types';
+import { Jogador, Partida, Pagamento, BotLog } from './types';
 
 // Carregar URL e Key salvas no LocalStorage ou providas no ambiente
 export function obterCredenciaisSupabase() {
@@ -401,3 +401,45 @@ export async function salvarConfiguracaoNoSupabase(chave: string, valor: string)
   }
 }
 
+/**
+ * Carregar Logs do Bot de WhatsApp da tabela bot_logs
+ */
+export async function carregarBotLogsDoSupabase(): Promise<BotLog[] | null> {
+  const supabase = getSupabase();
+  if (!supabase) return null;
+
+  try {
+    const { data, error } = await supabase
+      .from('bot_logs')
+      .select('*')
+      .order('enviado_em', { ascending: false })
+      .limit(50);
+
+    if (error) throw error;
+    return data;
+  } catch (err) {
+    console.error('Erro ao carregar bot_logs do Supabase:', err);
+    return null;
+  }
+}
+
+/**
+ * Deletar todos os logs da tabela bot_logs
+ */
+export async function limparBotLogsDoSupabase(): Promise<boolean> {
+  const supabase = getSupabase();
+  if (!supabase) return false;
+
+  try {
+    const { error } = await supabase
+      .from('bot_logs')
+      .delete()
+      .neq('id', 'dummy'); // Deleta todos
+
+    if (error) throw error;
+    return true;
+  } catch (err) {
+    console.error('Erro ao limpar bot_logs:', err);
+    return false;
+  }
+}
