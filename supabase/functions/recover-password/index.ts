@@ -1,11 +1,13 @@
 // ============================================================
-// Supabase Edge Function: recover-password (v5)
+// Supabase Edge Function: recover-password (v6 — fix query email)
 //
-// MUDANÇA CRÍTICA vs v4:
-//   Remove o import do @supabase/supabase-js via esm.sh
-//   que causava crash silencioso (booted → shutdown sem logs).
-//   Usa fetch direto na API REST do Supabase — sem dependências externas.
-//   Único import: deno std (confiável, já em cache no runtime).
+// CAMINHO NO GITHUB:
+//   supabase/functions/recover-password/index.ts
+//
+// VARIÁVEIS NECESSÁRIAS (Edge Functions → Manage secrets):
+//   RESEND_API_KEY = re_xxxxxxxxxxxx
+//
+// DEPLOY: automático via GitHub Actions ao fazer commit
 // ============================================================
 
 import { serve } from 'https://deno.land/std@0.168.0/http/server.ts';
@@ -23,35 +25,30 @@ const jsonResp = (data: unknown, status = 200) =>
   });
 
 serve(async (req) => {
-  // Preflight CORS
-  if (req.method === 'OPTIONS') {
-    return new Response('ok', { headers: CORS });
-  }
+  if (req.method === 'OPTIONS') return new Response('ok', { headers: CORS });
 
-  console.log('[recover-password] v5 — requisição recebida');
+  console.log('[recover-password] v6 — requisição recebida');
 
   try {
-    // ── Variáveis de ambiente ────────────────────────────────────────────────
     const RESEND_API_KEY   = Deno.env.get('RESEND_API_KEY');
     const SUPABASE_URL     = Deno.env.get('SUPABASE_URL');
     const SUPABASE_SERVICE = Deno.env.get('SUPABASE_SERVICE_ROLE_KEY');
 
     console.log('[recover-password] Vars:', {
-      temResend:    !!RESEND_API_KEY,
-      temSupabase:  !!SUPABASE_URL,
-      temServiceKey:!!SUPABASE_SERVICE,
+      temResend:     !!RESEND_API_KEY,
+      temSupabase:   !!SUPABASE_URL,
+      temServiceKey: !!SUPABASE_SERVICE,
     });
 
     if (!RESEND_API_KEY) {
-      return jsonResp({ error: 'RESEND_API_KEY não configurada nas variáveis da Edge Function.' }, 500);
+      return jsonResp({ error: 'RESEND_API_KEY não configurada.' }, 500);
     }
-
     if (!SUPABASE_URL || !SUPABASE_SERVICE) {
-      return jsonResp({ error: 'SUPABASE_URL ou SUPABASE_SERVICE_ROLE_KEY ausentes.' }, 500);
+      return jsonResp({ error: 'Variáveis do Supabase ausentes.' }, 500);
     }
 
-    // ── Lê o body ────────────────────────────────────────────────────────────
-    const body = await req.json();
+    // ── Lê o email do body ────────────────────────────────────────────────────
+    const body       = await req.json();
     const emailInput = (body.email || body.recoveryEmail || '').toString().toLowerCase().trim();
 
     console.log('[recover-password] Email recebido:', emailInput || '(vazio)');
@@ -60,68 +57,71 @@ serve(async (req) => {
       return jsonResp({ error: 'E-mail é obrigatório.' }, 400);
     }
 
-    // ── Busca jogador via REST API do Supabase (POST para evitar encoding de URL) ──
-    // Usa eq. com email exato — ilike + encodeURIComponent causava bug com @
-    const supabaseRestUrl = `${SUPABASE_URL}/rest/v1/jogadores?select=nome,sobrenome,email,senha&limit=1`;
+    // ── Busca jogador no Supabase via REST (sem SDK) ──────────────────────────
+    // FIX v6: usa eq. sem encodeURIComponent — o @ no email
+    // causava bug com ilike + encodeURIComponent na v5
+    const queryUrl = `${SUPABASE_URL}/rest/v1/jogadores` +
+      `?select=nome,sobrenome,email,senha` +
+      `&email=eq.${emailInput}` +
+      `&limit=1`;
 
-    console.log('[recover-password] Consultando Supabase para:', emailInput);
+    console.log('[recover-password] Consultando:', queryUrl);
 
-    // Tenta com eq. (igualdade exata, case-insensitive via citext ou ilike via header)
-    const dbResp = await fetch(
-      `${SUPABASE_URL}/rest/v1/jogadores?select=nome,sobrenome,email,senha&email=eq.${emailInput}&limit=1`,
-      {
+    const dbResp = await fetch(queryUrl, {
+      headers: {
+        'apikey':        SUPABASE_SERVICE,
+        'Authorization': `Bearer ${SUPABASE_SERVICE}`,
+        'Content-Type':  'application/json',
+        'Accept':        'application/json',
+      },
+    });
+
+    const dbStatus = dbResp.status;
+    const dbText   = await dbResp.text();
+    console.log('[recover-password] Supabase HTTP:', dbStatus);
+    console.log('[recover-password] Supabase resposta:', dbText.substring(0, 300));
+
+    if (!dbResp.ok) {
+      return jsonResp({ error: 'Erro ao consultar o banco.', details: dbText }, 500);
+    }
+
+    let jogadores: any[] = [];
+    try { jogadores = JSON.parse(dbText); } catch { jogadores = []; }
+
+    // Fallback: tenta com email em maiúsculas (caso o banco tenha capitalização diferente)
+    if (!jogadores || jogadores.length === 0) {
+      console.log('[recover-password] Não encontrado com eq. — tentando email original...');
+      const emailOriginal = (body.email || body.recoveryEmail || '').toString().trim();
+      const queryUrl2 = `${SUPABASE_URL}/rest/v1/jogadores` +
+        `?select=nome,sobrenome,email,senha` +
+        `&email=eq.${emailOriginal}` +
+        `&limit=1`;
+
+      const dbResp2 = await fetch(queryUrl2, {
         headers: {
           'apikey':        SUPABASE_SERVICE,
           'Authorization': `Bearer ${SUPABASE_SERVICE}`,
           'Content-Type':  'application/json',
           'Accept':        'application/json',
         },
-      }
-    );
-
-    const dbStatus = dbResp.status;
-    const dbText   = await dbResp.text();
-    console.log('[recover-password] Supabase status:', dbStatus, '| resposta:', dbText.substring(0, 200));
-
-    if (!dbResp.ok) {
-      console.error('[recover-password] Erro Supabase REST:', dbText);
-      return jsonResp({ error: 'Erro ao consultar o banco.' }, 500);
-    }
-
-    let jogadores: any[] = [];
-    try { jogadores = JSON.parse(dbText); } catch { jogadores = []; }
-
-    // Se não encontrou com eq., tenta com ilike (email em maiúscula no banco)
-    if (!jogadores || jogadores.length === 0) {
-      console.log('[recover-password] eq. não encontrou — tentando ilike...');
-      const dbResp2 = await fetch(
-        `${SUPABASE_URL}/rest/v1/jogadores?select=nome,sobrenome,email,senha&email=ilike.*${emailInput.replace('@','%40')}*&limit=1`,
-        {
-          headers: {
-            'apikey':        SUPABASE_SERVICE,
-            'Authorization': `Bearer ${SUPABASE_SERVICE}`,
-            'Content-Type':  'application/json',
-            'Accept':        'application/json',
-          },
-        }
-      );
+      });
       const dbText2 = await dbResp2.text();
-      console.log('[recover-password] ilike resposta:', dbText2.substring(0, 200));
+      console.log('[recover-password] Fallback resposta:', dbText2.substring(0, 300));
       try { jogadores = JSON.parse(dbText2); } catch { jogadores = []; }
     }
 
     console.log('[recover-password] Jogadores encontrados:', jogadores?.length ?? 0);
 
-    // Por segurança: mesmo sem encontrar, retorna sucesso (não revela se email existe)
+    // Mesmo sem encontrar retorna sucesso (segurança — não revela se email existe)
     if (!jogadores || jogadores.length === 0) {
-      console.log('[recover-password] Email não encontrado — retornando sucesso silencioso');
+      console.log('[recover-password] Email não encontrado no banco.');
       return jsonResp({ success: true, message: 'E-mail enviado com sucesso' });
     }
 
     const jogador      = jogadores[0];
     const nomeCompleto = `${jogador.nome || ''} ${jogador.sobrenome || ''}`.trim() || 'Atleta';
     const textoSenha   = jogador.senha
-      ? jogador.senha
+      ? String(jogador.senha)
       : '(PIN não cadastrado — contate o administrador)';
 
     console.log('[recover-password] Enviando e-mail para:', jogador.email);
@@ -148,8 +148,8 @@ serve(async (req) => {
               <p style="color:#333;font-size:16px;">
                 Você solicitou a recuperação do seu PIN de acesso ao portal.
               </p>
-              <div style="background:#ecfdf5;border:1px dashed #10b981;padding:15px;
-                          text-align:center;margin:25px 0;">
+              <div style="background:#ecfdf5;border:1px dashed #10b981;
+                          padding:15px;text-align:center;margin:25px 0;">
                 <p style="color:#064e3b;font-size:14px;margin:0 0 5px;
                            text-transform:uppercase;letter-spacing:1px;">
                   Sua Senha / PIN é:
@@ -172,13 +172,13 @@ serve(async (req) => {
       }),
     });
 
+    const resendStatus = resendResp.status;
+    const resendText   = await resendResp.text();
+    console.log('[recover-password] Resend HTTP:', resendStatus);
+
     if (!resendResp.ok) {
-      const resendErr = await resendResp.json().catch(() => ({}));
-      console.error('[recover-password] Erro Resend:', JSON.stringify(resendErr));
-      return jsonResp({
-        error:   'Falha ao enviar o e-mail via Resend.',
-        details: JSON.stringify(resendErr),
-      }, 500);
+      console.error('[recover-password] Erro Resend:', resendText);
+      return jsonResp({ error: 'Falha ao enviar o e-mail.', details: resendText }, 500);
     }
 
     console.log('[recover-password] ✅ E-mail enviado com sucesso para', jogador.email);
@@ -186,6 +186,6 @@ serve(async (req) => {
 
   } catch (err) {
     console.error('[recover-password] Erro interno:', String(err));
-    return jsonResp({ error: 'Erro interno no servidor.', details: String(err) }, 500);
+    return jsonResp({ error: 'Erro interno.', details: String(err) }, 500);
   }
 });
