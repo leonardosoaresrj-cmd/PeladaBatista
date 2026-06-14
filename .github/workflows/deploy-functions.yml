@@ -1,1 +1,36 @@
+# ============================================================
+# GitHub Actions — Deploy automático das Edge Functions
+# 
+# Este arquivo fica em: .github/workflows/deploy-functions.yml
+# Toda vez que você commitar na pasta supabase/functions/,
+# o GitHub faz o deploy automático no Supabase.
+# ============================================================
 
+name: Deploy Supabase Edge Functions
+
+on:
+  push:
+    branches:
+      - main
+    paths:
+      - 'supabase/functions/**'
+
+jobs:
+  deploy:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout código
+        uses: actions/checkout@v4
+
+      - name: Setup Supabase CLI
+        uses: supabase/setup-cli@v1
+        with:
+          version: latest
+
+      - name: Deploy recover-password
+        run: |
+          supabase functions deploy recover-password \
+            --project-ref ${{ secrets.SUPABASE_PROJECT_REF }} \
+            --no-verify-jwt
+        env:
+          SUPABASE_ACCESS_TOKEN: ${{ secrets.SUPABASE_ACCESS_TOKEN }}
