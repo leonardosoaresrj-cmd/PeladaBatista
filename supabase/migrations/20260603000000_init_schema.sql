@@ -5,13 +5,36 @@
 create extension if not exists "uuid-ossp";
 
 -- 2. Enumerados para tipos de posições e status
-create type posicao_jogador as enum ('Goleiro', 'Defesa', 'Meio', 'Ataque');
-create type status_jogador as enum ('pendente_aprovacao', 'ativo', 'suspenso');
-create type membro_status as enum ('mensalista', 'diarista');
-create type role_usuario as enum ('admin', 'jogador');
+DO $$
+BEGIN
+    IF NOT EXISTS (SELECT 1 FROM pg_type WHERE typname = 'posicao_jogador') THEN
+        CREATE TYPE posicao_jogador AS ENUM ('Goleiro', 'Defesa', 'Meio', 'Ataque');
+    END IF;
+END $$;
+
+DO $$
+BEGIN
+    IF NOT EXISTS (SELECT 1 FROM pg_type WHERE typname = 'status_jogador') THEN
+        CREATE TYPE status_jogador AS ENUM ('pendente_aprovacao', 'ativo', 'suspenso');
+    END IF;
+END $$;
+
+DO $$
+BEGIN
+    IF NOT EXISTS (SELECT 1 FROM pg_type WHERE typname = 'membro_status') THEN
+        CREATE TYPE membro_status AS ENUM ('mensalista', 'diarista', 'isento');
+    END IF;
+END $$;
+
+DO $$
+BEGIN
+    IF NOT EXISTS (SELECT 1 FROM pg_type WHERE typname = 'role_usuario') THEN
+        CREATE TYPE role_usuario AS ENUM ('admin', 'jogador');
+    END IF;
+END $$;
 
 -- 3. Tabela de Jogadores / Usuários
-create table jogadores (
+create table if not exists jogadores (
   id uuid primary key default uuid_generate_v4(),
   nome varchar(50) not null,
   sobrenome varchar(50) not null,
@@ -28,7 +51,7 @@ create table jogadores (
 );
 
 -- 4. Tabela de Partidas/Eventos
-create table partidas (
+create table if not exists partidas (
   id uuid primary key default uuid_generate_v4(),
   titulo varchar(150) not null,
   data date not null,
@@ -40,7 +63,7 @@ create table partidas (
 );
 
 -- 5. Tabela de Confirmações de Presença (Relação N-M)
-create table presencas (
+create table if not exists presencas (
   id uuid primary key default uuid_generate_v4(),
   partida_id uuid references partidas(id) on delete cascade not null,
   jogador_id uuid references jogadores(id) on delete cascade not null,
@@ -50,7 +73,7 @@ create table presencas (
 );
 
 -- 6. Tabela de Pagamentos
-create table pagamentos (
+create table if not exists pagamentos (
   id uuid primary key default uuid_generate_v4(),
   jogador_id uuid references jogadores(id) on delete cascade not null,
   mes_ref varchar(7) not null, -- Formato 'YYYY-MM'
@@ -61,10 +84,10 @@ create table pagamentos (
 );
 
 -- Criar Índices para consultas rápidas
-create index idx_jogadores_email on jogadores(email);
-create index idx_partidas_data on partidas(data);
-create index idx_presencas_partida on presencas(partida_id);
-create index idx_pagamentos_jogador_mes on pagamentos(jogador_id, mes_ref);
+create index if not exists idx_jogadores_email on jogadores(email);
+create index if not exists idx_partidas_data on partidas(data);
+create index if not exists idx_presencas_partida on presencas(partida_id);
+create index if not exists idx_pagamentos_jogador_mes on pagamentos(jogador_id, mes_ref);
 
 -- 7. Configurar Row Level Security (RLS) para Supabase
 alter table jogadores enable row level security;
@@ -73,71 +96,30 @@ alter table presencas enable row level security;
 alter table pagamentos enable row level security;
 
 -- Políticas para tabela JOGADORES
-create policy "Qualquer pessoa pode se cadastrar" on jogadores
-  for insert with check (true);
-
-create policy "Jogadores ativos podem ver perfis" on jogadores
-  for select using (
-    exists (
-      select 1 from jogadores where id = auth.uid() and status = 'ativo'
-    )
-  );
-
-create policy "Admins podem tudo em jogadores" on jogadores
-  using (
-    exists (
-      select 1 from jogadores where id = auth.uid() and role = 'admin'
-    )
-  );
+drop policy if exists "Qualquer pessoa pode se cadastrar" on jogadores;
+drop policy if exists "Jogadores ativos podem ver perfis" on jogadores;
+drop policy if exists "Admins podem tudo em jogadores" on jogadores;
+drop policy if exists "Acesso livre jogadores" on jogadores;
+create policy "Acesso livre jogadores" on jogadores for all using (true) with check (true);
 
 -- Políticas para tabela PARTIDAS
-create policy "Qualquer usuário ativo vê as partidas" on partidas
-  for select using (
-    exists (
-      select 1 from jogadores where id = auth.uid() and status = 'ativo'
-    )
-  );
-
-create policy "Apenas administradores editam partidas" on partidas
-  for all using (
-    exists (
-      select 1 from jogadores where id = auth.uid() and role = 'admin'
-    )
-  );
+drop policy if exists "Qualquer usuário ativo vê as partidas" on partidas;
+drop policy if exists "Apenas administradores editam partidas" on partidas;
+drop policy if exists "Acesso livre partidas" on partidas;
+create policy "Acesso livre partidas" on partidas for all using (true) with check (true);
 
 -- Políticas para tabela PRESENCAS
-create policy "Jogadores ativos podem ver presenças" on presencas
-  for select using (
-    exists (
-      select 1 from jogadores where id = auth.uid() and status = 'ativo'
-    )
-  );
-
-create policy "Jogadores ativos podem atualizar sua própria confirmação" on presencas
-  for all using (
-    jogador_id = auth.uid() and
-    exists (
-      select 1 from jogadores where id = auth.uid() and status = 'ativo'
-    )
-  );
-
-create policy "Admins gerenciam todas as confirmações" on presencas
-  for all using (
-    exists (
-      select 1 from jogadores where id = auth.uid() and role = 'admin'
-    )
-  );
+drop policy if exists "Jogadores ativos podem ver presenças" on presencas;
+drop policy if exists "Jogadores ativos podem atualizar sua própria confirmação" on presencas;
+drop policy if exists "Admins gerenciam todas as confirmações" on presencas;
+drop policy if exists "Acesso livre presenças" on presencas;
+create policy "Acesso livre presenças" on presencas for all using (true) with check (true);
 
 -- Políticas para tabela PAGAMENTOS
-create policy "Jogadores vêem seus próprios pagamentos" on pagamentos
-  for select using (jogador_id = auth.uid());
-
-create policy "Admins gerenciam todos os pagamentos" on pagamentos
-  for all using (
-    exists (
-      select 1 from jogadores where id = auth.uid() and role = 'admin'
-    )
-  );
+drop policy if exists "Jogadores vêem seus próprios pagamentos" on pagamentos;
+drop policy if exists "Admins gerenciam todos os pagamentos" on pagamentos;
+drop policy if exists "Acesso livre pagamentos" on pagamentos;
+create policy "Acesso livre pagamentos" on pagamentos for all using (true) with check (true);
 
 -- 8. Tabela de Logs e Histórico do Bot de WhatsApp (MIGRAÇÃO)
 create table if not exists whatsapp_logs (

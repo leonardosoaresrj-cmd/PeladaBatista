@@ -97,13 +97,14 @@ export async function salvarJogadorNoSupabase(jogador: Jogador): Promise<string 
         .insert(payload);
       
       if (error) {
-        console.error('Erro no insert:', error);
+        console.error('ERRO DETALHADO NO INSERT DO JOGADOR NO SUPABASE:', JSON.stringify(error, null, 2));
         throw error;
       }
       return jogador.id;
     }
-  } catch (error) {
-    console.error('Erro ao sincronizar jogador no Supabase:', error);
+  } catch (error: any) {
+    console.error('Erro ao sincronizar jogador no Supabase:', JSON.stringify(error, null, 2));
+    alert('Erro detalhado do Supabase: ' + (error?.message || JSON.stringify(error)));
     return null;
   }
 }
