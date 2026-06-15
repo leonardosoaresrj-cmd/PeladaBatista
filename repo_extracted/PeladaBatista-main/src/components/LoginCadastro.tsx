@@ -7,7 +7,6 @@ import React, { useState } from 'react';
 import { Jogador, PosicaoJogador, MembroStatus } from '../types';
 import { AVATAR_PRESETS } from '../data';
 import { KeyRound, Mail, User, Calendar, Shield, Users, Check, AlertCircle, ArrowLeft, Send, Loader2 } from 'lucide-react';
-import { obterCredenciaisSupabase } from '../supabaseClient';
 
 interface LoginCadastroProps {
   jogadores: Jogador[];
@@ -69,14 +68,14 @@ export default function LoginCadastro({ jogadores, onLoginSuccess, onRegistrar }
 
     try {
       // Lê a anon key do localStorage (salva nas configurações do Supabase do portal)
-      const { url, key } = obterCredenciaisSupabase();
+      const supabaseAnonKey = localStorage.getItem('supabase_key_config') || '';
 
-      const response = await fetch(`${url}/functions/v1/recover-password`, {
+      const response = await fetch('https://gqasacnaubkhokqyrpwc.supabase.co/functions/v1/recover-password', {
         method: 'POST',
         headers: {
           'Content-Type': 'application/json',
-          'apikey': key,
-          'Authorization': `Bearer ${key}`,
+          'apikey': supabaseAnonKey,
+          'Authorization': `Bearer ${supabaseAnonKey}`,
         },
         body: JSON.stringify({
           email: found.email,

@@ -28,7 +28,6 @@ import {
   salvarPagamentoNoSupabase,
   deletarPartidaNoSupabase,
   obterConfiguracaoDoSupabase,
-  obterTodasConfiguracoesDoSupabase,
   salvarConfiguracaoNoSupabase,
   carregarBotLogsDoSupabase,
   limparBotLogsDoSupabase,
@@ -114,11 +113,6 @@ export default function App() {
     localStorage.setItem('racha_whatsapp_automacao_ativa', ativa.toString());
     localStorage.setItem('racha_whatsapp_webhook_url', webhookUrl);
     localStorage.setItem('racha_whatsapp_webhook_token', token);
-
-    salvarConfiguracaoNoSupabase('whatsapp_grupo_link', link);
-    salvarConfiguracaoNoSupabase('whatsapp_automacao_ativa', ativa.toString());
-    salvarConfiguracaoNoSupabase('whatsapp_webhook_url', webhookUrl);
-    salvarConfiguracaoNoSupabase('whatsapp_webhook_token', token);
   };
 
   // Estados de Controle de Caixa e Lançamentos
@@ -136,19 +130,20 @@ export default function App() {
     };
     const novos = [lCompleto, ...lancamentos];
     setLancamentos(novos);
-    salvarConfiguracaoNoSupabase('lancamentos_avulsos', JSON.stringify(novos));
+    saveLancamentos(novos);
   };
 
   const handleRemoveLancamento = (id: string) => {
     const novos = lancamentos.filter(l => l.id !== id);
     setLancamentos(novos);
-    salvarConfiguracaoNoSupabase('lancamentos_avulsos', JSON.stringify(novos));
+    saveLancamentos(novos);
   };
 
   const handleLimparDadosDoMes = async (mesRef: string) => {
     // 1. Filtrar pagamentos que não pertencem ao mesRef
     const novosPagamentos = pagamentos.filter(p => p.mesRef !== mesRef);
     setPagamentos(novosPagamentos);
+    savePagamentos(novosPagamentos);
 
     const supabase = getSupabase();
 
@@ -167,6 +162,7 @@ export default function App() {
     // 3. Filtrar lançamentos avulsos que pertencem àquele mês
     const novosLancamentos = lancamentos.filter(l => !l.data || !l.data.startsWith(mesRef));
     setLancamentos(novosLancamentos);
+    saveLancamentos(novosLancamentos);
 
     // 4. Detetar partidas do mês (reais e sábados automáticos) e apagá-las/ocultá-las
     try {
@@ -206,6 +202,7 @@ export default function App() {
       // Atualizar partidas reais excluindo as deletadas
       const novasPartidas = partidas.filter(p => !partidasDoMesReaisIds.includes(p.id));
       setPartidas(novasPartidas);
+      savePartidas(novasPartidas);
 
       // Sincronizar exclusão de partidas reais e de configuração de deletadas no Supabase
       if (supabase) {
@@ -224,7 +221,7 @@ export default function App() {
 
   const handleUpdateAluguelCampoBase = (valor: number) => {
     setAluguelCampoBase(valor);
-    salvarConfiguracaoNoSupabase('aluguel_campo_base', valor.toString());
+    saveAluguelCampo(valor);
   };
 
   const handleRegistrarLogAutomacao = async (atletaNome: string, partidaTitulo: string, msg: string) => {
@@ -317,10 +314,6 @@ export default function App() {
     localStorage.setItem('racha_valor_4s', v4.toString());
     localStorage.setItem('racha_valor_5s', v5.toString());
     localStorage.setItem('racha_valor_diaria', vDiaria.toString());
-    
-    salvarConfiguracaoNoSupabase('valor_4_sabados', v4.toString());
-    salvarConfiguracaoNoSupabase('valor_5_sabados', v5.toString());
-    salvarConfiguracaoNoSupabase('valor_diaria', vDiaria.toString());
   };
 
   // Estados para Modal de Edição de Perfil
@@ -471,56 +464,15 @@ export default function App() {
           setPagamentos(getSavedPagamentos());
         }
 
-        // Carregar todas as configurações da nuvem
-        const configs = await obterTodasConfiguracoesDoSupabase();
-        if (configs) {
-          if (configs['partidas_excluidas']) {
-            try {
-              const parsed = JSON.parse(configs['partidas_excluidas']);
-              setPartidasDeletadas(parsed);
-              localStorage.setItem('futebol_partidas_deletadas', configs['partidas_excluidas']);
-            } catch (e) {
-              console.error(e);
-            }
-          }
-          if (configs['valor_4_sabados']) {
-             setValor4Sabados(parseFloat(configs['valor_4_sabados']));
-             localStorage.setItem('racha_valor_4s', configs['valor_4_sabados']);
-          }
-          if (configs['valor_5_sabados']) {
-             setValor5Sabados(parseFloat(configs['valor_5_sabados']));
-             localStorage.setItem('racha_valor_5s', configs['valor_5_sabados']);
-          }
-          if (configs['valor_diaria']) {
-             setValorDiaria(parseFloat(configs['valor_diaria']));
-             localStorage.setItem('racha_valor_diaria', configs['valor_diaria']);
-          }
-          if (configs['whatsapp_grupo_link']) {
-             setWhatsappGrupoLink(configs['whatsapp_grupo_link']);
-             localStorage.setItem('racha_whatsapp_grupo_link', configs['whatsapp_grupo_link']);
-          }
-          if (configs['whatsapp_automacao_ativa']) {
-             setWhatsappAutomacaoAtiva(configs['whatsapp_automacao_ativa'] === 'true');
-             localStorage.setItem('racha_whatsapp_automacao_ativa', configs['whatsapp_automacao_ativa']);
-          }
-          if (configs['whatsapp_webhook_url']) {
-             setWhatsappWebhookUrl(configs['whatsapp_webhook_url']);
-             localStorage.setItem('racha_whatsapp_webhook_url', configs['whatsapp_webhook_url']);
-          }
-          if (configs['whatsapp_webhook_token']) {
-             setWhatsappWebhookToken(configs['whatsapp_webhook_token']);
-             localStorage.setItem('racha_whatsapp_webhook_token', configs['whatsapp_webhook_token']);
-          }
-          if (configs['aluguel_campo_base']) {
-             setAluguelCampoBase(parseFloat(configs['aluguel_campo_base']));
-             saveAluguelCampo(parseFloat(configs['aluguel_campo_base']));
-          }
-          if (configs['lancamentos_avulsos']) {
-             try {
-                const parsedLancamentos = JSON.parse(configs['lancamentos_avulsos']);
-                setLancamentos(parsedLancamentos);
-                saveLancamentos(parsedLancamentos);
-             } catch(e) { console.error(e) }
+        // Carregar configurações de partidas excluídas da nuvem
+        const dbDeletadasStr = await obterConfiguracaoDoSupabase('partidas_excluidas');
+        if (dbDeletadasStr) {
+          try {
+            const parsed = JSON.parse(dbDeletadasStr);
+            setPartidasDeletadas(parsed);
+            localStorage.setItem('futebol_partidas_deletadas', dbDeletadasStr);
+          } catch (e) {
+            console.error(e);
           }
         }
 
@@ -663,28 +615,19 @@ export default function App() {
 
   // 1. Cadastro Solicitado por jogador (status 'pendente_aprovacao')
   const handleRegistrarJogador = async (novo: Omit<Jogador, 'id' | 'status' | 'role' | 'createdAt'>) => {
-    const isPrimeiro = jogadores.length === 0;
-
-    const novoId = crypto.randomUUID();
-
     const novoJogador: Jogador = {
       ...novo,
-      id: novoId,
-      status: isPrimeiro ? 'ativo' : 'pendente_aprovacao',
-      role: isPrimeiro ? 'admin' : 'jogador',
+      id: `jog-${Date.now()}`,
+      status: 'pendente_aprovacao',
+      role: 'jogador',
       createdAt: new Date().toISOString(),
     };
     
-    // Atualização Otimista
     const atualizados = [...jogadores, novoJogador];
     setJogadores(atualizados);
+    saveJogadores(atualizados);
 
-    const supId = await salvarJogadorNoSupabase(novoJogador);
-    // Remover da view caso falhe
-    if (!supId) {
-       setJogadores(jogadores);
-       console.error("Cadastro falhou: nao foi salvo no supabase.");
-    }
+    await salvarJogadorNoSupabase(novoJogador);
   };
 
   // 2. Aprovar / Recusar cadastro pendente (Ação administrativa)
@@ -705,13 +648,10 @@ export default function App() {
     }
     
     setJogadores(atualizados);
+    saveJogadores(atualizados);
 
     if (modificado) {
-      const supId = await salvarJogadorNoSupabase(modificado);
-      if (!supId) {
-         setJogadores(jogadores);
-         console.error("Erro ao aprovar jogador no supabase");
-      }
+      await salvarJogadorNoSupabase(modificado);
     } else if (!aprovar) {
       const supabase = getSupabase();
       if (supabase) {
@@ -724,6 +664,7 @@ export default function App() {
   const handleExcluirJogador = async (id: string) => {
     const atualizados = jogadores.filter(j => j.id !== id);
     setJogadores(atualizados);
+    saveJogadores(atualizados);
 
     const supabase = getSupabase();
     if (supabase) {
@@ -746,6 +687,7 @@ export default function App() {
       return j;
     });
     setJogadores(atualizados);
+    saveJogadores(atualizados);
 
     if (modificado) {
       await salvarJogadorNoSupabase(modificado);
@@ -857,12 +799,9 @@ export default function App() {
 
     const atualizadas = [...partidas, partidaCompleta];
     setPartidas(atualizadas);
+    savePartidas(atualizadas);
 
-    const supId = await salvarPartidaNoSupabase(partidaCompleta);
-    if (supId && supId !== partidaCompleta.id) {
-      const refetched = atualizadas.map(p => p.id === partidaCompleta.id ? { ...p, id: supId } : p);
-      setPartidas(refetched);
-    }
+    await salvarPartidaNoSupabase(partidaCompleta);
   };
 
   // Deletar Partida no Calendário / Histórico (Ação administrativa)
@@ -879,6 +818,7 @@ export default function App() {
       // 2. Filtrar e remover se for uma partida persistida no banco local/remoto as well
       const atualizadas = partidas.filter(p => p.id !== id);
       setPartidas(atualizadas);
+      savePartidas(atualizadas);
 
       // 3. Salvar esta exclusão no Supabase se houver conexão ativa de forma assíncrona tolerante a falhas
       if (getSupabase()) {
@@ -943,6 +883,7 @@ export default function App() {
     }
 
     setPartidas(novasPartidas);
+    savePartidas(novasPartidas);
 
     if (modificado) {
       await salvarPartidaNoSupabase(modificado);
@@ -986,6 +927,7 @@ export default function App() {
     }
 
     setPartidas(novasPartidas);
+    savePartidas(novasPartidas);
 
     if (modificado) {
       await salvarPartidaNoSupabase(modificado);
@@ -1039,13 +981,10 @@ export default function App() {
     }
 
     setPagamentos(atualizados);
+    savePagamentos(atualizados);
 
     if (pagModificado!) {
-      const supId = await salvarPagamentoNoSupabase(pagModificado);
-      if (supId && supId !== pagModificado.id) {
-        const refetched = atualizados.map(p => p.id === pagModificado.id ? { ...p, id: supId } : p);
-        setPagamentos(refetched);
-      }
+      await salvarPagamentoNoSupabase(pagModificado);
 
       if (status === 'pago' && whatsappAutomacaoAtiva) {
         const jogObj = jogadores.find(j => j.id === jogadorId);

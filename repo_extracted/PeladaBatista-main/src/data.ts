@@ -17,7 +17,22 @@ export const AVATAR_PRESETS = [
   { id: 'jersey-purple', name: 'Manto Roxo', color: '#9333ea', text: '⚪' },
 ];
 
-export const INITIAL_JOGADORES: Jogador[] = [];
+export const INITIAL_JOGADORES: Jogador[] = [
+  {
+    id: 'admin-leonardo',
+    nome: 'Leonardo',
+    sobrenome: 'Soares',
+    posicao: 'Meio',
+    dataNascimento: '1990-01-01',
+    foto: 'jersey-black',
+    membroStatus: 'mensalista',
+    email: 'leonardo.soares.rj@gmail.com',
+    senha: '1234',
+    status: 'ativo',
+    role: 'admin',
+    createdAt: '2026-06-03T12:00:00Z',
+  }
+];
 
 export const INITIAL_PARTIDAS: Partida[] = [];
 
@@ -93,23 +108,77 @@ create index idx_presencas_partida on presencas(partida_id);
 create index idx_pagamentos_jogador_mes on pagamentos(jogador_id, mes_ref);
 
 -- 7. Configurar Row Level Security (RLS) para Supabase
--- RLS desativado/permitido para a chave pública pois a autenticação ocorre a nível da aplicação (PIN customizado)
 alter table jogadores enable row level security;
 alter table partidas enable row level security;
 alter table presencas enable row level security;
 alter table pagamentos enable row level security;
 
--- Políticas para tabela JOGADORES (Acesso total para o sistema rodando frontend)
-create policy "Acesso livre jogadores" on jogadores for all using (true) with check (true);
+-- Políticas para tabela JOGADORES
+create policy "Qualquer pessoa pode se cadastrar" on jogadores
+  for insert with check (true);
+
+create policy "Jogadores ativos podem ver perfis" on jogadores
+  for select using (
+    exists (
+      select 1 from jogadores where id = auth.uid() and status = 'ativo'
+    )
+  );
+
+create policy "Admins podem tudo em jogadores" on jogadores
+  using (
+    exists (
+      select 1 from jogadores where id = auth.uid() and role = 'admin'
+    )
+  );
 
 -- Políticas para tabela PARTIDAS
-create policy "Acesso livre partidas" on partidas for all using (true) with check (true);
+create policy "Qualquer usuário ativo vê as partidas" on partidas
+  for select using (
+    exists (
+      select 1 from jogadores where id = auth.uid() and status = 'ativo'
+    )
+  );
+
+create policy "Apenas administradores editam partidas" on partidas
+  for all using (
+    exists (
+      select 1 from jogadores where id = auth.uid() and role = 'admin'
+    )
+  );
 
 -- Políticas para tabela PRESENCAS
-create policy "Acesso livre presenças" on presencas for all using (true) with check (true);
+create policy "Jogadores ativos podem ver presenças" on presencas
+  for select using (
+    exists (
+      select 1 from jogadores where id = auth.uid() and status = 'ativo'
+    )
+  );
+
+create policy "Jogadores ativos podem atualizar sua própria confirmação" on presencas
+  for all using (
+    jogador_id = auth.uid() and
+    exists (
+      select 1 from jogadores where id = auth.uid() and status = 'ativo'
+    )
+  );
+
+create policy "Admins gerenciam todas as confirmações" on presencas
+  for all using (
+    exists (
+      select 1 from jogadores where id = auth.uid() and role = 'admin'
+    )
+  );
 
 -- Políticas para tabela PAGAMENTOS
-create policy "Acesso livre pagamentos" on pagamentos for all using (true) with check (true);
+create policy "Jogadores vêem seus próprios pagamentos" on pagamentos
+  for select using (jogador_id = auth.uid());
+
+create policy "Admins gerenciam todos os pagamentos" on pagamentos
+  for all using (
+    exists (
+      select 1 from jogadores where id = auth.uid() and role = 'admin'
+    )
+  );
 
 -- 8. Tabelas de Integração do Robô WhatsApp v2.2 (MIGRAÇÃO)
 create table if not exists bot_session (

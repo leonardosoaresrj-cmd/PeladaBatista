@@ -53,13 +53,14 @@ export function getSupabase(): SupabaseClient | null {
 /**
  * Cadastrar ou atualizar jogador no Supabase
  */
-export async function salvarJogadorNoSupabase(jogador: Jogador): Promise<string | null> {
+export async function salvarJogadorNoSupabase(jogador: Jogador): Promise<boolean> {
   const supabase = getSupabase();
-  if (!supabase) return null;
+  if (!supabase) return false;
 
   try {
     // Mapear de camelCase para snake_case esperado no Postgres do usuário
     const record = {
+      // Usar o id diretamente se for formato uuid, caso contrário o Supabase gera ou o Postgres lida
       nome: jogador.nome,
       sobrenome: jogador.sobrenome,
       posicao: jogador.posicao,
@@ -87,24 +88,20 @@ export async function salvarJogadorNoSupabase(jogador: Jogador): Promise<string 
         .eq('id', existente.id);
       
       if (error) throw error;
-      return existente.id;
     } else {
-      const payload: any = { ...record };
-      payload.id = jogador.id;
-
       const { error } = await supabase
         .from('jogadores')
-        .insert(payload);
+        .insert({
+          ...record,
+          id: jogador.id.startsWith('jog-') ? undefined : jogador.id // Se for ID temporário, deixa o Supabase gerar uuid
+        });
       
-      if (error) {
-        console.error('Erro no insert:', error);
-        throw error;
-      }
-      return jogador.id;
+      if (error) throw error;
     }
+    return true;
   } catch (error) {
     console.error('Erro ao sincronizar jogador no Supabase:', error);
-    return null;
+    return false;
   }
 }
 
@@ -149,9 +146,9 @@ export async function carregarJogadoresDoSupabase(): Promise<Jogador[] | null> {
 /**
  * Salvar nova Partida no Supabase
  */
-export async function salvarPartidaNoSupabase(partida: Partida): Promise<string | null> {
+export async function salvarPartidaNoSupabase(partida: Partida): Promise<boolean> {
   const supabase = getSupabase();
-  if (!supabase) return null;
+  if (!supabase) return false;
 
   try {
     const record = {
@@ -190,10 +187,10 @@ export async function salvarPartidaNoSupabase(partida: Partida): Promise<string 
     //   await sincronizarPresencasNoSupabase(partidaId, partida.confirmados, true);
     //   await sincronizarPresencasNoSupabase(partidaId, partida.recusados, false);
     // }
-    return partidaId;
+    return true;
   } catch (error) {
     console.error('Erro ao salvar partida no Supabase:', error);
-    return null;
+    return false;
   }
 }
 
@@ -313,14 +310,14 @@ export async function carregarPartidasDoSupabase(): Promise<Partida[] | null> {
 /**
  * Salvar registro de pagamento no Supabase
  */
-export async function salvarPagamentoNoSupabase(pagamento: Pagamento): Promise<string | null> {
+export async function salvarPagamentoNoSupabase(pagamento: Pagamento): Promise<boolean> {
   const supabase = getSupabase();
-  if (!supabase) return null;
+  if (!supabase) return false;
 
   try {
     // Ignorar se id do jogador for simulado (somente aceita uuid de jogadores reais)
     if (pagamento.jogadorId.startsWith('admin-') || pagamento.jogadorId.startsWith('jog-')) {
-      return null;
+      return false;
     }
 
     const record = {
@@ -332,27 +329,17 @@ export async function salvarPagamentoNoSupabase(pagamento: Pagamento): Promise<s
       valor: pagamento.valor,
     };
 
-    if (pagamento.id.startsWith('pag-')) {
-      const { data, error } = await supabase
-        .from('pagamentos')
-        .insert(record)
-        .select('id')
-        .single();
-      if (error) throw error;
-      return data?.id || null;
-    } else {
-      const { error } = await supabase
-        .from('pagamentos')
-        .upsert(record, {
-          onConflict: 'id'
-        });
+    const { error } = await supabase
+      .from('pagamentos')
+      .upsert(record, {
+        onConflict: 'id'
+      });
 
-      if (error) throw error;
-      return pagamento.id;
-    }
+    if (error) throw error;
+    return true;
   } catch (error) {
     console.error('Erro ao salvar pagamento no Supabase:', error);
-    return null;
+    return false;
   }
 }
 
@@ -400,32 +387,6 @@ export async function deletarPartidaNoSupabase(id: string): Promise<boolean> {
   } catch (error) {
     console.error('Erro ao excluir partida no Supabase:', error);
     return false;
-  }
-}
-
-/**
- * Obter todas as configurações da tabela racha_configuracoes
- */
-export async function obterTodasConfiguracoesDoSupabase(): Promise<Record<string, string> | null> {
-  const supabase = getSupabase();
-  if (!supabase) return null;
-
-  try {
-    const { data, error } = await supabase
-      .from('racha_configuracoes')
-      .select('chave, valor');
-
-    if (error) throw error;
-    if (!data) return {};
-
-    const config: Record<string, string> = {};
-    data.forEach((row: any) => {
-      config[row.chave] = row.valor;
-    });
-    return config;
-  } catch (error) {
-    console.error('Erro ao obter todas configs do Supabase:', error);
-    return null;
   }
 }
 
