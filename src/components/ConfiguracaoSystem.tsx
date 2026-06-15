@@ -78,7 +78,7 @@ export default function ConfiguracaoSystem({
     setMpAccessToken(localStorage.getItem('mercado_pago_access_token') || '');
     setMpPublicKey(localStorage.getItem('mercado_pago_public_key') || '');
     setDiretoPixChave(localStorage.getItem('direto_pix_chave') || '');
-    setDiretoPixNome(localStorage.getItem('direto_pix_nome') || 'Arena Record');
+    setDiretoPixNome(localStorage.getItem('direto_pix_nome') || 'Pelada Batista Sábado');
     setDiretoPixCidade(localStorage.getItem('direto_pix_cidade') || 'SAO PAULO');
   }, []);
 

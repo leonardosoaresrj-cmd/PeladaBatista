@@ -1567,7 +1567,7 @@ export default function App() {
             </p>
             
             <div className="bg-amber-955/25 border border-amber-500/20 rounded-xl p-3 mb-5 text-[11px] text-amber-200 leading-relaxed font-sans">
-              <b>⚠️ Regulamento de Mensalistas:</b> No Arena Record, atletas com pendências financeiras de mensalidade passam temporariamente para o status de <b>Diarista</b> até a devida regularização do débito. Desse modo, você perde temporariamente a prioridade automática de mensalistas na lista de chamada oficial.
+              <b>⚠️ Regulamento de Mensalistas:</b> No Pelada Batista Sábado, atletas com pendências financeiras de mensalidade passam temporariamente para o status de <b>Diarista</b> até a devida regularização do débito. Desse modo, você perde temporariamente a prioridade automática de mensalistas na lista de chamada oficial.
             </div>
 
             <div className="flex gap-2.5">

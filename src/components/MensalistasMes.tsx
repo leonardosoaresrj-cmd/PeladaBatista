@@ -129,7 +129,7 @@ export default function MensalistasMes({
             Mensalistas Ativos da Temporada
           </h2>
           <p className="text-xs text-emerald-300/85 font-sans mt-0.5">
-            Membros oficiais e vitalícios que compõem o elenco da pelada Arena Record.
+            Membros oficiais e vitalícios que compõem o elenco da pelada Batista Sábado.
           </p>
         </div>
 

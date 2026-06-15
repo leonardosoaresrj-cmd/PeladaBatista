@@ -7,7 +7,7 @@ import React, { useState } from 'react';
 import { Jogador, PosicaoJogador, MembroStatus } from '../types';
 import { AVATAR_PRESETS } from '../data';
 import { KeyRound, Mail, User, Calendar, Shield, Users, Check, AlertCircle, ArrowLeft, Send, Loader2 } from 'lucide-react';
-import { obterCredenciaisSupabase } from '../supabaseClient';
+import { obterCredenciaisSupabase, getSupabase } from '../supabaseClient';
 
 interface LoginCadastroProps {
   jogadores: Jogador[];
@@ -99,16 +99,47 @@ export default function LoginCadastro({ jogadores, onLoginSuccess, onRegistrar }
 
       if (response.ok) {
         setRecoverySuccess(true);
+        const sb = getSupabase();
+        if (sb) {
+          await sb.from('bot_logs').insert({
+            id: `log-${Date.now()}-${Math.random().toString(36).substr(2, 4)}`,
+            tabela: `${found.nome} ${found.sobrenome}`,
+            evento: 'RECOVERY',
+            mensagem: `✅ Disparo de senha para o e-mail: ${found.email.toLowerCase()}`,
+            enviado_em: new Date().toISOString()
+          });
+        }
       } else {
         let errorMsg = data?.error || data?.details || 'Erro ao tentar enviar o e-mail pela API.';
         if (errorMsg.includes('validation_error') && errorMsg.includes('testing emails')) {
           errorMsg = 'Para enviar e-mails de recuperação para contas de terceiros é necessário confirmar o seu domínio no serviço de e-mail (Resend.com). Como está em ambiente de teste, o envio foi bloqueado pelo provedor.';
         }
         setRecoveryError(errorMsg);
+        const sb = getSupabase();
+        if (sb) {
+          await sb.from('bot_logs').insert({
+            id: `log-${Date.now()}-${Math.random().toString(36).substr(2, 4)}`,
+            tabela: `${found.nome} ${found.sobrenome}`,
+            evento: 'FALHA_RECOVERY',
+            mensagem: `⚠️ Falha ao recuperar senha via e-mail. Erro: ${errorMsg}`,
+            enviado_em: new Date().toISOString()
+          });
+        }
       }
     } catch (error: any) {
       console.error('Erro no envio de recuperação:', error);
-      setRecoveryError(`Falha na requisição: ${error.message || 'Erro de conexão.'}`);
+      const errMsg = `Falha na requisição: ${error.message || 'Erro de conexão.'}`;
+      setRecoveryError(errMsg);
+      const sb = getSupabase();
+      if (sb) {
+        await sb.from('bot_logs').insert({
+          id: `log-${Date.now()}-${Math.random().toString(36).substr(2, 4)}`,
+          tabela: `${found.nome} ${found.sobrenome}`,
+          evento: 'FALHA_RECOVERY',
+          mensagem: `⚠️ ${errMsg}`,
+          enviado_em: new Date().toISOString()
+        });
+      }
     } finally {
       setIsSending(false);
     }

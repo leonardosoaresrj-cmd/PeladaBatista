@@ -60,7 +60,7 @@ export default function CalendarioJogos({
   });
   const [newGameHoraInicio, setNewGameHoraInicio] = useState('08:05'); // padrão: 08:00
   const [newGameHoraFim, setNewGameHoraFim] = useState('10:05'); // padrão: 10:00
-  const [newGameLocal, setNewGameLocal] = useState('Arena Record - Quadra Principal');
+  const [newGameLocal, setNewGameLocal] = useState('Campo do Batista');
   const [schedulerError, setSchedulerError] = useState('');
   const [schedulerSuccess, setSchedulerSuccess] = useState(false);
 
@@ -273,7 +273,7 @@ export default function CalendarioJogos({
                       // CASO SEJA CLICADO EM UMA DATA SEM JOGO AGENDADO E SEJA ADMIN, ABRIR O POP UP DE CADASTRO DE NOVO JOGO
                       setSelectedDateForNewGame(dataString);
                       setNewGameTitulo('Pelada Batista Sábado');
-                      setNewGameLocal('Arena Record - Quadra Principal');
+                      setNewGameLocal('Campo do Batista');
                       setNewGameHoraInicio('08:05');
                       setNewGameHoraFim('10:05');
                       setSchedulerError('');
@@ -869,7 +869,7 @@ export default function CalendarioJogos({
                   <input
                     type="text"
                     required
-                    placeholder="Ex: Arena Record - Quadra Principal"
+                    placeholder="Ex: Campo do Batista"
                     value={newGameLocal}
                     onChange={(e) => setNewGameLocal(e.target.value)}
                     className="w-full bg-emerald-900 border border-white/10 text-white placeholder-emerald-600 rounded-lg p-2.5 text-xs focus:outline-none focus:border-emerald-500"

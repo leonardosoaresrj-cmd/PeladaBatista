@@ -179,7 +179,7 @@ export default function ControlePagamentos({
                 🛡️ Posição Isenta de Taxas (Goleiro Oficial)
               </h4>
               <p className="text-[11px] text-teal-300 mt-1 font-sans leading-relaxed">
-                No Arena Record, os <b>Goleiros são 100% gratuitos</b> e isentos de mensalidade ou diária. Obrigado por fechar o gol e garantir ótimas defesas a cada treino!
+                No Pelada Batista Sábado, os <b>Goleiros são 100% gratuitos</b> e isentos de mensalidade ou diária. Obrigado por fechar o gol e garantir ótimas defesas a cada treino!
               </p>
             </div>
           </div>
@@ -312,7 +312,7 @@ export default function ControlePagamentos({
               ) : debitosPessoais.length === 0 ? (
                 <div className="text-center w-full max-w-md space-y-1.5 pt-1">
                   <p className="text-xs text-teal-200 leading-relaxed font-sans bg-teal-500/10 border border-teal-500/20 p-3 rounded-xl font-bold">
-                    🎉 Excelente! Você está 100% em dia com a pelada Arena Record. Não há nenhum débito pendente em aberto ou em análise. Obrigado pela colaboração!
+                    🎉 Excelente! Você está 100% em dia com a pelada Batista Sábado. Não há nenhum débito pendente em aberto ou em análise. Obrigado pela colaboração!
                   </p>
                 </div>
               ) : hasPendenteConfirmacaoOnly ? (
@@ -323,7 +323,7 @@ export default function ControlePagamentos({
                   
                   <a
                     href={`https://api.whatsapp.com/send?text=${encodeURIComponent(
-                      `Olá! Sou o atleta ${jogadorAtual.nome} ${jogadorAtual.sobrenome} e acabei de informar o pagamento total de meus débitos no app Arena Record no valor de R$ ${totalConsolidado.toFixed(2)}.`
+                      `Olá! Sou o atleta ${jogadorAtual.nome} ${jogadorAtual.sobrenome} e acabei de informar o pagamento total de meus débitos no app Pelada Batista Sábado no valor de R$ ${totalConsolidado.toFixed(2)}.`
                     )}`}
                     target="_blank"
                     rel="noreferrer"
@@ -477,13 +477,34 @@ export default function ControlePagamentos({
 
           <div className="bg-black/25 rounded-2xl overflow-hidden border border-white/5 divide-y divide-white/5 font-sans">
             {competencasDisponiveis.map((comp) => {
-              const checkPg = obterPagamentoDoJogador(comp.value);
-              
-              // Se o pagamento foi cancelado, ocultamos do histórico (deletado do histórico)
-              if ((checkPg?.status as any) === 'cancelado') return null;
+              const debitosDoMes = debitosPessoais.filter(d => d.mesRef === comp.value);
+              const pendentes = debitosDoMes.filter(d => d.status === 'pendente');
+              const aguardando = debitosDoMes.filter(d => d.status === 'pendente_confirmacao');
+              const pagos = pagamentos.filter(p => p.jogadorId === jogadorAtual.id && p.mesRef === comp.value && p.status === 'pago');
 
               const isGoleiro = jogadorAtual.posicao === 'Goleiro';
-              const isCompPaid = isGoleiro || checkPg?.status === 'pago';
+              let statusMes = 'QUITADO';
+              if (isGoleiro) {
+                statusMes = 'ISENTO';
+              } else if (pendentes.length > 0) {
+                statusMes = 'PENDENTE';
+              } else if (aguardando.length > 0) {
+                statusMes = 'AGUARDANDO VALID';
+              }
+
+              let valorExibido = 0;
+              if (statusMes === 'PENDENTE') {
+                valorExibido = pendentes.reduce((sum, d) => sum + d.valor, 0);
+              } else if (statusMes === 'AGUARDANDO VALID') {
+                valorExibido = aguardando.reduce((sum, d) => sum + d.valor, 0);
+              } else {
+                valorExibido = pagos.reduce((sum, p) => sum + p.valor, 0);
+              }
+
+              // Mostrar data do pagamento se houver pago
+              const ultimaDataPg = pagos.length > 0 && pagos[pagos.length - 1].dataPagamento
+                ? pagos[pagos.length - 1].dataPagamento
+                : null;
 
               return (
                 <div 
@@ -502,34 +523,24 @@ export default function ControlePagamentos({
 
                   <div className="flex items-center justify-between sm:justify-end gap-3.5">
                     <span className="font-mono text-white font-bold">
-                      R$ {isGoleiro ? '0,00' : (checkPg ? checkPg.valor : valorCobradoMes).toFixed(2)}
+                      R$ {isGoleiro ? '0,00' : valorExibido.toFixed(2)}
                     </span>
 
                     <span className={`px-2.5 py-0.5 rounded text-[9px] font-black font-mono uppercase tracking-wider ${
                       isGoleiro 
                         ? 'bg-teal-555/40 border border-teal-500/30 text-teal-400' 
-                        : (checkPg?.status as any) === 'pendente_confirmacao'
+                        : statusMes === 'AGUARDANDO VALID'
                           ? 'bg-amber-955/70 border border-amber-500/20 text-amber-500'
-                          : (checkPg?.status as any) === 'cancelado'
-                            ? 'bg-slate-800/60 border border-slate-700/30 text-slate-400 line-through'
-                            : isCompPaid 
+                          : statusMes === 'QUITADO' 
                               ? 'bg-teal-900/60 border border-teal-500/30 text-teal-400' 
                               : 'bg-rose-955/60 border border-rose-500/30 text-rose-455'
                     }`}>
-                      {isGoleiro 
-                        ? 'ISENTO' 
-                        : (checkPg?.status as any) === 'pendente_confirmacao' 
-                          ? 'AGUARDANDO VALID' 
-                          : (checkPg?.status as any) === 'cancelado'
-                            ? 'CANCELADO'
-                            : isCompPaid 
-                              ? 'QUITADO' 
-                              : 'PENDENTE'}
+                      {statusMes}
                     </span>
 
-                    {checkPg?.dataPagamento && (
+                    {ultimaDataPg && (
                       <span className="text-[10px] font-mono text-emerald-400/80">
-                        PG: {checkPg.dataPagamento.split('-').reverse().join('/')}
+                        PG: {ultimaDataPg.split('-').reverse().join('/')}
                       </span>
                     )}
                   </div>
