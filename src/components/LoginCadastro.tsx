@@ -263,7 +263,7 @@ export default function LoginCadastro({ jogadores, onLoginSuccess, onRegistrar }
             <Users className="w-6 h-6" />
           </div>
           <h2 className="text-2xl font-display font-bold text-white tracking-wide">PELADA BATISTA SÁBADO</h2>
-          <p className="text-xs text-emerald-400 font-semibold tracking-widest uppercase mt-0.5">Gestão de Partidas de Futebol e Finanças</p>
+          <p className="text-xs text-emerald-400 font-semibold tracking-widest uppercase mt-0.5">PORTAL DE GESTÃO DOS JOGOS</p>
         </div>
 
         {/* Abas */}
