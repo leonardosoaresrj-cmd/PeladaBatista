@@ -40,9 +40,9 @@ create table if not exists jogadores (
   sobrenome varchar(50) not null,
   posicao posicao_jogador not null,
   data_nascimento date not null,
-  foto varchar(100) default 'jersey-red',
+  foto text default 'jersey-red',
   membro_status membro_status not null,
-  email varchar(100) unique not null,
+  email varchar(255) unique not null,
   senha varchar(4) not null, -- PIN de 4 dígitos
   status status_jogador default 'pendente_aprovacao',
   role role_usuario default 'jogador',

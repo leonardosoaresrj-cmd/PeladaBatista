@@ -376,7 +376,7 @@ export default function App() {
     if (!jogadorAtual) return null;
     return {
       ...jogadorAtual,
-      membroStatus: obterStatusMembroEfetivo(jogadorAtual, pagamentos),
+      membroStatus: obterStatusMembroEfetivo(jogadorAtual),
       isGold: isJogadorFuncionalmenteGold(jogadorAtual, pagamentos)
     };
   }, [jogadorAtual, pagamentos]);
@@ -384,7 +384,7 @@ export default function App() {
   const jogadoresEfetivos = useMemo(() => {
     return jogadores.map(j => ({
       ...j,
-      membroStatus: obterStatusMembroEfetivo(j, pagamentos),
+      membroStatus: obterStatusMembroEfetivo(j),
       membroStatusDb: j.membroStatus,
       isGoldDb: j.isGold,
       isGold: isJogadorFuncionalmenteGold(j, pagamentos)
@@ -662,7 +662,7 @@ export default function App() {
   // ----- OPERAÇÕES DE TABELAS (MUTANTES DE ESTADO COM PERSISTÊNCIA) -----
 
   // 1. Cadastro Solicitado por jogador (status 'pendente_aprovacao')
-  const handleRegistrarJogador = async (novo: Omit<Jogador, 'id' | 'status' | 'role' | 'createdAt'>) => {
+  const handleRegistrarJogador = async (novo: Omit<Jogador, 'id' | 'status' | 'role' | 'createdAt'>): Promise<boolean | string> => {
     const isPrimeiro = jogadores.length === 0;
 
     const novoId = crypto.randomUUID();
@@ -679,12 +679,18 @@ export default function App() {
     const atualizados = [...jogadores, novoJogador];
     setJogadores(atualizados);
 
-    const supId = await salvarJogadorNoSupabase(novoJogador);
-    // Remover da view caso falhe
-    if (!supId) {
-       setJogadores(jogadores);
-       console.error("Cadastro falhou: nao foi salvo no supabase.");
-       alert("Erro ao cadastrar: As informações não puderam ser salvas no banco de dados. Por favor, verifique se as configurações do Supabase estão corretas e se as regras de segurança (RLS) permitem a inserção de dados.");
+    try {
+      const supId = await salvarJogadorNoSupabase(novoJogador);
+      if (!supId) {
+         setJogadores(jogadores);
+         console.error("Cadastro falhou: nao foi salvo no supabase.");
+         return false;
+      }
+      return true;
+    } catch (e: any) {
+      setJogadores(jogadores);
+      console.error("Erro no cadastro supabase:", e);
+      return e?.message || JSON.stringify(e) || "Erro ao salvar no banco de dados.";
     }
   };
 
@@ -710,18 +716,24 @@ export default function App() {
     const jogador = jogadores.find(j => j.id === id);
 
     if (modificado && jogador) {
-      const supId = await salvarJogadorNoSupabase(modificado);
-      if (!supId) {
-         setJogadores(jogadores);
-         console.error("Erro ao aprovar jogador no supabase");
-      } else {
-         if (whatsappAutomacaoAtiva) {
-           handleRegistrarLogAutomacao(
-             `${jogador.nome} ${jogador.sobrenome}`,
-             'Aprovação de Cadastro',
-             `✅ O administrador aprovou o cadastro e acesso de ${jogador.nome} ${jogador.sobrenome} à plataforma!`
-           );
-         }
+      try {
+        const supId = await salvarJogadorNoSupabase(modificado);
+        if (!supId) {
+           setJogadores(jogadores);
+           console.error("Erro ao aprovar jogador no supabase");
+        } else {
+           if (whatsappAutomacaoAtiva) {
+             handleRegistrarLogAutomacao(
+               `${jogador.nome} ${jogador.sobrenome}`,
+               'Aprovação de Cadastro',
+               `✅ O administrador aprovou o cadastro e acesso de ${jogador.nome} ${jogador.sobrenome} à plataforma!`
+             );
+           }
+        }
+      } catch (err: any) {
+        console.error('Erro na aprovação:', err);
+        setJogadores(jogadores); // rollback
+        alert('Erro ao atualizar: ' + (err?.message || 'Database error'));
       }
     } else if (!aprovar && jogador) {
       const supabase = getSupabase();
@@ -759,7 +771,14 @@ export default function App() {
     setJogadores(atualizados);
 
     if (modificado) {
-      await salvarJogadorNoSupabase(modificado);
+      try {
+        await salvarJogadorNoSupabase(modificado);
+      } catch (err: any) {
+        setJogadores(jogadores); // rollback
+        console.error('Erro na edição:', err);
+        alert('Erro ao atualizar informações: ' + (err?.message || 'Database erro'));
+        return;
+      }
     }
 
     // Atualizar sessão corrente caso tenha editado o próprio perfil

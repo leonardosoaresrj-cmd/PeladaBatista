@@ -104,8 +104,7 @@ export async function salvarJogadorNoSupabase(jogador: Jogador): Promise<string 
     }
   } catch (error: any) {
     console.error('Erro ao sincronizar jogador no Supabase:', JSON.stringify(error, null, 2));
-    alert('Erro detalhado do Supabase: ' + (error?.message || JSON.stringify(error)));
-    return null;
+    throw error;
   }
 }
 
