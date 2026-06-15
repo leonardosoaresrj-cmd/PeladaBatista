@@ -684,6 +684,7 @@ export default function App() {
     if (!supId) {
        setJogadores(jogadores);
        console.error("Cadastro falhou: nao foi salvo no supabase.");
+       alert("Erro ao cadastrar: As informações não puderam ser salvas no banco de dados. Por favor, verifique se as configurações do Supabase estão corretas e se as regras de segurança (RLS) permitem a inserção de dados.");
     }
   };
 
@@ -706,13 +707,23 @@ export default function App() {
     
     setJogadores(atualizados);
 
-    if (modificado) {
+    const jogador = jogadores.find(j => j.id === id);
+
+    if (modificado && jogador) {
       const supId = await salvarJogadorNoSupabase(modificado);
       if (!supId) {
          setJogadores(jogadores);
          console.error("Erro ao aprovar jogador no supabase");
+      } else {
+         if (whatsappAutomacaoAtiva) {
+           handleRegistrarLogAutomacao(
+             `${jogador.nome} ${jogador.sobrenome}`,
+             'Aprovação de Cadastro',
+             `✅ O administrador aprovou o cadastro e acesso de ${jogador.nome} ${jogador.sobrenome} à plataforma!`
+           );
+         }
       }
-    } else if (!aprovar) {
+    } else if (!aprovar && jogador) {
       const supabase = getSupabase();
       if (supabase) {
         await supabase.from('jogadores').delete().eq('id', id);

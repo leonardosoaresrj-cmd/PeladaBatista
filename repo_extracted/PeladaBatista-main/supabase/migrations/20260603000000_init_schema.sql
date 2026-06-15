@@ -5,28 +5,32 @@
 create extension if not exists "uuid-ossp";
 
 -- 2. Enumerados para tipos de posições e status
-DO $$ BEGIN
-    CREATE TYPE posicao_jogador AS ENUM ('Goleiro', 'Defesa', 'Meio', 'Ataque');
-EXCEPTION
-    WHEN duplicate_object THEN null;
+DO $$
+BEGIN
+    IF NOT EXISTS (SELECT 1 FROM pg_type WHERE typname = 'posicao_jogador') THEN
+        CREATE TYPE posicao_jogador AS ENUM ('Goleiro', 'Defesa', 'Meio', 'Ataque');
+    END IF;
 END $$;
 
-DO $$ BEGIN
-    CREATE TYPE status_jogador AS ENUM ('pendente_aprovacao', 'ativo', 'suspenso');
-EXCEPTION
-    WHEN duplicate_object THEN null;
+DO $$
+BEGIN
+    IF NOT EXISTS (SELECT 1 FROM pg_type WHERE typname = 'status_jogador') THEN
+        CREATE TYPE status_jogador AS ENUM ('pendente_aprovacao', 'ativo', 'suspenso');
+    END IF;
 END $$;
 
-DO $$ BEGIN
-    CREATE TYPE membro_status AS ENUM ('mensalista', 'diarista');
-EXCEPTION
-    WHEN duplicate_object THEN null;
+DO $$
+BEGIN
+    IF NOT EXISTS (SELECT 1 FROM pg_type WHERE typname = 'membro_status') THEN
+        CREATE TYPE membro_status AS ENUM ('mensalista', 'diarista', 'isento');
+    END IF;
 END $$;
 
-DO $$ BEGIN
-    CREATE TYPE role_usuario AS ENUM ('admin', 'jogador');
-EXCEPTION
-    WHEN duplicate_object THEN null;
+DO $$
+BEGIN
+    IF NOT EXISTS (SELECT 1 FROM pg_type WHERE typname = 'role_usuario') THEN
+        CREATE TYPE role_usuario AS ENUM ('admin', 'jogador');
+    END IF;
 END $$;
 
 -- 3. Tabela de Jogadores / Usuários
