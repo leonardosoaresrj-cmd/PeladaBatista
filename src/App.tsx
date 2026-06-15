@@ -1099,11 +1099,12 @@ export default function App() {
   };
 
   return (
-    <div className="min-h-screen bg-emerald-950 text-slate-50 flex flex-col font-sans selection:bg-emerald-600 selection:text-white relative">
+    <div className="min-h-screen max-w-full overflow-x-hidden bg-emerald-950 text-slate-50 flex flex-col font-sans selection:bg-emerald-600 selection:text-white relative">
       
       {/* Visual de linhas do campo de futebol em marca d'água de alta fidelidade */}
       <div className="absolute inset-0 bg-[radial-gradient(ellipse_at_top,_var(--tw-gradient-stops))] from-emerald-900/40 via-emerald-950 to-emerald-950 pointer-events-none" />
-      <div className="absolute top-0 left-1/2 -translate-x-1/2 w-[600px] h-[300px] border-b border-l border-r border-white/5 rounded-b-[150px] pointer-events-none" />
+      <div className="absolute top-0 left-1/2 -translate-x-1/2 w-full max-w-[600px] h-[300px] border-b border-l border-r border-white/5 rounded-b-[150px] pointer-events-none" />
+
       <div className="absolute top-1/2 left-1/2 -translate-x-1/2 -translate-y-1/2 w-48 h-48 border-2 border-white/5 rounded-full pointer-events-none" />
 
       {/* HEADER PRINCIPAL */}
@@ -1190,9 +1191,9 @@ export default function App() {
         
         {/* MENU NAVEGAÇÃO HORIZONTAL NO CELULAR / VERTICAL NO DESKTOP (Somente se autenticado) */}
         {jogadorAtual && (
-          <aside className="w-full md:w-64 shrink-0 p-2 md:p-4 rounded-2xl bg-emerald-900/25 border border-white/10 md:sticky md:top-24 gap-1.5 md:gap-2 flex flex-row md:flex-col overflow-x-auto md:overflow-visible shadow-xl backdrop-blur-md select-none whitespace-nowrap [&::-webkit-scrollbar]:hidden [-ms-overflow-style:none] [scrollbar-width:none]">
+          <aside className="w-full md:w-64 shrink-0 p-2 md:p-4 rounded-2xl bg-emerald-900/25 border border-white/10 md:sticky md:top-24 gap-1.5 md:gap-2 flex flex-row flex-wrap md:flex-col shadow-xl backdrop-blur-md select-none justify-center md:justify-start">
             
-            <div className="hidden md:block px-3.5 pb-2 border-b border-white/5 text-[10px] font-bold text-emerald-400 uppercase tracking-widest font-mono shrink-0">
+            <div className="hidden md:block px-3.5 pb-2 border-b border-white/5 text-[10px] font-bold text-emerald-400 uppercase tracking-widest font-mono shrink-0 w-full">
               Menu de Acesso
             </div>
 
