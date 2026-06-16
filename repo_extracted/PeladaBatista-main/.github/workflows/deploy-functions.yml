@@ -6,7 +6,7 @@ on:
       - main
     paths:
       - 'supabase/functions/**'
-  workflow_dispatch:  # permite rodar manualmente pelo painel do GitHub
+  workflow_dispatch:
 
 jobs:
   deploy:
@@ -20,10 +20,22 @@ jobs:
         with:
           version: latest
 
-      - name: Deploy recover-password (sem verificação de JWT)
-        run: |
-          supabase functions deploy recover-password \
-            --project-ref ${{ secrets.SUPABASE_PROJECT_REF }} \
-            --no-verify-jwt
+      - name: Deploy recover-password
+        run: supabase functions deploy recover-password --project-ref ${{ secrets.SUPABASE_PROJECT_REF }} --no-verify-jwt
+        env:
+          SUPABASE_ACCESS_TOKEN: ${{ secrets.SUPABASE_ACCESS_TOKEN }}
+
+      - name: Deploy pix-criar
+        run: supabase functions deploy pix-criar --project-ref ${{ secrets.SUPABASE_PROJECT_REF }} --no-verify-jwt
+        env:
+          SUPABASE_ACCESS_TOKEN: ${{ secrets.SUPABASE_ACCESS_TOKEN }}
+
+      - name: Deploy pix-status
+        run: supabase functions deploy pix-status --project-ref ${{ secrets.SUPABASE_PROJECT_REF }} --no-verify-jwt
+        env:
+          SUPABASE_ACCESS_TOKEN: ${{ secrets.SUPABASE_ACCESS_TOKEN }}
+
+      - name: Deploy pix-webhook
+        run: supabase functions deploy pix-webhook --project-ref ${{ secrets.SUPABASE_PROJECT_REF }} --no-verify-jwt
         env:
           SUPABASE_ACCESS_TOKEN: ${{ secrets.SUPABASE_ACCESS_TOKEN }}
