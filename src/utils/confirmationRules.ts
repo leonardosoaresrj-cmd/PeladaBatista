@@ -198,13 +198,13 @@ export function obterDebitosDoJogador(
       const [ano, mesNum] = mes.split('-').map(Number);
       
       // Contar sábados
-      const tempDate = new Date(ano, mesNum - 1, 1);
+      const tempDate = new Date(Date.UTC(ano, mesNum - 1, 1, 12, 0, 0));
       let count = 0;
-      while (tempDate.getMonth() === mesNum - 1) {
-        if (tempDate.getDay() === 6) {
+      while (tempDate.getUTCMonth() === mesNum - 1) {
+        if (tempDate.getUTCDay() === 6) {
           count++;
         }
-        tempDate.setDate(tempDate.getDate() + 1);
+        tempDate.setUTCDate(tempDate.getUTCDate() + 1);
       }
       const valorMensalidade = count === 5 ? valor5Sabados : valor4Sabados;
 
@@ -415,8 +415,20 @@ https://peladabatista.onrender.com`;
 /**
  * Retorna o status de membro efetivo do jogador (tratando mensalistas inadimplentes como diaristas)
  */
-export function obterStatusMembroEfetivo(jogador: Jogador): 'mensalista' | 'diarista' | 'isento' {
+export function obterStatusMembroEfetivo(jogador: Jogador, pagamentos: Pagamento[]): 'mensalista' | 'diarista' | 'isento' {
   if (jogador.posicao === 'Goleiro') return 'isento';
-  return jogador.membroStatus as 'mensalista' | 'diarista' | 'isento';
+  if (jogador.membroStatus !== 'mensalista') return jogador.membroStatus as 'diarista' | 'isento';
+
+  // Se o jogador é cadastrado como mensalista, ele precisa ter pagamentos com status 'pago' para os meses de cobrança ('2026-05' e '2026-06').
+  // Caso tenha algum débito de mensalidade com status diferente de 'pago' em algum destes meses, seu status efetivo passa a ser 'diarista'.
+  const mesesCobranca = ['2026-05', '2026-06'];
+  for (const mes of mesesCobranca) {
+    const pago = pagamentos.some(p => p.jogadorId === jogador.id && p.mesRef === mes && p.status === 'pago');
+    if (!pago) {
+      return 'diarista';
+    }
+  }
+
+  return 'mensalista';
 }
 

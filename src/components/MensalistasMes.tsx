@@ -114,8 +114,8 @@ export default function MensalistasMes({
     
     msg += `\n_Para realizar o pagamento através da nossa chave PIX, procure a tesouraria. Quem paga em dia garante prioridade no jogo!_`;
 
-    onRegistrarLogAutomacao('Administrador (Manual)', 'Mensalidade', msg);
-    alert('Mensagem enviada para o bot!');
+    // Automatic sending removed as per user request (only config area tests allowed)
+    alert('Automação removida conforme solicitação. Somente mensagens da área de configuração estão ativas no momento.');
   };
 
   return (
@@ -129,7 +129,7 @@ export default function MensalistasMes({
             Mensalistas Ativos da Temporada
           </h2>
           <p className="text-xs text-emerald-300/85 font-sans mt-0.5">
-            Membros oficiais e vitalícios que compõem o elenco da pelada Batista Sábado.
+            Membros oficiais e vitalícios que compõem o elenco da pelada Arena Record.
           </p>
         </div>
 

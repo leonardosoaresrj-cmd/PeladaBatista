@@ -37,13 +37,13 @@ interface ControlePagamentosProps {
 function contarSabadosNoMes(mes: string): number {
   if (!mes || !mes.includes('-')) return 4;
   const [ano, mesNum] = mes.split('-').map(Number);
-  const data = new Date(ano, mesNum - 1, 1);
+  const data = new Date(Date.UTC(ano, mesNum - 1, 1, 12, 0, 0));
   let count = 0;
-  while (data.getMonth() === mesNum - 1) {
-    if (data.getDay() === 6) { // 6 é sábado
+  while (data.getUTCMonth() === mesNum - 1) {
+    if (data.getUTCDay() === 6) { // 6 é sábado
       count++;
     }
-    data.setDate(data.getDate() + 1);
+    data.setUTCDate(data.getUTCDate() + 1);
   }
   return count;
 }
@@ -59,7 +59,8 @@ export default function ControlePagamentos({
   partidas,
 }: ControlePagamentosProps) {
   // Filtro de mês de referência para a cobrança atual
-  const [mesSelecionado, setMesSelecionado] = useState('2026-05');
+  const hojeDateStr = new Date().toISOString().substring(0, 7); // ex: '2026-06'
+  const [mesSelecionado, setMesSelecionado] = useState(hojeDateStr >= '2026-05' ? hojeDateStr : '2026-06');
 
   // Estado para confirmar cancelamento sem window.confirm
   const [cancelarConfirmId, setCancelarConfirmId] = useState<string | null>(null);
@@ -82,12 +83,12 @@ export default function ControlePagamentos({
     setIsCheckoutOpen(true);
   };
 
-  const handleConfirmarPagamentoTotal = (
+  const handleConfirmarPagamentoTotal = async (
     debitList: Array<{ mesRef: string; valor: number; partidaId?: string }>
   ) => {
     const hojeStr = new Date().toISOString().split('T')[0];
-    debitList.forEach((deb) => {
-      onRegistrarPagamento(
+    for (const deb of debitList) {
+      await onRegistrarPagamento(
         jogadorAtual.id,
         deb.mesRef,
         'pago', // Altera status para quitado imediatamente!
@@ -95,7 +96,8 @@ export default function ControlePagamentos({
         deb.valor,
         deb.partidaId
       );
-    });
+    }
+    setIsCheckoutOpen(false);
   };
   
   // Cálculos de sábados e tarifas correspondentes
@@ -179,7 +181,7 @@ export default function ControlePagamentos({
                 🛡️ Posição Isenta de Taxas (Goleiro Oficial)
               </h4>
               <p className="text-[11px] text-teal-300 mt-1 font-sans leading-relaxed">
-                No Pelada Batista Sábado, os <b>Goleiros são 100% gratuitos</b> e isentos de mensalidade ou diária. Obrigado por fechar o gol e garantir ótimas defesas a cada treino!
+                No Arena Record, os <b>Goleiros são 100% gratuitos</b> e isentos de mensalidade ou diária. Obrigado por fechar o gol e garantir ótimas defesas a cada treino!
               </p>
             </div>
           </div>
@@ -312,7 +314,7 @@ export default function ControlePagamentos({
               ) : debitosPessoais.length === 0 ? (
                 <div className="text-center w-full max-w-md space-y-1.5 pt-1">
                   <p className="text-xs text-teal-200 leading-relaxed font-sans bg-teal-500/10 border border-teal-500/20 p-3 rounded-xl font-bold">
-                    🎉 Excelente! Você está 100% em dia com a pelada Batista Sábado. Não há nenhum débito pendente em aberto ou em análise. Obrigado pela colaboração!
+                    🎉 Excelente! Você está 100% em dia com a pelada Arena Record. Não há nenhum débito pendente em aberto ou em análise. Obrigado pela colaboração!
                   </p>
                 </div>
               ) : hasPendenteConfirmacaoOnly ? (
@@ -323,7 +325,7 @@ export default function ControlePagamentos({
                   
                   <a
                     href={`https://api.whatsapp.com/send?text=${encodeURIComponent(
-                      `Olá! Sou o atleta ${jogadorAtual.nome} ${jogadorAtual.sobrenome} e acabei de informar o pagamento total de meus débitos no app Pelada Batista Sábado no valor de R$ ${totalConsolidado.toFixed(2)}.`
+                      `Olá! Sou o atleta ${jogadorAtual.nome} ${jogadorAtual.sobrenome} e acabei de informar o pagamento total de meus débitos no app Arena Record no valor de R$ ${totalConsolidado.toFixed(2)}.`
                     )}`}
                     target="_blank"
                     rel="noreferrer"
@@ -477,34 +479,76 @@ export default function ControlePagamentos({
 
           <div className="bg-black/25 rounded-2xl overflow-hidden border border-white/5 divide-y divide-white/5 font-sans">
             {competencasDisponiveis.map((comp) => {
-              const debitosDoMes = debitosPessoais.filter(d => d.mesRef === comp.value);
-              const pendentes = debitosDoMes.filter(d => d.status === 'pendente');
-              const aguardando = debitosDoMes.filter(d => d.status === 'pendente_confirmacao');
-              const pagos = pagamentos.filter(p => p.jogadorId === jogadorAtual.id && p.mesRef === comp.value && p.status === 'pago');
-
               const isGoleiro = jogadorAtual.posicao === 'Goleiro';
-              let statusMes = 'QUITADO';
-              if (isGoleiro) {
-                statusMes = 'ISENTO';
-              } else if (pendentes.length > 0) {
-                statusMes = 'PENDENTE';
-              } else if (aguardando.length > 0) {
-                statusMes = 'AGUARDANDO VALID';
+              const isDiarista = jogadorAtual.membroStatus === 'diarista';
+              
+              if (isDiarista) {
+                const pagamentosMes = pagamentos.filter(p => p.jogadorId === jogadorAtual.id && p.mesRef === comp.value && p.status !== 'cancelado' && p.partidaId);
+                const valorTotalNoMes = pagamentosMes.reduce((sum, p) => sum + p.valor, 0);
+                const isAllPaid = pagamentosMes.length > 0 && pagamentosMes.every(p => p.status === 'pago');
+                const hasPendingValidation = pagamentosMes.some(p => p.status === 'pendente_confirmacao');
+                const pStatus = isGoleiro ? 'isento' : pagamentosMes.length === 0 ? 'nenhum' : hasPendingValidation ? 'aguardando' : isAllPaid ? 'pago' : 'pendente';
+
+                return (
+                  <div key={`diarista-${comp.value}`} className="flex flex-col p-3.5 bg-emerald-955/10 hover:bg-emerald-955/20 transition-all gap-3 text-xs w-full">
+                    <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-3 w-full">
+                      <div className="flex items-center gap-2.5">
+                        <div className="w-2 h-2 rounded-full bg-teal-400 shrink-0" />
+                        <div>
+                          <p className="font-bold text-white text-xs">{comp.label}</p>
+                          <p className="text-[10px] text-emerald-300 font-mono mt-0.5">
+                            Faturamento de: Diarista Avulso (Consolidado)
+                          </p>
+                        </div>
+                      </div>
+
+                      <div className="flex items-center justify-between sm:justify-end gap-3.5">
+                        <span className="font-mono text-white font-bold">
+                          R$ {valorTotalNoMes.toFixed(2)}
+                        </span>
+
+                        <span className={`px-2.5 py-0.5 rounded text-[9px] font-black font-mono uppercase tracking-wider ${
+                          pStatus === 'isento' 
+                            ? 'bg-teal-555/40 border border-teal-500/30 text-teal-400' 
+                            : pStatus === 'nenhum'
+                              ? 'bg-slate-800/60 border border-slate-700/30 text-slate-400'
+                              : pStatus === 'aguardando'
+                                ? 'bg-amber-955/70 border border-amber-500/20 text-amber-500'
+                                : pStatus === 'pago' 
+                                  ? 'bg-teal-900/60 border border-teal-500/30 text-teal-400' 
+                                  : 'bg-rose-955/60 border border-rose-500/30 text-rose-455'
+                        }`}>
+                          {pStatus === 'isento' ? 'ISENTO' : pStatus === 'nenhum' ? 'SEM JOGOS' : pStatus === 'aguardando' ? 'AGUARDANDO VALID' : pStatus === 'pago' ? 'QUITADO' : 'PENDENTE'}
+                        </span>
+                      </div>
+                    </div>
+
+                    {/* Detalhamento das partidas pagas no mes pelo diarista */}
+                    {pagamentosMes.length > 0 && (
+                      <div className="mt-2 pl-4 border-l-2 border-emerald-500/20 space-y-1.5">
+                        <p className="text-[9.5px] font-bold text-emerald-400 mb-1">Relação de Diárias no Mês:</p>
+                        {pagamentosMes.map(p => {
+                          const prt = partidas.find(pt => pt.id === p.partidaId);
+                          return (
+                            <div key={p.id} className="flex justify-between items-center text-[10px] tracking-wide text-emerald-200">
+                              <span>• {prt ? prt.titulo : 'Jogo Avulso'} ({p.status === 'pago' ? 'PG' : 'PENDENTE'})</span>
+                              <span className="font-mono font-bold">R$ {p.valor.toFixed(2)}</span>
+                            </div>
+                          );
+                        })}
+                      </div>
+                    )}
+                  </div>
+                );
               }
 
-              let valorExibido = 0;
-              if (statusMes === 'PENDENTE') {
-                valorExibido = pendentes.reduce((sum, d) => sum + d.valor, 0);
-              } else if (statusMes === 'AGUARDANDO VALID') {
-                valorExibido = aguardando.reduce((sum, d) => sum + d.valor, 0);
-              } else {
-                valorExibido = pagos.reduce((sum, p) => sum + p.valor, 0);
-              }
+              // Lógica original para MENSALISTAS
+              const checkPg = obterPagamentoDoJogador(comp.value);
+              
+              // Se o pagamento foi cancelado, ocultamos do histórico (deletado do histórico)
+              if ((checkPg?.status as any) === 'cancelado') return null;
 
-              // Mostrar data do pagamento se houver pago
-              const ultimaDataPg = pagos.length > 0 && pagos[pagos.length - 1].dataPagamento
-                ? pagos[pagos.length - 1].dataPagamento
-                : null;
+              const isCompPaid = isGoleiro || checkPg?.status === 'pago';
 
               return (
                 <div 
@@ -516,31 +560,41 @@ export default function ControlePagamentos({
                     <div>
                       <p className="font-bold text-white text-xs">{comp.label}</p>
                       <p className="text-[10px] text-emerald-300 font-mono mt-0.5">
-                        Faturamento de: {isGoleiro ? 'Isenção de Goleiro' : (jogadorAtual.membroStatus === 'mensalista' ? 'Mensalista Fixo' : 'Diarista Avulso')}
+                        Faturamento de: {isGoleiro ? 'Isenção de Goleiro' : 'Mensalista Fixo'}
                       </p>
                     </div>
                   </div>
 
                   <div className="flex items-center justify-between sm:justify-end gap-3.5">
                     <span className="font-mono text-white font-bold">
-                      R$ {isGoleiro ? '0,00' : valorExibido.toFixed(2)}
+                      R$ {isGoleiro ? '0,00' : (checkPg ? checkPg.valor : valorCobradoMes).toFixed(2)}
                     </span>
 
                     <span className={`px-2.5 py-0.5 rounded text-[9px] font-black font-mono uppercase tracking-wider ${
                       isGoleiro 
                         ? 'bg-teal-555/40 border border-teal-500/30 text-teal-400' 
-                        : statusMes === 'AGUARDANDO VALID'
+                        : (checkPg?.status as any) === 'pendente_confirmacao'
                           ? 'bg-amber-955/70 border border-amber-500/20 text-amber-500'
-                          : statusMes === 'QUITADO' 
+                          : (checkPg?.status as any) === 'cancelado'
+                            ? 'bg-slate-800/60 border border-slate-700/30 text-slate-400 line-through'
+                            : isCompPaid 
                               ? 'bg-teal-900/60 border border-teal-500/30 text-teal-400' 
                               : 'bg-rose-955/60 border border-rose-500/30 text-rose-455'
                     }`}>
-                      {statusMes}
+                      {isGoleiro 
+                        ? 'ISENTO' 
+                        : (checkPg?.status as any) === 'pendente_confirmacao' 
+                          ? 'AGUARDANDO VALID' 
+                          : (checkPg?.status as any) === 'cancelado'
+                            ? 'CANCELADO'
+                            : isCompPaid 
+                              ? 'QUITADO' 
+                              : 'PENDENTE'}
                     </span>
 
-                    {ultimaDataPg && (
+                    {checkPg?.dataPagamento && (
                       <span className="text-[10px] font-mono text-emerald-400/80">
-                        PG: {ultimaDataPg.split('-').reverse().join('/')}
+                        PG: {checkPg.dataPagamento.split('-').reverse().join('/')}
                       </span>
                     )}
                   </div>

@@ -8,6 +8,7 @@ import { Partida, Jogador, Pagamento, MembroStatus, PosicaoJogador } from '../ty
 import { AVATAR_PRESETS } from '../data';
 import { Calendar as CalendarIcon, MapPin, Clock, Users, Check, X, ShieldAlert, Award, ChevronLeft, ChevronRight, Share2, AlertTriangle, Send, Copy, Edit2, Trash2, Shield } from 'lucide-react';
 import { getJanelaConfirmacao, gerarLinkCompartilhamento, obterTextoAlertaSemanal, obterDebitosDoJogador, obterTextoListaCompletaPartida } from '../utils/confirmationRules';
+import CheckoutPixModal from './CheckoutPixModal';
 
 interface ConfirmacaoPresencaProps {
   partidas: Partida[];
@@ -23,6 +24,7 @@ interface ConfirmacaoPresencaProps {
   whatsappGrupoLink?: string;
   onRegistrarLogAutomacao?: (atletaNome: string, partidaTitulo: string, msg: string) => void;
   onCancelarPartida?: (partidaId: string, cancelar: boolean) => void;
+  onRegistrarPagamento?: (jogadorId: string, mesRef: string, status: 'pago' | 'pendente' | 'pendente_confirmacao' | 'cancelado', dataPagamento: string | null, valor: number, partidaId?: string) => Promise<void>;
 }
 
 export default function ConfirmacaoPresenca({
@@ -39,6 +41,7 @@ export default function ConfirmacaoPresenca({
   whatsappGrupoLink = '',
   onRegistrarLogAutomacao,
   onCancelarPartida,
+  onRegistrarPagamento,
 }: ConfirmacaoPresencaProps) {
   const [showShareModal, setShowShareModal] = useState(false);
   const [shareText, setShareText] = useState('');
@@ -53,6 +56,10 @@ export default function ConfirmacaoPresenca({
   const [showInadimplenteModal, setShowInadimplenteModal] = useState(false);
   const [debitosPendentes, setDebitosPendentes] = useState<any[]>([]);
   const [dadosConfirmacaoPendente, setDadosConfirmacaoPendente] = useState<{ id: string; confirmado: boolean } | null>(null);
+
+  // Estados para Modal Checkout PIX Diarista
+  const [showPixCheckoutDiarista, setShowPixCheckoutDiarista] = useState(false);
+  const [debitosParaPagarDiarista, setDebitosParaPagarDiarista] = useState<any[]>([]);
 
   // Estados para Fora do Período de Confirmação
   const [showForaPeriodoModal, setShowForaPeriodoModal] = useState(false);
@@ -178,12 +185,9 @@ export default function ConfirmacaoPresenca({
   const dispararListaWhatsAppAdmin = () => {
     if (!partidaSelecionada) return;
     const msg = obterTextoListaCompletaPartida(partidaSelecionada, jogadores, window.location.origin);
-    if (onRegistrarLogAutomacao) {
-      onRegistrarLogAutomacao('Administrador (Manual)', partidaSelecionada.titulo, msg);
-      setAutoToastMsg(`🤖 [BOT DO WHATSAPP]: Convocação/Lista Oficial enviada com sucesso!`);
-      setShowAutoToast(true);
-      setTimeout(() => setShowAutoToast(false), 5000);
-    }
+    // Automatic WhatsApp API calling removed as per user request (only config area tests allowed)
+    setShareText(msg);
+    setShowShareModal(true);
   };
 
   const executarConfirmacaoPresenca = (id: string, confirmado: boolean) => {
@@ -202,21 +206,7 @@ export default function ConfirmacaoPresenca({
 
       const msgAtualizada = obterTextoListaCompletaPartida(partidaAtualizada, jogadores, window.location.origin);
 
-      if (whatsappAutomacaoAtiva) {
-        // Envio automático via Bot do Racha de Futebol
-        // O Supabase Webhook vai interceptar a tabela "presencas" e cuidar de enviar WhatsApp automaticamente.
-        
-        // Ativar animação/aviso do robô
-        setAutoToastMsg(`🤖 [BOT DO WHATSAPP]: Confirmação registrada e lista atualizada enviada ao grupo!`);
-        setShowAutoToast(true);
-        setTimeout(() => {
-          setShowAutoToast(false);
-        }, 5000);
-      } else {
-        // Modo manual antigo de retransmissão: agora envia a lista completa
-        setShareText(msgAtualizada);
-        setShowShareModal(true);
-      }
+      // Removed WhatsApp toast for individual confirmation as per user request
     }
   };
 
@@ -260,6 +250,22 @@ export default function ConfirmacaoPresenca({
         setDebitosPendentes(debits);
         setDadosConfirmacaoPendente({ id, confirmado });
         setShowInadimplenteModal(true);
+        return;
+      } else if (jogadorAtual.role !== 'admin' && jogadorAtual.membroStatus === 'diarista' && id === jogadorAtual.id && partidaSelecionada) {
+        // Diarista sem débitos anteriores: deve pagar a diária atual no ato
+        const novaDiaria = {
+          id: `diaria-[temp]-${partidaSelecionada.id}`,
+          tipo: 'diaria',
+          referencia: `Diária do jogo: ${partidaSelecionada.titulo}`,
+          dataOrigem: partidaSelecionada.data,
+          mesRef: partidaSelecionada.data.substring(0, 7),
+          valor: vDiaria,
+          status: 'pendente',
+          partidaId: partidaSelecionada.id
+        };
+        setDebitosParaPagarDiarista([novaDiaria]);
+        setDadosConfirmacaoPendente({ id, confirmado });
+        setShowPixCheckoutDiarista(true);
         return;
       }
     }
@@ -1603,20 +1609,22 @@ export default function ConfirmacaoPresenca({
             </div>
 
             <div className="flex flex-col gap-2 pt-2">
-              <button
-                type="button"
-                id="btn-confirmar-inadimplente-prosseguir"
-                onClick={() => {
-                  setShowInadimplenteModal(false);
-                  if (dadosConfirmacaoPendente) {
-                    executarConfirmacaoPresenca(dadosConfirmacaoPendente.id, dadosConfirmacaoPendente.confirmado);
-                    setDadosConfirmacaoPendente(null);
-                  }
-                }}
-                className="w-full py-2.5 bg-rose-500 hover:bg-rose-400 text-black font-black text-xs rounded-xl transition-all shadow-md active:scale-97 text-center cursor-pointer uppercase"
-              >
-                Confirmar Presença e Regularizar depois
-              </button>
+              {jogadorAtual.membroStatus !== 'diarista' && (
+                <button
+                  type="button"
+                  id="btn-confirmar-inadimplente-prosseguir"
+                  onClick={() => {
+                    setShowInadimplenteModal(false);
+                    if (dadosConfirmacaoPendente) {
+                      executarConfirmacaoPresenca(dadosConfirmacaoPendente.id, dadosConfirmacaoPendente.confirmado);
+                      setDadosConfirmacaoPendente(null);
+                    }
+                  }}
+                  className="w-full py-2.5 bg-rose-500 hover:bg-rose-400 text-black font-black text-xs rounded-xl transition-all shadow-md active:scale-97 text-center cursor-pointer uppercase"
+                >
+                  Confirmar Presença e Regularizar depois
+                </button>
+              )}
               <button
                 type="button"
                 id="btn-confirmar-inadimplente-fechar"
@@ -1722,6 +1730,33 @@ export default function ConfirmacaoPresenca({
             </div>
           </div>
         </div>
+      )}
+
+      {showPixCheckoutDiarista && debitosParaPagarDiarista.length > 0 && (
+        <CheckoutPixModal
+          isOpen={showPixCheckoutDiarista}
+          onClose={() => {
+            setShowPixCheckoutDiarista(false);
+            setDadosConfirmacaoPendente(null);
+            setDebitosParaPagarDiarista([]);
+          }}
+          jogadorAtual={jogadorAtual}
+          valorTotal={debitosParaPagarDiarista.reduce((sum, d) => sum + d.valor, 0)}
+          debitos={debitosParaPagarDiarista}
+          onConfirmarPagamentoTotal={async (debitList) => {
+            if (onRegistrarPagamento) {
+              for (const dt of debitList) {
+                await onRegistrarPagamento(jogadorAtual.id, dt.mesRef, 'pago', new Date().toISOString().split('T')[0], dt.valor, dt.partidaId);
+              }
+            }
+            if (dadosConfirmacaoPendente) {
+              executarConfirmacaoPresenca(dadosConfirmacaoPendente.id, dadosConfirmacaoPendente.confirmado);
+            }
+            setShowPixCheckoutDiarista(false);
+            setDadosConfirmacaoPendente(null);
+            setDebitosParaPagarDiarista([]);
+          }}
+        />
       )}
 
     </div>

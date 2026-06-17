@@ -6,8 +6,9 @@
 import React, { useState } from 'react';
 import { Partida, Jogador, Pagamento } from '../types';
 import { AVATAR_PRESETS } from '../data';
-import { Calendar as CalendarIcon, MapPin, Clock, Users, ArrowUpRight, ChevronLeft, ChevronRight, CheckCircle2, AlertCircle, PlusCircle, Trash2, Check, X, AlertTriangle } from 'lucide-react';
-import { getJanelaConfirmacao } from '../utils/confirmationRules';
+import { Calendar as CalendarIcon, MapPin, Clock, Users, ArrowUpRight, ChevronLeft, ChevronRight, CheckCircle2, AlertCircle, PlusCircle, Trash2, Check, X, AlertTriangle, ShieldAlert } from 'lucide-react';
+import { getJanelaConfirmacao, obterDebitosDoJogador } from '../utils/confirmationRules';
+import CheckoutPixModal from './CheckoutPixModal';
 
 interface CalendarioJogosProps {
   partidas: Partida[];
@@ -20,6 +21,7 @@ interface CalendarioJogosProps {
   onCriarPartida?: (novaPartida: Omit<Partida, 'id' | 'confirmados' | 'recusados' | 'createdAt'>) => void;
   onDeletarPartida?: (partidaId: string) => void;
   onActualizarPresenca?: (partidaId: string, jogadorId: string, confirmado: boolean | null) => void;
+  onRegistrarPagamento?: (jogadorId: string, mesRef: string, status: 'pago' | 'pendente' | 'pendente_confirmacao' | 'cancelado', dataPagamento: string | null, valor: number, partidaId?: string) => Promise<void>;
 }
 
 export default function CalendarioJogos({
@@ -33,6 +35,7 @@ export default function CalendarioJogos({
   onCriarPartida,
   onDeletarPartida,
   onActualizarPresenca,
+  onRegistrarPagamento,
 }: CalendarioJogosProps) {
   // Estado para armazenar o ID do jogo agendado atualmente exibido em pop-up detalhado
   const [partidaDetalhadaPopupId, setPartidaDetalhadaPopupId] = useState<string | null>(null);
@@ -41,6 +44,15 @@ export default function CalendarioJogos({
   // Estado para modal/pop-up de fora do período de confirmação
   const [showForaPeriodoModal, setShowForaPeriodoModal] = useState(false);
   const [foraPeriodoInfo, setForaPeriodoInfo] = useState<{ inicio: string; fim: string; jogoTitulo: string; jogoData: string } | null>(null);
+
+  // Estados para Modal Checkout PIX Diarista
+  const [showPixCheckoutDiarista, setShowPixCheckoutDiarista] = useState(false);
+  const [debitosParaPagarDiarista, setDebitosParaPagarDiarista] = useState<any[]>([]);
+  const [dadosConfirmacaoPendente, setDadosConfirmacaoPendente] = useState<{ partidaId: string; jogadorId: string; confirmado: boolean } | null>(null);
+
+  // Estados para Modal de Inadimplência
+  const [showInadimplenteModal, setShowInadimplenteModal] = useState(false);
+  const [debitosPendentes, setDebitosPendentes] = useState<any[]>([]);
 
   // Estado do calendário de visualização: Inicia no mês atual de forma dinâmica
   const [currentYear, setCurrentYear] = useState(() => new Date().getFullYear());
@@ -60,7 +72,7 @@ export default function CalendarioJogos({
   });
   const [newGameHoraInicio, setNewGameHoraInicio] = useState('08:05'); // padrão: 08:00
   const [newGameHoraFim, setNewGameHoraFim] = useState('10:05'); // padrão: 10:00
-  const [newGameLocal, setNewGameLocal] = useState('Campo do Batista');
+  const [newGameLocal, setNewGameLocal] = useState('Arena Record - Quadra Principal');
   const [schedulerError, setSchedulerError] = useState('');
   const [schedulerSuccess, setSchedulerSuccess] = useState(false);
 
@@ -273,7 +285,7 @@ export default function CalendarioJogos({
                       // CASO SEJA CLICADO EM UMA DATA SEM JOGO AGENDADO E SEJA ADMIN, ABRIR O POP UP DE CADASTRO DE NOVO JOGO
                       setSelectedDateForNewGame(dataString);
                       setNewGameTitulo('Pelada Batista Sábado');
-                      setNewGameLocal('Campo do Batista');
+                      setNewGameLocal('Arena Record - Quadra Principal');
                       setNewGameHoraInicio('08:05');
                       setNewGameHoraFim('10:05');
                       setSchedulerError('');
@@ -624,6 +636,49 @@ export default function CalendarioJogos({
                           setShowForaPeriodoModal(true);
                           return;
                         }
+
+                        if (jogadorAtual.role !== 'admin' && !isConfirmado) {
+                          const vDiaria = parseFloat(localStorage.getItem('racha_valor_diaria') || '20');
+                          const v4 = parseFloat(localStorage.getItem('racha_valor_mensalidade_4') || '80');
+                          const v5 = parseFloat(localStorage.getItem('racha_valor_mensalidade_5') || '100');
+
+                          const debits = obterDebitosDoJogador(
+                            jogadorAtual.id,
+                            jogadorAtual.membroStatus,
+                            jogadorAtual.posicao,
+                            partidas,
+                            pagamentos,
+                            vDiaria,
+                            v4,
+                            v5
+                          );
+
+                          if (debits.length > 0) {
+                            setDebitosPendentes(debits);
+                            setDadosConfirmacaoPendente({ partidaId: activePartidaPopup.id, jogadorId: jogadorAtual.id, confirmado: true });
+                            setShowInadimplenteModal(true);
+                            return;
+                          }
+                        }
+
+                        if (jogadorAtual.role !== 'admin' && jogadorAtual.membroStatus === 'diarista' && !isConfirmado) {
+                          const vDiaria = parseFloat(localStorage.getItem('racha_valor_diaria') || '20');
+                          const novaDiaria = {
+                            id: `diaria-[temp]-${activePartidaPopup.id}`,
+                            tipo: 'diaria',
+                            referencia: `Diária do jogo: ${activePartidaPopup.titulo}`,
+                            dataOrigem: activePartidaPopup.data,
+                            mesRef: activePartidaPopup.data.substring(0, 7),
+                            valor: vDiaria,
+                            status: 'pendente',
+                            partidaId: activePartidaPopup.id
+                          };
+                          setDebitosParaPagarDiarista([novaDiaria]);
+                          setDadosConfirmacaoPendente({ partidaId: activePartidaPopup.id, jogadorId: jogadorAtual.id, confirmado: true });
+                          setShowPixCheckoutDiarista(true);
+                          return;
+                        }
+
                         if (onActualizarPresenca) {
                           onActualizarPresenca(activePartidaPopup.id, jogadorAtual.id, true);
                         }
@@ -869,7 +924,7 @@ export default function CalendarioJogos({
                   <input
                     type="text"
                     required
-                    placeholder="Ex: Campo do Batista"
+                    placeholder="Ex: Arena Record - Quadra Principal"
                     value={newGameLocal}
                     onChange={(e) => setNewGameLocal(e.target.value)}
                     className="w-full bg-emerald-900 border border-white/10 text-white placeholder-emerald-600 rounded-lg p-2.5 text-xs focus:outline-none focus:border-emerald-500"
@@ -946,6 +1001,112 @@ export default function CalendarioJogos({
                 className="w-full py-2.5 bg-amber-500 hover:bg-amber-400 text-amber-950 font-black text-xs rounded-xl transition-all shadow-md active:scale-97 text-center cursor-pointer uppercase font-sans"
               >
                 Entendido
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {showPixCheckoutDiarista && debitosParaPagarDiarista.length > 0 && (
+        <CheckoutPixModal
+          isOpen={showPixCheckoutDiarista}
+          onClose={() => {
+            setShowPixCheckoutDiarista(false);
+            setDadosConfirmacaoPendente(null);
+            setDebitosParaPagarDiarista([]);
+          }}
+          jogadorAtual={jogadorAtual}
+          valorTotal={debitosParaPagarDiarista.reduce((sum, d) => sum + d.valor, 0)}
+          debitos={debitosParaPagarDiarista}
+          onConfirmarPagamentoTotal={async (debitList) => {
+            if (onRegistrarPagamento) {
+              for (const dt of debitList) {
+                await onRegistrarPagamento(jogadorAtual.id, dt.mesRef, 'pago', new Date().toISOString().split('T')[0], dt.valor, dt.partidaId);
+              }
+            }
+            if (dadosConfirmacaoPendente && onActualizarPresenca) {
+              onActualizarPresenca(dadosConfirmacaoPendente.partidaId, dadosConfirmacaoPendente.jogadorId, dadosConfirmacaoPendente.confirmado);
+            }
+            setShowPixCheckoutDiarista(false);
+            setDadosConfirmacaoPendente(null);
+            setDebitosParaPagarDiarista([]);
+          }}
+        />
+      )}
+
+      {showInadimplenteModal && (
+        <div id="modal-alerta-inadimplencia" className="fixed inset-0 bg-black/85 backdrop-blur-sm flex items-center justify-center p-4 z-50 animate-fade-in overflow-y-auto">
+          <div className="bg-emerald-950 border border-rose-500/30 rounded-2xl w-full max-w-md p-6 shadow-2xl space-y-5 backdrop-blur-md">
+            <div className="flex items-center gap-3 border-b border-rose-500/20 pb-3">
+              <div className="w-10 h-10 rounded-full bg-rose-500/10 border border-rose-500/30 flex items-center justify-center text-rose-400">
+                <ShieldAlert className="w-6 h-6 animate-pulse" />
+              </div>
+              <div className="text-left">
+                <h3 className="font-display font-black text-sm text-rose-400 uppercase tracking-wider">
+                  ⚠️ Aviso de Inadimplência
+                </h3>
+                <p className="text-[10px] text-rose-350 font-mono mt-0.5">
+                  Regularização Pendente de Contribuição
+                </p>
+              </div>
+            </div>
+
+            <div className="space-y-3.5 text-left text-xs font-sans text-rose-100">
+              <p className="leading-relaxed text-[11.5px]">
+                Prezado(a) <strong className="text-white">{jogadorAtual.nome} {jogadorAtual.sobrenome}</strong>, detectamos débitos pendentes de quitação.
+              </p>
+
+              <div className="bg-black/40 border border-rose-500/15 p-3.5 rounded-xl space-y-2.5 max-h-48 overflow-y-auto font-mono text-[10.5px]">
+                <p className="font-bold text-rose-300 font-sans border-b border-white/5 pb-1 uppercase tracking-wider">Detalhamento dos Débitos:</p>
+                {debitosPendentes.map((deb, index) => (
+                  <div key={deb.id || index} className="flex justify-between items-start gap-2 border-b border-white/5 last:border-b-0 pb-1.5 last:pb-0">
+                    <div>
+                      <p className="text-white/90 font-bold">{deb.referencia}</p>
+                      <p className="text-[9px] text-rose-400 font-sans mt-0.5">Vencido desde/Referente: {deb.dataOrigem.split('-').reverse().join('/')}</p>
+                    </div>
+                    <span className="text-xs font-bold text-rose-400 shrink-0 font-mono">
+                      R$ {deb.valor.toFixed(2)}
+                    </span>
+                  </div>
+                ))}
+                <div className="flex justify-between items-center text-xs font-bold border-t border-rose-500/20 pt-2 text-rose-400 font-mono">
+                  <span>VALOR TOTAL DEVIDO:</span>
+                  <span>R$ {debitosPendentes.reduce((sum, d) => sum + d.valor, 0).toFixed(2)}</span>
+                </div>
+              </div>
+
+              <p className="text-[11px] text-rose-250/80 leading-relaxed italic bg-rose-500/5 p-3 rounded-xl border border-rose-500/10">
+                Por favor, solicitamos a regularização desses débitos no sistema para manter o compromisso com nossa pelada e com o aluguel da quadra. Os débitos encontram-se descritos no seu histórico de mensalidades/pagamentos.
+              </p>
+            </div>
+
+            <div className="flex flex-col gap-2 pt-2">
+              {jogadorAtual.membroStatus !== 'diarista' && (
+                <button
+                  type="button"
+                  id="btn-confirmar-inadimplente-prosseguir"
+                  onClick={() => {
+                    setShowInadimplenteModal(false);
+                    if (dadosConfirmacaoPendente && onActualizarPresenca) {
+                      onActualizarPresenca(dadosConfirmacaoPendente.partidaId, dadosConfirmacaoPendente.jogadorId, dadosConfirmacaoPendente.confirmado);
+                      setDadosConfirmacaoPendente(null);
+                    }
+                  }}
+                  className="w-full py-2.5 bg-rose-500 hover:bg-rose-400 text-black font-black text-xs rounded-xl transition-all shadow-md active:scale-97 text-center cursor-pointer uppercase"
+                >
+                  Confirmar Presença e Regularizar depois
+                </button>
+              )}
+              <button
+                type="button"
+                id="btn-confirmar-inadimplente-fechar"
+                onClick={() => {
+                  setShowInadimplenteModal(false);
+                  setDadosConfirmacaoPendente(null);
+                }}
+                className="w-full py-2.5 bg-white/5 hover:bg-white/10 text-white font-bold text-xs rounded-xl transition-all text-center cursor-pointer"
+              >
+                Voltar
               </button>
             </div>
           </div>

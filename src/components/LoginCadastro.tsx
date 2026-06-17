@@ -7,12 +7,11 @@ import React, { useState } from 'react';
 import { Jogador, PosicaoJogador, MembroStatus } from '../types';
 import { AVATAR_PRESETS } from '../data';
 import { KeyRound, Mail, User, Calendar, Shield, Users, Check, AlertCircle, ArrowLeft, Send, Loader2 } from 'lucide-react';
-import { obterCredenciaisSupabase, getSupabase } from '../supabaseClient';
 
 interface LoginCadastroProps {
   jogadores: Jogador[];
   onLoginSuccess: (jogador: Jogador) => void;
-  onRegistrar: (novo: Omit<Jogador, 'id' | 'status' | 'role' | 'createdAt'>) => Promise<boolean | void> | void;
+  onRegistrar: (novo: Omit<Jogador, 'id' | 'status' | 'role' | 'createdAt'>) => void;
 }
 
 export default function LoginCadastro({ jogadores, onLoginSuccess, onRegistrar }: LoginCadastroProps) {
@@ -38,11 +37,8 @@ export default function LoginCadastro({ jogadores, onLoginSuccess, onRegistrar }
   const [membroStatus, setMembroStatus] = useState<MembroStatus>('mensalista');
   const [email, setEmail] = useState('');
   const [pin, setPin] = useState('');
-  
-  // Custom modals instead of inline errors
   const [singupSuccess, setSingupSuccess] = useState(false);
   const [signupError, setSignupError] = useState('');
-  const [isRegistering, setIsRegistering] = useState(false);
 
   // Password Recovery State
   const [isRecoveryMode, setIsRecoveryMode] = useState(false);
@@ -72,14 +68,14 @@ export default function LoginCadastro({ jogadores, onLoginSuccess, onRegistrar }
 
     try {
       // Lê a anon key do localStorage (salva nas configurações do Supabase do portal)
-      const { url, key } = obterCredenciaisSupabase();
+      const supabaseAnonKey = localStorage.getItem('supabase_key_config') || '';
 
-      const response = await fetch(`${url}/functions/v1/recover-password`, {
+      const response = await fetch('https://gqasacnaubkhokqyrpwc.supabase.co/functions/v1/recover-password', {
         method: 'POST',
         headers: {
           'Content-Type': 'application/json',
-          'apikey': key,
-          'Authorization': `Bearer ${key}`,
+          'apikey': supabaseAnonKey,
+          'Authorization': `Bearer ${supabaseAnonKey}`,
         },
         body: JSON.stringify({
           email: found.email,
@@ -99,47 +95,12 @@ export default function LoginCadastro({ jogadores, onLoginSuccess, onRegistrar }
 
       if (response.ok) {
         setRecoverySuccess(true);
-        const sb = getSupabase();
-        if (sb) {
-          await sb.from('bot_logs').insert({
-            id: `log-${Date.now()}-${Math.random().toString(36).substr(2, 4)}`,
-            tabela: `${found.nome} ${found.sobrenome}`,
-            evento: 'RECOVERY',
-            mensagem: `✅ Disparo de senha para o e-mail: ${found.email.toLowerCase()}`,
-            enviado_em: new Date().toISOString()
-          });
-        }
       } else {
-        let errorMsg = data?.error || data?.details || 'Erro ao tentar enviar o e-mail pela API.';
-        if (errorMsg.includes('validation_error') && errorMsg.includes('testing emails')) {
-          errorMsg = 'Para enviar e-mails de recuperação para contas de terceiros é necessário confirmar o seu domínio no serviço de e-mail (Resend.com). Como está em ambiente de teste, o envio foi bloqueado pelo provedor.';
-        }
-        setRecoveryError(errorMsg);
-        const sb = getSupabase();
-        if (sb) {
-          await sb.from('bot_logs').insert({
-            id: `log-${Date.now()}-${Math.random().toString(36).substr(2, 4)}`,
-            tabela: `${found.nome} ${found.sobrenome}`,
-            evento: 'FALHA_RECOVERY',
-            mensagem: `⚠️ Falha ao recuperar senha via e-mail. Erro: ${errorMsg}`,
-            enviado_em: new Date().toISOString()
-          });
-        }
+        setRecoveryError(data?.error || data?.details || 'Erro ao tentar enviar o e-mail pela API.');
       }
     } catch (error: any) {
       console.error('Erro no envio de recuperação:', error);
-      const errMsg = `Falha na requisição: ${error.message || 'Erro de conexão.'}`;
-      setRecoveryError(errMsg);
-      const sb = getSupabase();
-      if (sb) {
-        await sb.from('bot_logs').insert({
-          id: `log-${Date.now()}-${Math.random().toString(36).substr(2, 4)}`,
-          tabela: `${found.nome} ${found.sobrenome}`,
-          evento: 'FALHA_RECOVERY',
-          mensagem: `⚠️ ${errMsg}`,
-          enviado_em: new Date().toISOString()
-        });
-      }
+      setRecoveryError(`Falha na requisição: ${error.message || 'Erro de conexão.'}`);
     } finally {
       setIsSending(false);
     }
@@ -191,7 +152,7 @@ export default function LoginCadastro({ jogadores, onLoginSuccess, onRegistrar }
     onLoginSuccess(found);
   };
 
-  const handleSignUpSubmit = async (e: React.FormEvent) => {
+  const handleSignUpSubmit = (e: React.FormEvent) => {
     e.preventDefault();
     setSignupError('');
     setSingupSuccess(false);
@@ -213,42 +174,26 @@ export default function LoginCadastro({ jogadores, onLoginSuccess, onRegistrar }
       return;
     }
 
-    setIsRegistering(true);
-    
-    try {
-      const res = await onRegistrar({
-        nome: nome.trim(),
-        sobrenome: sobrenome.trim(),
-        posicao,
-        dataNascimento,
-        foto,
-        membroStatus,
-        email: email.toLowerCase().trim(),
-        senha: pin,
-        isGold: false,
-      });
+    onRegistrar({
+      nome: nome.trim(),
+      sobrenome: sobrenome.trim(),
+      posicao,
+      dataNascimento,
+      foto,
+      membroStatus,
+      email: email.toLowerCase().trim(),
+      senha: pin,
+      isGold: false,
+    });
 
-      if (res === false) {
-        // App.tsx handles the supabase alert inside handleRegistrarJogador but we can also set the error here.
-        // If it returned false, we just stop. Wait, App.tsx might just return false.
-        setSignupError('Erro ao cadastrar. As informações não puderam ser salvas no banco de dados.');
-      } else if (typeof res === 'string') {
-          setSignupError(res);
-      } else {
-        setSingupSuccess(true);
-        // Reset form
-        setNome('');
-        setSobrenome('');
-        setDataNascimento('');
-        setEmail('');
-        setPin('');
-        setFoto('');
-      }
-    } catch (e) {
-      setSignupError('Ocorreu um erro ao processar seu cadastro.');
-    } finally {
-      setIsRegistering(false);
-    }
+    setSingupSuccess(true);
+    // Reset form
+    setNome('');
+    setSobrenome('');
+    setDataNascimento('');
+    setEmail('');
+    setPin('');
+    setFoto('');
   };
 
   return (
@@ -263,7 +208,7 @@ export default function LoginCadastro({ jogadores, onLoginSuccess, onRegistrar }
             <Users className="w-6 h-6" />
           </div>
           <h2 className="text-2xl font-display font-bold text-white tracking-wide">PELADA BATISTA SÁBADO</h2>
-          <p className="text-xs text-emerald-400 font-semibold tracking-widest uppercase mt-0.5">PORTAL DE GESTÃO DOS JOGOS</p>
+          <p className="text-xs text-emerald-400 font-semibold tracking-widest uppercase mt-0.5">Gestão de Partidas de Futebol e Finanças</p>
         </div>
 
         {/* Abas */}
@@ -311,10 +256,40 @@ export default function LoginCadastro({ jogadores, onLoginSuccess, onRegistrar }
                   <span className="text-sm font-semibold text-white tracking-wide">Recuperar Senha (PIN)</span>
                 </div>
 
-                <form onSubmit={handleRecoverySubmit} className="space-y-4">
-                  <p className="text-xs text-emerald-200/90 leading-relaxed font-sans mt-1">
-                    Insira o seu e-mail cadastrado abaixo. O sistema verificará seu cadastro no portal e reenviará o seu PIN de acesso de 4 dígitos.
-                  </p>
+                {recoveryError && (
+                  <div className="flex items-start gap-2 bg-rose-950/50 border border-rose-500/20 text-rose-200 text-xs px-3 py-2.5 rounded-lg animate-pulse">
+                    <AlertCircle className="w-4 h-4 text-rose-450 shrink-0 mt-0.5" />
+                    <span>{recoveryError}</span>
+                  </div>
+                )}
+
+                {recoverySuccess ? (
+                  <div className="bg-emerald-950/60 border border-teal-500/10 rounded-xl p-4 space-y-4 text-left">
+                    <div className="flex items-center gap-1.5 text-teal-400">
+                      <Check className="w-4 h-4" />
+                      <span className="text-xs font-bold uppercase tracking-wider">Disparo Realizado!</span>
+                    </div>
+                    <p className="text-xs text-emerald-200 leading-relaxed">
+                      O sistema localizou seu cadastro e enviou as credenciais para o e-mail: <strong className="text-white font-medium">{recoveryEmail.toLowerCase().trim()}</strong>.
+                    </p>
+
+                    <button
+                      type="button"
+                      onClick={() => {
+                        setIsRecoveryMode(false);
+                        setRecoverySuccess(false);
+                        setRecoveryError('');
+                      }}
+                      className="w-full bg-white hover:bg-emerald-100 text-black font-bold py-2.5 rounded-lg text-sm transition-all shadow-md cursor-pointer uppercase tracking-wider text-[11px] hover:scale-[1.01]"
+                    >
+                      Voltar para o Login
+                    </button>
+                  </div>
+                ) : (
+                  <form onSubmit={handleRecoverySubmit} className="space-y-4">
+                    <p className="text-xs text-emerald-200/90 leading-relaxed font-sans mt-1">
+                      Insira o seu e-mail cadastrado abaixo. O sistema verificará seu cadastro no portal e reenviará o seu PIN de acesso de 4 dígitos.
+                    </p>
 
                     <div>
                       <label className="block text-[10px] font-bold uppercase text-emerald-400 tracking-wider mb-1.5">Email Cadastrado</label>
@@ -358,6 +333,7 @@ export default function LoginCadastro({ jogadores, onLoginSuccess, onRegistrar }
                       Voltar ao Login
                     </button>
                   </form>
+                )}
               </div>
             ) : (
               /* FORMULÁRIO DE LOGIN */
@@ -430,6 +406,23 @@ export default function LoginCadastro({ jogadores, onLoginSuccess, onRegistrar }
           ) : (
             /* FORMULÁRIO DE CADASTRO */
             <form onSubmit={handleSignUpSubmit} className="space-y-4">
+              {signupError && (
+                <div className="flex items-start gap-2 bg-rose-950/50 border border-rose-500/20 text-rose-200 text-xs px-3 py-2.5 rounded-lg">
+                  <AlertCircle className="w-4 h-4 text-rose-450 shrink-0 mt-0.5" />
+                  <span>{signupError}</span>
+                </div>
+              )}
+
+              {singupSuccess && (
+                <div className="flex flex-col gap-2 bg-emerald-950/50 border border-white/10 text-emerald-200 text-xs px-3 py-3 rounded-lg">
+                  <div className="flex items-center gap-1.5 text-emerald-400 font-bold">
+                    <Check className="w-4 h-4" />
+                    <span>Cadastro Pré-Registrado!</span>
+                  </div>
+                  <p>Sua conta foi criada no portal com sucesso. Para segurança do campeonato, um **administrador do jogo** deve aprovar seu cadastro antes de habilitar seu login com este PIN.</p>
+                </div>
+              )}
+
               <div className="grid grid-cols-2 gap-3">
                 <div>
                   <label className="block text-[10px] font-bold uppercase text-emerald-400 tracking-wider mb-1">Nome</label>
@@ -620,130 +613,6 @@ export default function LoginCadastro({ jogadores, onLoginSuccess, onRegistrar }
           )}
         </div>
       </div>
-
-      {/* POPUP DE SUCESSO DE CADASTRO */}
-      {singupSuccess && (
-        <div 
-          className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/80 backdrop-blur-md animate-fade-in"
-        >
-          <div className="bg-emerald-900 border border-emerald-500/35 rounded-2xl max-w-sm w-full p-6 text-center shadow-2xl relative animate-scale-up">
-            <div className="w-16 h-16 bg-emerald-500/20 rounded-full flex items-center justify-center mx-auto mb-4 border border-emerald-400/30">
-              <Check className="w-8 h-8 text-emerald-400" />
-            </div>
-            
-            <h3 className="text-xl font-display font-bold text-white mb-2">
-              Cadastro Pré-Registrado!
-            </h3>
-            
-            <p className="text-sm text-emerald-200/90 leading-relaxed mb-6">
-              Sua conta foi criada no portal com sucesso. Para segurança do campeonato, um administrador deve aprovar seu cadastro antes de habilitar seu login com este PIN.
-            </p>
-            
-            <button
-              type="button"
-              onClick={() => {
-                setSingupSuccess(false);
-                setIsLogin(true); // Redirecionar para o login
-              }}
-              className="w-full bg-emerald-500 hover:bg-emerald-400 text-emerald-950 font-bold py-3 rounded-xl transition-all shadow-lg active:scale-95"
-            >
-              Voltar ao Login
-            </button>
-          </div>
-        </div>
-      )}
-
-      {/* POPUP DE ERRO DE CADASTRO */}
-      {signupError && (
-        <div 
-          className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/80 backdrop-blur-md animate-fade-in"
-        >
-          <div className="bg-rose-950/90 border border-rose-500/35 rounded-2xl max-w-sm w-full p-6 text-center shadow-2xl relative animate-scale-up">
-            <div className="w-16 h-16 bg-rose-500/20 rounded-full flex items-center justify-center mx-auto mb-4 border border-rose-400/30">
-              <AlertCircle className="w-8 h-8 text-rose-450" />
-            </div>
-            
-            <h3 className="text-xl font-display font-bold text-white mb-2">
-              Não foi possível cadastrar
-            </h3>
-            
-            <p className="text-sm text-rose-200/90 leading-relaxed mb-6">
-              {signupError}
-            </p>
-            
-            <button
-              type="button"
-              onClick={() => setSignupError('')}
-              className="w-full bg-rose-500 hover:bg-rose-400 text-rose-950 font-bold py-3 rounded-xl transition-all shadow-lg active:scale-95"
-            >
-              Corrigir e tentar novamente
-            </button>
-          </div>
-        </div>
-      )}
-
-      {/* POPUP DE SUCESSO DE RECUPERAÇÃO */}
-      {recoverySuccess && (
-        <div 
-          className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/80 backdrop-blur-md animate-fade-in"
-        >
-          <div className="bg-emerald-900 border border-teal-500/35 rounded-2xl max-w-sm w-full p-6 text-center shadow-2xl relative animate-scale-up">
-            <div className="w-16 h-16 bg-teal-500/20 rounded-full flex items-center justify-center mx-auto mb-4 border border-teal-400/30">
-              <Check className="w-8 h-8 text-teal-400" />
-            </div>
-            
-            <h3 className="text-xl font-display font-bold text-white mb-2">
-              Disparo Realizado!
-            </h3>
-            
-            <p className="text-sm text-emerald-200/90 leading-relaxed mb-6">
-              O sistema localizou seu cadastro e enviou as credenciais para o e-mail: <strong className="text-white font-medium">{recoveryEmail.toLowerCase().trim()}</strong>.
-            </p>
-            
-            <button
-              type="button"
-              onClick={() => {
-                setIsRecoveryMode(false);
-                setRecoverySuccess(false);
-                setRecoveryError('');
-              }}
-              className="w-full bg-teal-500 hover:bg-teal-400 text-teal-950 font-bold py-3 rounded-xl transition-all shadow-lg active:scale-95"
-            >
-              Voltar ao Login
-            </button>
-          </div>
-        </div>
-      )}
-
-      {/* POPUP DE ERRO DE RECUPERAÇÃO */}
-      {recoveryError && (
-        <div 
-          className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/80 backdrop-blur-md animate-fade-in"
-        >
-          <div className="bg-rose-950/90 border border-rose-500/35 rounded-2xl max-w-sm w-full p-6 text-center shadow-2xl relative animate-scale-up">
-            <div className="w-16 h-16 bg-rose-500/20 rounded-full flex items-center justify-center mx-auto mb-4 border border-rose-400/30">
-              <AlertCircle className="w-8 h-8 text-rose-450" />
-            </div>
-            
-            <h3 className="text-xl font-display font-bold text-white mb-2">
-              Erro na Recuperação
-            </h3>
-            
-            <p className="text-sm text-rose-200/90 leading-relaxed mb-6">
-              {recoveryError}
-            </p>
-            
-            <button
-              type="button"
-              onClick={() => setRecoveryError('')}
-              className="w-full bg-rose-500 hover:bg-rose-400 text-rose-950 font-bold py-3 rounded-xl transition-all shadow-lg active:scale-95"
-            >
-              Certo, entendi
-            </button>
-          </div>
-        </div>
-      )}
-
     </div>
   );
 }

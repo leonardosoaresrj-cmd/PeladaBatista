@@ -78,18 +78,7 @@ export default function ListaCadastrados({
 
     const msgAtualizada = obterTextoListaCompletaPartida(partidaAtualizada, jogadores, window.location.origin);
 
-    if (whatsappAutomacaoAtiva) {
-      const statusTermo = confirmado ? 'CONFIRMAÇÃO' : 'AUSÊNCIA';
-      setAutoToastMsg(`🤖 [BOT DO WHATSAPP]: ${statusTermo} de ${jog.nome} registrado! Lista atualizada enviada ao grupo!`);
-      setShowAutoToast(true);
-      setTimeout(() => {
-        setShowAutoToast(false);
-      }, 5000);
-    } else {
-      // Abre o modal de compartilhamento manual caso a automação do WhatsApp esteja inativa
-      setShareText(msgAtualizada);
-      setShowShareModal(true);
-    }
+    // Removed WhatsApp toast and modal for individual confirmation as per user request
   };
 
   // Função para verificar a janela de renovação mensal
