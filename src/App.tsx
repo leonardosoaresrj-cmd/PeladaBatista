@@ -1012,14 +1012,10 @@ export default function App() {
           {/* Logo / Emblema da Arena */}
           <div className="flex items-center gap-3">
             <img 
-              src={logoPelada || "/logo_pelada_batista_1780453160575.png"} 
+              src="/logo_pelada_batista_1780453160575.png" 
               alt="Pelada Batista Logo" 
               className="w-14 h-14 object-contain drop-shadow-xl" 
               referrerPolicy="no-referrer"
-              onError={(e) => {
-                e.currentTarget.onerror = null;
-                e.currentTarget.src = "/logo_pelada_batista_1780453160575.png";
-              }}
             />
             <div>
               <h1 className="text-lg font-display font-extrabold tracking-tight text-white flex items-center gap-1.5">
