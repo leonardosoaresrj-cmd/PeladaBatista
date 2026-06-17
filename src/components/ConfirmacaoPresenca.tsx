@@ -658,39 +658,35 @@ export default function ConfirmacaoPresenca({
                     );
                   }
 
+                  const isAdmin = jogadorAtual.role === 'admin';
                   const isDiarista = jogadorAtual.membroStatus === 'diarista';
-                  const temDiariaPendente = pagamentos.some(
-                    p => p.jogadorId === jogadorAtual.id && (p.status === 'pendente' || p.status === 'pendente_confirmacao')
-                  );
-                  const bloqueadoPorPendencia = false; // Desativado para usar pop-up de alerta dinâmico solicitado
+                  const isMensalista = !isAdmin && !isDiarista;
+                  
+                  let hasDebits = false;
+                  if (isMensalista) {
+                    const vD = parseFloat(localStorage.getItem('racha_valor_diaria') || '20');
+                    const v4 = parseFloat(localStorage.getItem('racha_valor_4s') || '85');
+                    const v5 = parseFloat(localStorage.getItem('racha_valor_5s') || '105');
+                    hasDebits = obterDebitosDoJogador(jogadorAtual.id, jogadorAtual.membroStatus, jogadorAtual.posicao, partidas, pagamentos, vD, v4, v5).length > 0;
+                  }
 
-                  return bloqueadoPorPendencia ? (
-                    <div className="bg-rose-950/60 border border-rose-500/30 p-4 rounded-xl text-center space-y-2.5">
-                      <div className="flex items-center justify-center gap-1.5 text-rose-400 font-extrabold text-xs uppercase tracking-wide">
-                        <ShieldAlert className="w-4 h-4 text-rose-500" />
-                        Confirmação Bloqueada
-                      </div>
-                      <p className="text-[11px] text-rose-200 leading-relaxed font-sans">
-                        Você possui diárias pendentes de pagamento. Atletas diaristas com pendências financeiras estão impedidos de confirmar presença em novos jogos.
-                      </p>
-                      <div className="text-[10px] text-rose-350 font-mono">
-                        Acesse a aba <b>Pagamentos</b> para informar seu pagamento e aguarde a aprovação do administrador.
-                      </div>
-                    </div>
-                  ) : (
+                  return (
                     <div className="grid grid-cols-2 gap-2.5">
                       <button
                         id="btn-presenca-sim"
                         type="button"
+                        disabled={hasDebits && presencaUsuarioAtual !== 'sim'}
                         onClick={() => handleConfirmarPresencaLocally(jogadorAtual.id, true)}
-                        className={`flex items-center justify-center gap-1.5 py-3 text-xs font-extrabold rounded-xl transition-all cursor-pointer ${
+                        className={`flex items-center justify-center gap-1.5 py-3 text-xs font-extrabold rounded-xl transition-all ${
                           presencaUsuarioAtual === 'sim'
-                            ? 'bg-white text-black shadow-md ring-2 ring-white'
-                            : 'bg-emerald-950/50 border border-white/10 text-emerald-300 hover:text-white hover:bg-white/5'
+                            ? 'bg-white text-black shadow-md ring-2 ring-white cursor-pointer'
+                            : hasDebits
+                              ? 'bg-rose-950/60 border border-rose-500/40 text-rose-300 opacity-80 cursor-not-allowed'
+                              : 'bg-emerald-950/50 border border-white/10 text-emerald-300 hover:text-white hover:bg-white/5 cursor-pointer'
                         }`}
                       >
                         <Check className="w-4 h-4" />
-                        Sim, vou jogar
+                        {presencaUsuarioAtual === 'sim' ? 'Sim, vou jogar' : (hasDebits ? 'Pendente Financeiro' : 'Sim, vou jogar')}
                       </button>
                       <button
                         id="btn-presenca-nao"

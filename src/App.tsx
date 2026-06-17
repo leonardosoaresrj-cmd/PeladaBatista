@@ -322,6 +322,7 @@ export default function App() {
   const [perfilSobrenome, setPerfilSobrenome] = useState('');
   const [perfilPosicao, setPerfilPosicao] = useState<PosicaoJogador>('Meio');
   const [perfilMembroStatus, setPerfilMembroStatus] = useState<MembroStatus>('mensalista');
+  const [alertaRenovacaoPlano, setAlertaRenovacaoPlano] = useState<{aberto: boolean, inicio: string, fim: string} | null>(null);
   const [perfilFoto, setPerfilFoto] = useState('');
   const [perfilDataNascimento, setPerfilDataNascimento] = useState('');
   const [perfilSenha, setPerfilSenha] = useState('');
@@ -1766,15 +1767,23 @@ export default function App() {
                   <label className="text-[10px] font-bold text-emerald-300 uppercase tracking-wide">Plano de Participação</label>
                   <select
                     value={perfilMembroStatus}
-                    onChange={(e) => setPerfilMembroStatus(e.target.value as MembroStatus)}
-                    disabled={
-                      jogadorAtual.role !== 'admin' && 
-                      (
-                        !checkJanelaRenovacaoGeral().estaAberta || 
-                        pagamentos.some(p => p.jogadorId === jogadorAtual.id && p.mesRef === `${new Date().getFullYear()}-${String(new Date().getMonth() + 1).padStart(2, '0')}` && !p.partidaId && p.status === 'pago')
-                      ) && 
-                      perfilPosicao !== 'Goleiro'
-                    }
+                    onChange={(e) => {
+                      const allowed = (
+                        jogadorAtual.role === 'admin' ||
+                        perfilPosicao === 'Goleiro' ||
+                        (checkJanelaRenovacaoGeral().estaAberta && !pagamentos.some(p => p.jogadorId === jogadorAtual.id && p.mesRef === `${new Date().getFullYear()}-${String(new Date().getMonth() + 1).padStart(2, '0')}` && !p.partidaId && p.status === 'pago'))
+                      );
+                      
+                      if (!allowed) {
+                        const info = checkJanelaRenovacaoGeral();
+                        const dtInicio = info.inicio.toLocaleDateString('pt-BR');
+                        const dtFim = info.fim.toLocaleDateString('pt-BR');
+                        setAlertaRenovacaoPlano({ aberto: true, inicio: dtInicio, fim: dtFim });
+                        return;
+                      }
+
+                      setPerfilMembroStatus(e.target.value as MembroStatus);
+                    }}
                     className="w-full bg-emerald-900 border border-white/10 rounded-xl px-2.5 py-2 text-xs text-white focus:outline-none disabled:opacity-50 disabled:cursor-not-allowed"
                     style={{ backgroundColor: '#064e3b' }}
                   >
@@ -1789,16 +1798,6 @@ export default function App() {
                   </select>
                 </div>
               </div>
-
-              {/* Mensagem informativa sobre plano se bloqueado */}
-              {jogadorAtual.role !== 'admin' && (
-                !checkJanelaRenovacaoGeral().estaAberta || 
-                pagamentos.some(p => p.jogadorId === jogadorAtual.id && p.mesRef === `${new Date().getFullYear()}-${String(new Date().getMonth() + 1).padStart(2, '0')}` && !p.partidaId && p.status === 'pago')
-              ) && perfilPosicao !== 'Goleiro' && (
-                <div className="bg-black/20 border border-rose-500/20 p-2 rounded-xl text-[9px] text-rose-350 leading-relaxed font-sans">
-                  * Alteração de plano (Status Membro) indisponível fora do período de renovação mensal estabelecido ou mensalidade já paga.
-                </div>
-              )}
 
               {/* Data Aniversário e PIN de Segurança */}
               <div className="flex flex-col gap-3 w-full">
@@ -1915,6 +1914,36 @@ export default function App() {
               </div>
 
             </form>
+            
+            {alertaRenovacaoPlano?.aberto && (
+              <div className="absolute inset-0 z-50 flex items-center justify-center p-4 bg-emerald-950/80 backdrop-blur-sm rounded-2xl">
+                <div className="bg-rose-950 border border-rose-500/30 p-5 rounded-2xl shadow-2xl max-w-[280px] text-center space-y-4">
+                  <div className="flex justify-center">
+                    <div className="w-10 h-10 rounded-full bg-rose-500/20 text-rose-400 flex items-center justify-center">
+                      <Lock className="w-5 h-5" />
+                    </div>
+                  </div>
+                  <div>
+                    <h4 className="text-sm font-bold text-rose-300 uppercase">Alteração Indisponível</h4>
+                    <p className="text-[11px] text-rose-200 mt-2 leading-relaxed">
+                      O plano de participação somente pode ser alterado durante o período da próxima renovação.
+                    </p>
+                    <div className="mt-3 bg-black/30 p-2 rounded-xl border border-rose-500/10">
+                      <p className="text-[9px] text-rose-400 font-mono uppercase">Período de Renovação</p>
+                      <p className="text-xs font-bold text-white mt-0.5">{alertaRenovacaoPlano.inicio} a {alertaRenovacaoPlano.fim}</p>
+                    </div>
+                  </div>
+                  <button
+                    type="button"
+                    onClick={() => setAlertaRenovacaoPlano(null)}
+                    className="w-full bg-rose-500 hover:bg-rose-400 text-black py-2 rounded-xl text-xs font-bold shadow-md transition-all active:scale-97"
+                  >
+                    Entendido
+                  </button>
+                </div>
+              </div>
+            )}
+            
           </div>
         </div>
       )}

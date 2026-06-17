@@ -597,7 +597,19 @@ export default function CalendarioJogos({
               })()}
 
               {/* Presença do Usuário Atual */}
-              {isFutureMatch && (
+              {isFutureMatch && (() => {
+                const isAdmin = jogadorAtual.role === 'admin';
+                const isMensalista = jogadorAtual.membroStatus !== 'diarista';
+                
+                let hasDebits = false;
+                if (!isAdmin && isMensalista) {
+                  const vD = parseFloat(localStorage.getItem('racha_valor_diaria') || '20');
+                  const v4 = parseFloat(localStorage.getItem('racha_valor_4s') || '85');
+                  const v5 = parseFloat(localStorage.getItem('racha_valor_5s') || '105');
+                  hasDebits = obterDebitosDoJogador(jogadorAtual.id, jogadorAtual.membroStatus, jogadorAtual.posicao, partidas, pagamentos, vD, v4, v5).length > 0;
+                }
+
+                return (
                 <div className="bg-emerald-900/10 border border-emerald-500/20 rounded-xl p-4 space-y-3">
                   <div className="flex items-center justify-between">
                     <span className="text-xs font-bold text-emerald-300 font-sans">Sua Presença neste Jogo:</span>
@@ -620,6 +632,7 @@ export default function CalendarioJogos({
                     <button
                       id="btn-confirmar-presenca-popup"
                       type="button"
+                      disabled={hasDebits && !isConfirmado}
                       onClick={() => {
                         const jan = getJanelaConfirmacao(activePartidaPopup.data);
                         if (jogadorAtual.role !== 'admin' && jan.status === 'fechado') {
@@ -635,30 +648,6 @@ export default function CalendarioJogos({
                           });
                           setShowForaPeriodoModal(true);
                           return;
-                        }
-
-                        if (jogadorAtual.role !== 'admin' && !isConfirmado) {
-                          const vDiaria = parseFloat(localStorage.getItem('racha_valor_diaria') || '20');
-                          const v4 = parseFloat(localStorage.getItem('racha_valor_mensalidade_4') || '80');
-                          const v5 = parseFloat(localStorage.getItem('racha_valor_mensalidade_5') || '100');
-
-                          const debits = obterDebitosDoJogador(
-                            jogadorAtual.id,
-                            jogadorAtual.membroStatus,
-                            jogadorAtual.posicao,
-                            partidas,
-                            pagamentos,
-                            vDiaria,
-                            v4,
-                            v5
-                          );
-
-                          if (debits.length > 0) {
-                            setDebitosPendentes(debits);
-                            setDadosConfirmacaoPendente({ partidaId: activePartidaPopup.id, jogadorId: jogadorAtual.id, confirmado: true });
-                            setShowInadimplenteModal(true);
-                            return;
-                          }
                         }
 
                         if (jogadorAtual.role !== 'admin' && jogadorAtual.membroStatus === 'diarista' && !isConfirmado) {
@@ -683,14 +672,16 @@ export default function CalendarioJogos({
                           onActualizarPresenca(activePartidaPopup.id, jogadorAtual.id, true);
                         }
                       }}
-                      className={`flex-1 flex items-center justify-center gap-1.5 py-2.5 rounded-xl font-bold text-xs transition-all cursor-pointer ${
+                      className={`flex-1 flex items-center justify-center gap-1.5 py-2.5 rounded-xl font-bold text-xs transition-all ${
                         isConfirmado
-                          ? 'bg-emerald-500 text-emerald-950 shadow-md ring-2 ring-emerald-350'
-                          : 'bg-emerald-900 hover:bg-emerald-800 text-white border border-emerald-500/20'
+                          ? 'bg-emerald-500 text-emerald-950 shadow-md ring-2 ring-emerald-350 cursor-pointer'
+                          : hasDebits 
+                            ? 'bg-rose-950/60 border border-rose-500/40 text-rose-300 opacity-70 cursor-not-allowed'
+                            : 'bg-emerald-900 hover:bg-emerald-800 text-white border border-emerald-500/20 cursor-pointer'
                       }`}
                     >
                       <Check className="w-3.5 h-3.5" />
-                      Confirmar Jogo (Vou Jogar)
+                      {isConfirmado ? 'Confirmar Jogo (Vou Jogar)' : (hasDebits ? 'Pendente Financeiro' : 'Confirmar Jogo (Vou Jogar)')}
                     </button>
 
                     <button
@@ -727,7 +718,8 @@ export default function CalendarioJogos({
                     </button>
                   </div>
                 </div>
-              )}
+                );
+              })()}
 
               {/* Listas curtas de Jogadores que confirmaram ou recusaram para sabermos a presença */}
               <div className="grid grid-cols-2 gap-3 text-xs pt-1">
