@@ -234,10 +234,13 @@ export default function ConfirmacaoPresenca({
       const v5 = parseFloat(localStorage.getItem('racha_valor_5s') || '105');
       const vDiaria = parseFloat(localStorage.getItem('racha_valor_diaria') || '20');
 
+      const targetPlayer = (jogadores && jogadores.find(j => j.id === id)) || jogadorAtual;
+      const originalStatus = targetPlayer.membroStatusDb || targetPlayer.membroStatus;
+
       const debits = obterDebitosDoJogador(
         id,
-        jogadorAtual.membroStatus,
-        jogadorAtual.posicao,
+        originalStatus,
+        targetPlayer.posicao,
         partidas,
         pagamentos,
         vDiaria,
@@ -245,14 +248,7 @@ export default function ConfirmacaoPresenca({
         v5
       );
 
-      if (debits.length > 0) {
-        // Se houver débitos, abre o pop-up e salva as variáveis de confirmação
-        setDebitosPendentes(debits);
-        setDadosConfirmacaoPendente({ id, confirmado });
-        setShowInadimplenteModal(true);
-        return;
-      } else if (jogadorAtual.role !== 'admin' && jogadorAtual.membroStatus === 'diarista' && id === jogadorAtual.id && partidaSelecionada) {
-        // Diarista sem débitos anteriores: deve pagar a diária atual no ato
+      if (jogadorAtual.role !== 'admin' && originalStatus === 'diarista' && id === jogadorAtual.id && partidaSelecionada) {
         const novaDiaria = {
           id: `diaria-[temp]-${partidaSelecionada.id}`,
           tipo: 'diaria',
@@ -263,9 +259,17 @@ export default function ConfirmacaoPresenca({
           status: 'pendente',
           partidaId: partidaSelecionada.id
         };
-        setDebitosParaPagarDiarista([novaDiaria]);
+        const todosDebitos = [novaDiaria, ...debits];
+        setDebitosParaPagarDiarista(todosDebitos);
         setDadosConfirmacaoPendente({ id, confirmado });
         setShowPixCheckoutDiarista(true);
+        return;
+      }
+
+      if (jogadorAtual.role !== 'admin' && originalStatus === 'mensalista' && debits.length > 0 && id === jogadorAtual.id) {
+        setDebitosPendentes(debits);
+        setDadosConfirmacaoPendente({ id, confirmado });
+        setShowInadimplenteModal(true);
         return;
       }
     }
@@ -659,15 +663,16 @@ export default function ConfirmacaoPresenca({
                   }
 
                   const isAdmin = jogadorAtual.role === 'admin';
-                  const isDiarista = jogadorAtual.membroStatus === 'diarista';
-                  const isMensalista = !isAdmin && !isDiarista;
+                  const originalStatus = jogadorAtual.membroStatusDb || jogadorAtual.membroStatus;
+                  const isDiarista = originalStatus === 'diarista';
+                  const isMensalista = originalStatus === 'mensalista';
                   
                   let hasDebits = false;
-                  if (isMensalista) {
+                  if (isMensalista && !isAdmin) {
                     const vD = parseFloat(localStorage.getItem('racha_valor_diaria') || '20');
                     const v4 = parseFloat(localStorage.getItem('racha_valor_4s') || '85');
                     const v5 = parseFloat(localStorage.getItem('racha_valor_5s') || '105');
-                    hasDebits = obterDebitosDoJogador(jogadorAtual.id, jogadorAtual.membroStatus, jogadorAtual.posicao, partidas, pagamentos, vD, v4, v5).length > 0;
+                    hasDebits = obterDebitosDoJogador(jogadorAtual.id, 'mensalista', jogadorAtual.posicao, partidas, pagamentos, vD, v4, v5).length > 0;
                   }
 
                   return (
@@ -675,18 +680,17 @@ export default function ConfirmacaoPresenca({
                       <button
                         id="btn-presenca-sim"
                         type="button"
-                        disabled={hasDebits && presencaUsuarioAtual !== 'sim'}
                         onClick={() => handleConfirmarPresencaLocally(jogadorAtual.id, true)}
-                        className={`flex items-center justify-center gap-1.5 py-3 text-xs font-extrabold rounded-xl transition-all ${
+                        className={`flex items-center justify-center gap-1.5 py-3 text-xs font-extrabold rounded-xl transition-all cursor-pointer ${
                           presencaUsuarioAtual === 'sim'
-                            ? 'bg-white text-black shadow-md ring-2 ring-white cursor-pointer'
+                            ? 'bg-white text-black shadow-md ring-2 ring-white'
                             : hasDebits
-                              ? 'bg-rose-950/60 border border-rose-500/40 text-rose-300 opacity-80 cursor-not-allowed'
-                              : 'bg-emerald-950/50 border border-white/10 text-emerald-300 hover:text-white hover:bg-white/5 cursor-pointer'
+                              ? 'bg-amber-600 hover:bg-amber-500 text-white'
+                              : 'bg-emerald-950/50 border border-white/10 text-emerald-300 hover:text-white hover:bg-white/5'
                         }`}
                       >
                         <Check className="w-4 h-4" />
-                        {presencaUsuarioAtual === 'sim' ? 'Sim, vou jogar' : (hasDebits ? 'Pendente Financeiro' : 'Sim, vou jogar')}
+                        {presencaUsuarioAtual === 'sim' ? 'Sim, vou jogar' : (hasDebits ? 'Pendente Financeiro (Vou Jogar)' : 'Sim, vou jogar')}
                       </button>
                       <button
                         id="btn-presenca-nao"
@@ -1604,22 +1608,37 @@ export default function ConfirmacaoPresenca({
               </p>
             </div>
 
-            <div className="flex flex-col gap-2 pt-2">
+             <div className="flex flex-col gap-2 pt-2">
               {jogadorAtual.membroStatus !== 'diarista' && (
-                <button
-                  type="button"
-                  id="btn-confirmar-inadimplente-prosseguir"
-                  onClick={() => {
-                    setShowInadimplenteModal(false);
-                    if (dadosConfirmacaoPendente) {
-                      executarConfirmacaoPresenca(dadosConfirmacaoPendente.id, dadosConfirmacaoPendente.confirmado);
-                      setDadosConfirmacaoPendente(null);
-                    }
-                  }}
-                  className="w-full py-2.5 bg-rose-500 hover:bg-rose-400 text-black font-black text-xs rounded-xl transition-all shadow-md active:scale-97 text-center cursor-pointer uppercase"
-                >
-                  Confirmar Presença e Regularizar depois
-                </button>
+                <>
+                  <button
+                    type="button"
+                    id="btn-quitar-debitos-pix"
+                    onClick={() => {
+                      setShowInadimplenteModal(false);
+                      setDebitosParaPagarDiarista(debitosPendentes);
+                      setShowPixCheckoutDiarista(true);
+                    }}
+                    className="w-full py-2.5 bg-teal-500 hover:bg-teal-400 text-emerald-950 font-black text-xs rounded-xl transition-all shadow-md active:scale-97 text-center cursor-pointer uppercase flex items-center justify-center gap-1.5"
+                  >
+                    <span>⚡ Quitar Débitos via PIX</span>
+                  </button>
+
+                  <button
+                    type="button"
+                    id="btn-confirmar-inadimplente-prosseguir"
+                    onClick={() => {
+                      setShowInadimplenteModal(false);
+                      if (dadosConfirmacaoPendente) {
+                        executarConfirmacaoPresenca(dadosConfirmacaoPendente.id, dadosConfirmacaoPendente.confirmado);
+                        setDadosConfirmacaoPendente(null);
+                      }
+                    }}
+                    className="w-full py-2.5 bg-rose-500 hover:bg-rose-400 text-black font-black text-xs rounded-xl transition-all shadow-md active:scale-97 text-center cursor-pointer uppercase"
+                  >
+                    Confirmar Presença e Regularizar depois
+                  </button>
+                </>
               )}
               <button
                 type="button"

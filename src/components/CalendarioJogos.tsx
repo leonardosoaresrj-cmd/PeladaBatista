@@ -599,14 +599,15 @@ export default function CalendarioJogos({
               {/* Presença do Usuário Atual */}
               {isFutureMatch && (() => {
                 const isAdmin = jogadorAtual.role === 'admin';
-                const isMensalista = jogadorAtual.membroStatus !== 'diarista';
+                const originalStatus = jogadorAtual.membroStatusDb || jogadorAtual.membroStatus;
+                const isMensalista = originalStatus === 'mensalista';
                 
                 let hasDebits = false;
                 if (!isAdmin && isMensalista) {
                   const vD = parseFloat(localStorage.getItem('racha_valor_diaria') || '20');
                   const v4 = parseFloat(localStorage.getItem('racha_valor_4s') || '85');
                   const v5 = parseFloat(localStorage.getItem('racha_valor_5s') || '105');
-                  hasDebits = obterDebitosDoJogador(jogadorAtual.id, jogadorAtual.membroStatus, jogadorAtual.posicao, partidas, pagamentos, vD, v4, v5).length > 0;
+                  hasDebits = obterDebitosDoJogador(jogadorAtual.id, 'mensalista', jogadorAtual.posicao, partidas, pagamentos, vD, v4, v5).length > 0;
                 }
 
                 return (
@@ -632,7 +633,6 @@ export default function CalendarioJogos({
                     <button
                       id="btn-confirmar-presenca-popup"
                       type="button"
-                      disabled={hasDebits && !isConfirmado}
                       onClick={() => {
                         const jan = getJanelaConfirmacao(activePartidaPopup.data);
                         if (jogadorAtual.role !== 'admin' && jan.status === 'fechado') {
@@ -650,21 +650,43 @@ export default function CalendarioJogos({
                           return;
                         }
 
-                        if (jogadorAtual.role !== 'admin' && jogadorAtual.membroStatus === 'diarista' && !isConfirmado) {
-                          const vDiaria = parseFloat(localStorage.getItem('racha_valor_diaria') || '20');
+                        const vD = parseFloat(localStorage.getItem('racha_valor_diaria') || '20');
+                        const v4 = parseFloat(localStorage.getItem('racha_valor_4s') || '85');
+                        const v5 = parseFloat(localStorage.getItem('racha_valor_5s') || '105');
+
+                        const debits = obterDebitosDoJogador(
+                          jogadorAtual.id,
+                          originalStatus,
+                          jogadorAtual.posicao,
+                          partidas,
+                          pagamentos,
+                          vD,
+                          v4,
+                          v5
+                        );
+
+                        if (jogadorAtual.role !== 'admin' && originalStatus === 'diarista' && !isConfirmado) {
                           const novaDiaria = {
                             id: `diaria-[temp]-${activePartidaPopup.id}`,
                             tipo: 'diaria',
                             referencia: `Diária do jogo: ${activePartidaPopup.titulo}`,
                             dataOrigem: activePartidaPopup.data,
                             mesRef: activePartidaPopup.data.substring(0, 7),
-                            valor: vDiaria,
+                            valor: vD,
                             status: 'pendente',
                             partidaId: activePartidaPopup.id
                           };
-                          setDebitosParaPagarDiarista([novaDiaria]);
+                          const todosDebitos = [novaDiaria, ...debits];
+                          setDebitosParaPagarDiarista(todosDebitos);
                           setDadosConfirmacaoPendente({ partidaId: activePartidaPopup.id, jogadorId: jogadorAtual.id, confirmado: true });
                           setShowPixCheckoutDiarista(true);
+                          return;
+                        }
+
+                        if (jogadorAtual.role !== 'admin' && originalStatus === 'mensalista' && debits.length > 0 && !isConfirmado) {
+                          setDebitosPendentes(debits);
+                          setDadosConfirmacaoPendente({ partidaId: activePartidaPopup.id, jogadorId: jogadorAtual.id, confirmado: true });
+                          setShowInadimplenteModal(true);
                           return;
                         }
 
@@ -672,16 +694,16 @@ export default function CalendarioJogos({
                           onActualizarPresenca(activePartidaPopup.id, jogadorAtual.id, true);
                         }
                       }}
-                      className={`flex-1 flex items-center justify-center gap-1.5 py-2.5 rounded-xl font-bold text-xs transition-all ${
+                      className={`flex-1 flex items-center justify-center gap-1.5 py-2.5 rounded-xl font-bold text-xs transition-all cursor-pointer ${
                         isConfirmado
-                          ? 'bg-emerald-500 text-emerald-950 shadow-md ring-2 ring-emerald-350 cursor-pointer'
+                          ? 'bg-emerald-500 text-emerald-950 shadow-md ring-2 ring-emerald-350'
                           : hasDebits 
-                            ? 'bg-rose-950/60 border border-rose-500/40 text-rose-300 opacity-70 cursor-not-allowed'
-                            : 'bg-emerald-900 hover:bg-emerald-800 text-white border border-emerald-500/20 cursor-pointer'
+                            ? 'bg-amber-600 hover:bg-amber-500 text-white'
+                            : 'bg-emerald-900 hover:bg-emerald-800 text-white border border-emerald-500/20'
                       }`}
                     >
                       <Check className="w-3.5 h-3.5" />
-                      {isConfirmado ? 'Confirmar Jogo (Vou Jogar)' : (hasDebits ? 'Pendente Financeiro' : 'Confirmar Jogo (Vou Jogar)')}
+                      {isConfirmado ? 'Confirmar Jogo (Vou Jogar)' : (hasDebits ? 'Pendente Financeiro (Vou Jogar)' : 'Confirmar Jogo (Vou Jogar)')}
                     </button>
 
                     <button
@@ -1074,20 +1096,35 @@ export default function CalendarioJogos({
 
             <div className="flex flex-col gap-2 pt-2">
               {jogadorAtual.membroStatus !== 'diarista' && (
-                <button
-                  type="button"
-                  id="btn-confirmar-inadimplente-prosseguir"
-                  onClick={() => {
-                    setShowInadimplenteModal(false);
-                    if (dadosConfirmacaoPendente && onActualizarPresenca) {
-                      onActualizarPresenca(dadosConfirmacaoPendente.partidaId, dadosConfirmacaoPendente.jogadorId, dadosConfirmacaoPendente.confirmado);
-                      setDadosConfirmacaoPendente(null);
-                    }
-                  }}
-                  className="w-full py-2.5 bg-rose-500 hover:bg-rose-400 text-black font-black text-xs rounded-xl transition-all shadow-md active:scale-97 text-center cursor-pointer uppercase"
-                >
-                  Confirmar Presença e Regularizar depois
-                </button>
+                <>
+                  <button
+                    type="button"
+                    id="btn-quitar-debitos-pix"
+                    onClick={() => {
+                      setShowInadimplenteModal(false);
+                      setDebitosParaPagarDiarista(debitosPendentes);
+                      setShowPixCheckoutDiarista(true);
+                    }}
+                    className="w-full py-2.5 bg-teal-500 hover:bg-teal-400 text-emerald-950 font-black text-xs rounded-xl transition-all shadow-md active:scale-97 text-center cursor-pointer uppercase flex items-center justify-center gap-1.5"
+                  >
+                    <span>⚡ Quitar Débitos via PIX</span>
+                  </button>
+
+                  <button
+                    type="button"
+                    id="btn-confirmar-inadimplente-prosseguir"
+                    onClick={() => {
+                      setShowInadimplenteModal(false);
+                      if (dadosConfirmacaoPendente && onActualizarPresenca) {
+                        onActualizarPresenca(dadosConfirmacaoPendente.partidaId, dadosConfirmacaoPendente.jogadorId, dadosConfirmacaoPendente.confirmado);
+                        setDadosConfirmacaoPendente(null);
+                      }
+                    }}
+                    className="w-full py-2.5 bg-rose-500 hover:bg-rose-400 text-black font-black text-xs rounded-xl transition-all shadow-md active:scale-97 text-center cursor-pointer uppercase"
+                  >
+                    Confirmar Presença e Regularizar depois
+                  </button>
+                </>
               )}
               <button
                 type="button"

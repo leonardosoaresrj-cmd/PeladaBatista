@@ -371,6 +371,7 @@ export default function App() {
     return {
       ...jogadorAtual,
       membroStatus: obterStatusMembroEfetivo(jogadorAtual, pagamentos),
+      membroStatusDb: jogadorAtual.membroStatus,
       isGold: isJogadorFuncionalmenteGold(jogadorAtual, pagamentos)
     };
   }, [jogadorAtual, pagamentos]);
