@@ -3,7 +3,7 @@
  * SPDX-License-Identifier: Apache-2.0
  */
 
-import React, { useState, useMemo } from 'react';
+import React, { useState, useMemo, useEffect } from 'react';
 import { Jogador, Pagamento, Partida } from '../types';
 import { AVATAR_PRESETS } from '../data';
 import {
@@ -27,6 +27,7 @@ interface ControlePagamentosProps {
   jogadores: Jogador[];
   jogadorAtual: Jogador;
   onRegistrarPagamento: (jogadorId: string, mesRef: string, status: 'pago' | 'pendente' | 'pendente_confirmacao' | 'cancelado', dataPagamento: string | null, valor: number, partidaId?: string) => void;
+  onRegistrarVariosPagamentos?: (jogadorId: string, items: Array<{ mesRef: string, status: 'pago' | 'pendente' | 'pendente_confirmacao' | 'cancelado', dataPagamento: string | null, valor: number, partidaId?: string }>) => Promise<void>;
   valor4Sabados: number;
   valor5Sabados: number;
   valorDiaria: number;
@@ -53,14 +54,29 @@ export default function ControlePagamentos({
   jogadores,
   jogadorAtual,
   onRegistrarPagamento,
+  onRegistrarVariosPagamentos,
   valor4Sabados,
   valor5Sabados,
   valorDiaria,
   partidas,
 }: ControlePagamentosProps) {
   // Filtro de mês de referência para a cobrança atual
-  const hojeDateStr = new Date().toISOString().substring(0, 7); // ex: '2026-06'
-  const [mesSelecionado, setMesSelecionado] = useState(hojeDateStr >= '2026-05' ? hojeDateStr : '2026-06');
+  const [mesSelecionado, setMesSelecionado] = useState(() => {
+    const d = new Date();
+    const y = d.getFullYear();
+    const m = String(d.getMonth() + 1).padStart(2, '0');
+    return `${y}-${m}`;
+  });
+
+  const startupMonth = useMemo(() => {
+    return localStorage.getItem('futebol_startup_month') || '2026-05';
+  }, []);
+
+  useEffect(() => {
+    if (mesSelecionado < startupMonth) {
+      setMesSelecionado(startupMonth);
+    }
+  }, [mesSelecionado, startupMonth]);
 
   // Estado para confirmar cancelamento sem window.confirm
   const [cancelarConfirmId, setCancelarConfirmId] = useState<string | null>(null);
@@ -87,15 +103,26 @@ export default function ControlePagamentos({
     debitList: Array<{ mesRef: string; valor: number; partidaId?: string }>
   ) => {
     const hojeStr = new Date().toISOString().split('T')[0];
-    for (const deb of debitList) {
-      await onRegistrarPagamento(
-        jogadorAtual.id,
-        deb.mesRef,
-        'pago', // Altera status para quitado imediatamente!
-        hojeStr,
-        deb.valor,
-        deb.partidaId
-      );
+    if (onRegistrarVariosPagamentos) {
+      const items = debitList.map(deb => ({
+        mesRef: deb.mesRef,
+        status: 'pago' as const,
+        dataPagamento: hojeStr,
+        valor: deb.valor,
+        partidaId: deb.partidaId
+      }));
+      await onRegistrarVariosPagamentos(jogadorAtual.id, items);
+    } else {
+      for (const deb of debitList) {
+        await onRegistrarPagamento(
+          jogadorAtual.id,
+          deb.mesRef,
+          'pago', // Altera status para quitado imediatamente!
+          hojeStr,
+          deb.valor,
+          deb.partidaId
+        );
+      }
     }
     setIsCheckoutOpen(false);
   };
@@ -121,11 +148,75 @@ export default function ControlePagamentos({
     return valorDiariaMes;
   }, [jogadorAtual, valorMensalidadeMes, valorDiariaMes]);
 
-  // Histórico de competências que o usuário pode visualizar
-  const competencasDisponiveis = [
-    { value: '2026-05', label: 'Maio / 2026' },
-    { value: '2026-06', label: 'Junho / 2026' }
-  ];
+  const obterMesAtual = (): string => {
+    const d = new Date();
+    const y = d.getFullYear();
+    const m = String(d.getMonth() + 1).padStart(2, '0');
+    return `${y}-${m}`;
+  };
+
+  // Histórico de competências que o usuário pode visualizar (computado dinamicamente)
+  const competencasDisponiveis = useMemo(() => {
+    const mesLimit = obterMesAtual(); // ex: '2026-06'
+    const mesSet = new Set<string>();
+    
+    if (mesLimit >= startupMonth) {
+      mesSet.add(mesLimit);
+    } else {
+      mesSet.add(startupMonth);
+    }
+
+    partidas.forEach(p => {
+      if (p.data && p.data.length >= 7) {
+        const m = p.data.substring(0, 7);
+        if (m >= startupMonth && m <= mesLimit) {
+          mesSet.add(m);
+        }
+      }
+    });
+
+    pagamentos.forEach(p => {
+      if (p.mesRef && p.mesRef.length >= 7) {
+        if (p.mesRef >= startupMonth && p.mesRef <= mesLimit) {
+          mesSet.add(p.mesRef);
+        }
+      }
+    });
+
+    const listaMeses = Array.from(mesSet).sort();
+    if (listaMeses.length > 0) {
+      const minMes = listaMeses[0] >= startupMonth ? listaMeses[0] : startupMonth;
+      const maxMes = mesLimit >= startupMonth ? mesLimit : startupMonth;
+      const [minY, minM] = minMes.split('-').map(Number);
+      const [maxY, maxM] = maxMes.split('-').map(Number);
+
+      const sequencia: string[] = [];
+      let curY = minY;
+      let curM = minM;
+      while (curY < maxY || (curY === maxY && curM <= maxM)) {
+        const mesStr = `${curY}-${String(curM).padStart(2, '0')}`;
+        sequencia.push(mesStr);
+        curM++;
+        if (curM > 12) {
+          curM = 1;
+          curY++;
+        }
+      }
+      
+      const nomesMesesIndex: Record<string, string> = {
+        '01': 'Janeiro', '02': 'Fevereiro', '03': 'Março', '04': 'Abril',
+        '05': 'Maio', '06': 'Junho', '07': 'Julho', '08': 'Agosto',
+        '09': 'Setembro', '10': 'Outubro', '11': 'Novembro', '12': 'Dezembro'
+      };
+
+      return sequencia.map(m => {
+        const [ano, mesId] = m.split('-');
+        const label = `${nomesMesesIndex[mesId] || mesId} / ${ano}`;
+        return { value: m, label };
+      });
+    }
+    return [{ value: startupMonth, label: 'Maio / 2026' }];
+  }, [partidas, pagamentos, startupMonth]);
 
   const debitosPessoais = useMemo(() => {
     return obterDebitosDoJogador(
@@ -181,7 +272,7 @@ export default function ControlePagamentos({
                 🛡️ Posição Isenta de Taxas (Goleiro Oficial)
               </h4>
               <p className="text-[11px] text-teal-300 mt-1 font-sans leading-relaxed">
-                No Arena Record, os <b>Goleiros são 100% gratuitos</b> e isentos de mensalidade ou diária. Obrigado por fechar o gol e garantir ótimas defesas a cada treino!
+                No Pelada Batista Sábado, os <b>Goleiros são 100% gratuitos</b> e isentos de mensalidade ou diária. Obrigado por fechar o gol e garantir ótimas defesas a cada treino!
               </p>
             </div>
           </div>
@@ -314,7 +405,7 @@ export default function ControlePagamentos({
               ) : debitosPessoais.length === 0 ? (
                 <div className="text-center w-full max-w-md space-y-1.5 pt-1">
                   <p className="text-xs text-teal-200 leading-relaxed font-sans bg-teal-500/10 border border-teal-500/20 p-3 rounded-xl font-bold">
-                    🎉 Excelente! Você está 100% em dia com a pelada Arena Record. Não há nenhum débito pendente em aberto ou em análise. Obrigado pela colaboração!
+                    🎉 Excelente! Você está 100% em dia com a pelada Pelada Batista Sábado. Não há nenhum débito pendente em aberto ou em análise. Obrigado pela colaboração!
                   </p>
                 </div>
               ) : hasPendenteConfirmacaoOnly ? (
@@ -325,7 +416,7 @@ export default function ControlePagamentos({
                   
                   <a
                     href={`https://api.whatsapp.com/send?text=${encodeURIComponent(
-                      `Olá! Sou o atleta ${jogadorAtual.nome} ${jogadorAtual.sobrenome} e acabei de informar o pagamento total de meus débitos no app Arena Record no valor de R$ ${totalConsolidado.toFixed(2)}.`
+                      `Olá! Sou o atleta ${jogadorAtual.nome} ${jogadorAtual.sobrenome} e acabei de informar o pagamento total de meus débitos no app Pelada Batista Sábado no valor de R$ ${totalConsolidado.toFixed(2)}.`
                     )}`}
                     target="_blank"
                     rel="noreferrer"
@@ -532,7 +623,14 @@ export default function ControlePagamentos({
                           return (
                             <div key={p.id} className="flex justify-between items-center text-[10px] tracking-wide text-emerald-200">
                               <span>• {prt ? prt.titulo : 'Jogo Avulso'} ({p.status === 'pago' ? 'PG' : 'PENDENTE'})</span>
-                              <span className="font-mono font-bold">R$ {p.valor.toFixed(2)}</span>
+                              <div className="flex items-center gap-2">
+                                {p.status === 'pago' && p.dataPagamento && (
+                                  <span className="text-[9px] font-mono text-emerald-400 bg-emerald-950/40 px-1 rounded border border-emerald-500/20 font-bold">
+                                    PG: {p.dataPagamento.split('-').reverse().join('/')}
+                                  </span>
+                                )}
+                                <span className="font-mono font-bold">R$ {p.valor.toFixed(2)}</span>
+                              </div>
                             </div>
                           );
                         })}

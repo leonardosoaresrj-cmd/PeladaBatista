@@ -232,7 +232,7 @@ export default function ConfirmacaoPresenca({
     if (confirmado) {
       const v4 = parseFloat(localStorage.getItem('racha_valor_4s') || '85');
       const v5 = parseFloat(localStorage.getItem('racha_valor_5s') || '105');
-      const vDiaria = parseFloat(localStorage.getItem('racha_valor_diaria') || '20');
+      const vDiaria = parseFloat(localStorage.getItem('racha_valor_diaria') || '30');
 
       const targetPlayer = (jogadores && jogadores.find(j => j.id === id)) || jogadorAtual;
       const originalStatus = targetPlayer.membroStatusDb || targetPlayer.membroStatus;
@@ -559,23 +559,7 @@ export default function ConfirmacaoPresenca({
 
               {jogadorAtual.role === 'admin' && (
                 <div className="flex flex-col gap-3 w-full">
-                  <div id="admin-actions-whatsapp" className="mt-4 pt-3.5 border-t border-dashed border-white/15 flex flex-col sm:flex-row items-center justify-between gap-3 text-xs w-full">
-                    <div className="flex flex-col text-left">
-                      <span className="font-extrabold text-teal-400 uppercase tracking-wider text-[9.5px] font-mono">🤖 Automação de WhatsApp</span>
-                      <span className="text-[10px] text-emerald-300">Dispare a lista oficial de convocados / ausentes atualizada no grupo.</span>
-                    </div>
-                    <button
-                      id="btn-admin-disparar-whatsapp-manual"
-                      type="button"
-                      onClick={dispararListaWhatsAppAdmin}
-                      className="w-full sm:w-auto bg-teal-600 hover:bg-teal-500 text-white font-black px-4 py-2 rounded-xl text-[10px] tracking-widest uppercase cursor-pointer transition-all duration-200 shadow border-none inline-flex items-center justify-center gap-1.5"
-                    >
-                      <Send className="w-3.5 h-3.5" />
-                      <span>📢 Disparar Lista Oficial</span>
-                    </button>
-                  </div>
-                  
-                  <div id="admin-actions-partida-cancelamento" className="pt-3 flex flex-col sm:flex-row items-center justify-between gap-3 text-xs w-full border-t border-dashed border-white/10">
+                  <div id="admin-actions-partida-cancelamento" className="mt-4 pt-3.5 flex flex-col sm:flex-row items-center justify-between gap-3 text-xs w-full border-t border-dashed border-white/15">
                     <div className="flex flex-col text-left">
                       <span className="font-extrabold text-amber-400 uppercase tracking-wider text-[9.5px] font-mono">🔐 Controle de Partida</span>
                       <span className="text-[10px] text-emerald-300">Marque se o jogo foi cancelado por fortuito/chuva.</span>
@@ -618,14 +602,14 @@ export default function ConfirmacaoPresenca({
                 <div className={`p-4 rounded-2xl text-xs flex items-start gap-2.5 border ${
                   isFechado 
                     ? 'bg-amber-950/45 border-amber-500/20 text-amber-200 shadow' 
-                    : 'bg-emerald-950/45 border-emerald-500/25 text-emerald-100 shadow'
+                    : 'bg-amber-950/40 border-amber-500/35 text-amber-100 shadow'
                 }`}>
-                  <AlertTriangle className={`w-4.5 h-4.5 shrink-0 mt-0.5 ${isFechado ? 'text-amber-400' : 'text-emerald-400'}`} />
+                  <AlertTriangle className="w-4.5 h-4.5 shrink-0 mt-0.5 text-amber-400" />
                   <div>
-                    <h5 className="font-bold uppercase tracking-wide text-[10px] flex items-center gap-1">
-                      {isFechado ? '🚨 Janela de Confirmação Fechada' : '✅ Janela de Confirmação Aberta'}
+                    <h5 className="font-bold uppercase tracking-wide text-[10px] flex items-center gap-1 text-amber-300">
+                      {isFechado ? '🚨 Janela de Confirmação Fechada' : '⚠️ Janela de Confirmação Aberta'}
                     </h5>
-                    <p className="mt-0.5 leading-relaxed text-[11px] text-emerald-300">
+                    <p className="mt-0.5 leading-relaxed text-[11px] text-amber-200/95">
                       Regulamento: Terça-feira (<b>{jan.inicio.toLocaleDateString('pt-BR')}</b>) às 00:00 até Sexta-feira (<b>{jan.fim.toLocaleDateString('pt-BR')}</b>) às 23:59.
                     </p>
                     {isFechado && (
@@ -638,10 +622,13 @@ export default function ConfirmacaoPresenca({
 
             {/* SUA CONFIRMAÇÃO PESSOAL */}
             {partidaSelecionada.data >= '2026-05-31' && (
-              <div className="bg-emerald-950/40 border border-white/10 rounded-2xl p-5 shadow-lg backdrop-blur-sm space-y-4">
-                <div>
-                  <h4 className="text-xs font-bold uppercase text-emerald-400 tracking-wider">Sua Presença Oficial</h4>
-                  <p className="text-[11px] text-emerald-300 font-sans mt-0.5">Marque se você estará em campo ou relate ausência justificada:</p>
+              <div className="bg-amber-950/30 border border-amber-500/25 rounded-2xl p-5 shadow-lg backdrop-blur-sm space-y-4">
+                <div className="flex items-start gap-2.5">
+                  <AlertTriangle className="w-5 h-5 text-amber-400 shrink-0 mt-0.5" />
+                  <div>
+                    <h4 className="text-xs font-bold uppercase text-amber-400 tracking-wider">Sua Presença Oficial</h4>
+                    <p className="text-[11px] text-amber-300/90 font-sans mt-0.5">Marque se você estará em campo ou relate ausência justificada:</p>
+                  </div>
                 </div>
 
                 {(() => {
@@ -669,10 +656,10 @@ export default function ConfirmacaoPresenca({
                   
                   let hasDebits = false;
                   if (isMensalista && !isAdmin) {
-                    const vD = parseFloat(localStorage.getItem('racha_valor_diaria') || '20');
+                    const vD = parseFloat(localStorage.getItem('racha_valor_diaria') || '30');
                     const v4 = parseFloat(localStorage.getItem('racha_valor_4s') || '85');
                     const v5 = parseFloat(localStorage.getItem('racha_valor_5s') || '105');
-                    hasDebits = obterDebitosDoJogador(jogadorAtual.id, 'mensalista', jogadorAtual.posicao, partidas, pagamentos, vD, v4, v5).length > 0;
+                    hasDebits = obterDebitosDoJogador(jogadorAtual.id, originalStatus, jogadorAtual.posicao, partidas, pagamentos, vD, v4, v5).length > 0;
                   }
 
                   return (
@@ -1610,35 +1597,18 @@ export default function ConfirmacaoPresenca({
 
              <div className="flex flex-col gap-2 pt-2">
               {jogadorAtual.membroStatus !== 'diarista' && (
-                <>
-                  <button
-                    type="button"
-                    id="btn-quitar-debitos-pix"
-                    onClick={() => {
-                      setShowInadimplenteModal(false);
-                      setDebitosParaPagarDiarista(debitosPendentes);
-                      setShowPixCheckoutDiarista(true);
-                    }}
-                    className="w-full py-2.5 bg-teal-500 hover:bg-teal-400 text-emerald-950 font-black text-xs rounded-xl transition-all shadow-md active:scale-97 text-center cursor-pointer uppercase flex items-center justify-center gap-1.5"
-                  >
-                    <span>⚡ Quitar Débitos via PIX</span>
-                  </button>
-
-                  <button
-                    type="button"
-                    id="btn-confirmar-inadimplente-prosseguir"
-                    onClick={() => {
-                      setShowInadimplenteModal(false);
-                      if (dadosConfirmacaoPendente) {
-                        executarConfirmacaoPresenca(dadosConfirmacaoPendente.id, dadosConfirmacaoPendente.confirmado);
-                        setDadosConfirmacaoPendente(null);
-                      }
-                    }}
-                    className="w-full py-2.5 bg-rose-500 hover:bg-rose-400 text-black font-black text-xs rounded-xl transition-all shadow-md active:scale-97 text-center cursor-pointer uppercase"
-                  >
-                    Confirmar Presença e Regularizar depois
-                  </button>
-                </>
+                <button
+                  type="button"
+                  id="btn-quitar-debitos-pix"
+                  onClick={() => {
+                    setShowInadimplenteModal(false);
+                    setDebitosParaPagarDiarista(debitosPendentes);
+                    setShowPixCheckoutDiarista(true);
+                  }}
+                  className="w-full py-2.5 bg-teal-500 hover:bg-teal-400 text-emerald-950 font-black text-xs rounded-xl transition-all shadow-md active:scale-97 text-center cursor-pointer uppercase flex items-center justify-center gap-1.5"
+                >
+                  <span>⚡ Quitar Débitos via PIX</span>
+                </button>
               )}
               <button
                 type="button"

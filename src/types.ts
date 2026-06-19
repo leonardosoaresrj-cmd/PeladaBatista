@@ -56,6 +56,7 @@ export interface LancamentoAvulso {
   valor: number;
   data: string; // YYYY-MM-DD
   categoria: string; // 'mensalidade' | 'diaria' | 'aluguel' | 'goleiro' | 'outros_receita' | 'outros_despesa'
+  partidaId?: string;
 }
 
 export interface BotLog {

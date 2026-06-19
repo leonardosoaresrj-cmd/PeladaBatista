@@ -25,7 +25,8 @@ import {
   ChevronRight,
   ShieldAlert,
   X,
-  Users
+  Users,
+  Pencil
 } from 'lucide-react';
 import { obterDebitosDoJogador } from '../utils/confirmationRules';
 
@@ -36,6 +37,7 @@ interface ControleCaixaProps {
   lancamentos: LancamentoAvulso[];
   onAddLancamento: (l: Omit<LancamentoAvulso, 'id'>) => void;
   onRemoveLancamento: (id: string) => void;
+  onUpdateLancamento?: (l: LancamentoAvulso) => void;
   aluguelCampoBase: number;
   onUpdateAluguelCampoBase: (valor: number) => void;
   valorDiaria: number;
@@ -53,6 +55,7 @@ export default function ControleCaixa({
   lancamentos,
   onAddLancamento,
   onRemoveLancamento,
+  onUpdateLancamento,
   aluguelCampoBase,
   onUpdateAluguelCampoBase,
   valorDiaria,
@@ -62,8 +65,29 @@ export default function ControleCaixa({
   jogadorAtual,
   onLimparDadosDoMes
 }: ControleCaixaProps) {
-  // Estado para escopo de visualização (Mensal vs Anual Consolidado)
-  const [visaoEscopo, setVisaoEscopo] = useState<'mensal' | 'anual'>('mensal');
+  // Helper to find the correct rent of a given month
+  const getAluguelDoMes = (mes: string): number => {
+    const mapStr = localStorage.getItem('futebol_aluguel_mensal_map');
+    const currentMonthStr = '2026-06';
+    if (mapStr) {
+      try {
+        const map = JSON.parse(mapStr);
+        if (map[mes] !== undefined) {
+          return map[mes];
+        }
+      } catch (e) {
+        console.error(e);
+      }
+    }
+    if (mes <= currentMonthStr) {
+      const priorVal = localStorage.getItem('futebol_aluguel_campo_prior');
+      return priorVal ? Number(priorVal) : 500;
+    }
+    return aluguelCampoBase;
+  };
+
+  // Estado para escopo de visualização (Mensal vs Anual vs Consolidado Total)
+  const [visaoEscopo, setVisaoEscopo] = useState<'mensal' | 'anual' | 'consolidado'>('mensal');
 
   // Estado para confirmar cancelamento sem window.confirm
   const [cancelarConfirmId, setCancelarConfirmId] = useState<string | null>(null);
@@ -73,7 +97,12 @@ export default function ControleCaixa({
   const [detalhesMesModal, setDetalhesMesModal] = useState<string | null>(null);
 
   // Estado para Mês de Referência do Caixa Geral
-  const [mesSelecionado, setMesSelecionado] = useState('2026-05');
+  const [mesSelecionado, setMesSelecionado] = useState(() => {
+    const d = new Date();
+    const y = d.getFullYear();
+    const m = String(d.getMonth() + 1).padStart(2, '0');
+    return `${y}-${m}`;
+  });
   
   // Estado para Jogo Selecionado na sub-área 1
   const [partidaSelecionadaId, setPartidaSelecionadaId] = useState<string>('');
@@ -85,6 +114,8 @@ export default function ControleCaixa({
   const [avulsoValor, setAvulsoValor] = useState<number>(0);
   const [avulsoData, setAvulsoData] = useState<string>(new Date().toISOString().split('T')[0]);
   const [avulsoCategoria, setAvulsoCategoria] = useState<string>('outros_receita');
+  const [avulsoPartidaId, setAvulsoPartidaId] = useState<string>('');
+  const [editingLancamentoId, setEditingLancamentoId] = useState<string>('');
 
   // Ajuste de aluguel do campo local state
   const [tempAluguel, setTempAluguel] = useState<number>(aluguelCampoBase);
@@ -100,6 +131,11 @@ export default function ControleCaixa({
   const partidasDoMes = useMemo(() => {
     return partidas.filter(p => !p.cancelada && p.data.startsWith(mesSelecionado));
   }, [partidas, mesSelecionado]);
+
+  // Ordenar partidas cronologicamente
+  const partidasDoMesSorted = useMemo(() => {
+    return [...partidasDoMes].sort((a, b) => a.data.localeCompare(b.data));
+  }, [partidasDoMes]);
 
   // Contagem de sábados no mês para rateios de mensalidades
   const numSabados = useMemo(() => {
@@ -244,8 +280,8 @@ export default function ControleCaixa({
 
   // 2. Despesas Automáticas do Mês
   const despesaAluguelAutomatico = useMemo(() => {
-    return partidasDoMes.length * aluguelCampoBase;
-  }, [partidasDoMes, aluguelCampoBase]);
+    return partidasDoMes.length * getAluguelDoMes(mesSelecionado);
+  }, [partidasDoMes, mesSelecionado, aluguelCampoBase]);
 
   // Despesas Avulsas do Mês
   const despesaAvulsaTotal = useMemo(() => {
@@ -260,6 +296,18 @@ export default function ControleCaixa({
   // Saldo Líquido do Mês
   const saldoLiquidoMês = receitaTotalGeral - despesaTotalGeral;
 
+
+  const startupMonth = useMemo(() => {
+    return localStorage.getItem('futebol_startup_month') || '2026-05';
+  }, []);
+
+  // Retorna o mês atual no formato "YYYY-MM"
+  const obterMesAtual = (): string => {
+    const d = new Date();
+    const y = d.getFullYear();
+    const m = String(d.getMonth() + 1).padStart(2, '0');
+    return `${y}-${m}`;
+  };
 
   // --- CÁLCULO ANUAL CONSOLIDADO ATÉ O MOMENTO (BREAKDOWN MENSAL) ---
   const consolidadoMensalDoAno = useMemo(() => {
@@ -282,47 +330,53 @@ export default function ControleCaixa({
     const anoAtual = hoje.getFullYear();
     const mesAtual = hoje.getMonth() + 1;
     const anoSelInt = parseInt(anoSelecionado) || 2026;
+    const mesLimit = obterMesAtual();
 
     const mesesExibidos = meses.filter(m => {
       const mesIdInt = parseInt(m.id);
+      const mesRef = `${anoSelecionado}-${m.id}`;
+      // Nao mostrar meses passados que foram resetados (antes de startupMonth) ou meses futuros
+      if (mesRef < startupMonth || mesRef > mesLimit) {
+        return false;
+      }
       if (anoSelInt < anoAtual) {
-        return true; // past year: include all months
+        return true; // past year
       } else if (anoSelInt === anoAtual) {
         return mesIdInt <= mesAtual; // current year: up to current month (YTD)
       } else {
-        return false; // future year: exclude all months
+        return false; // future year
       }
     });
 
     return mesesExibidos.map(m => {
       const mesRef = `${anoSelecionado}-${m.id}`;
       
-      const partidasM = partidas.filter(p => !p.cancelada && p.data.startsWith(mesRef));
+      const partidasM = partidas.filter(p => !p.cancelada && p.data && p.data.startsWith(mesRef));
       const pagamentosM = pagamentos.filter(p => p.mesRef === mesRef && p.status === 'pago');
       
       const recMensalistasM = pagamentosM
         .filter(p => {
-          const j = jogadores.find(j => j.id === p.jogadorId);
+          const j = jogadores.find(jg => jg.id === p.jogadorId);
           return j && j.membroStatus === 'mensalista';
         })
         .reduce((sum, p) => sum + p.valor, 0);
 
       const recDiaristasM = pagamentosM
         .filter(p => {
-          const j = jogadores.find(j => j.id === p.jogadorId);
+          const j = jogadores.find(jg => jg.id === p.jogadorId);
           return j && j.membroStatus === 'diarista';
         })
         .reduce((sum, p) => sum + p.valor, 0);
 
       const recAvulsaM = lancamentos
-        .filter(l => l.tipo === 'receita' && l.data.startsWith(mesRef))
+        .filter(l => l.tipo === 'receita' && l.data && l.data.startsWith(mesRef))
         .reduce((sum, l) => sum + l.valor, 0);
 
       const receitaTotalM = recMensalistasM + recDiaristasM + recAvulsaM;
 
-      const despesaAluguelM = partidasM.length * aluguelCampoBase;
+      const despesaAluguelM = partidasM.length * getAluguelDoMes(mesRef);
       const despesaAvulsaM = lancamentos
-        .filter(l => l.tipo === 'despesa' && l.data.startsWith(mesRef))
+        .filter(l => l.tipo === 'despesa' && l.data && l.data.startsWith(mesRef))
         .reduce((sum, l) => sum + l.valor, 0);
 
       const despesaTotalM = despesaAluguelM + despesaAvulsaM;
@@ -341,7 +395,7 @@ export default function ControleCaixa({
         saldo: receitaTotalM - despesaTotalM
       };
     });
-  }, [partidas, pagamentos, lancamentos, jogadores, aluguelCampoBase, anoSelecionado]);
+  }, [partidas, pagamentos, lancamentos, jogadores, aluguelCampoBase, anoSelecionado, startupMonth]);
 
   // Agregar totais anais com base no demonstrativo consolidado mensal
   const receitaTotalAno = useMemo(() => {
@@ -375,6 +429,194 @@ export default function ControleCaixa({
   const saldoLiquidoAno = receitaTotalAno - despesaTotalAno;
 
 
+  // --- CÁLCULOS CONSOLIDADOS (HISTÓRICO TOTAL) ---
+  const receitaMensalistasConsolidado = useMemo(() => {
+    const mesLimit = obterMesAtual();
+    return pagamentos
+      .filter(p => p.status === 'pago' && p.mesRef >= startupMonth && p.mesRef <= mesLimit)
+      .filter(p => {
+        const j = jogadores.find(jg => jg.id === p.jogadorId);
+        return j && j.membroStatus === 'mensalista';
+      })
+      .reduce((sum, p) => sum + p.valor, 0);
+  }, [pagamentos, jogadores, startupMonth]);
+
+  const receitaDiaristasConsolidado = useMemo(() => {
+    const mesLimit = obterMesAtual();
+    return pagamentos
+      .filter(p => p.status === 'pago' && p.mesRef >= startupMonth && p.mesRef <= mesLimit)
+      .filter(p => {
+        const j = jogadores.find(jg => jg.id === p.jogadorId);
+        return j && j.membroStatus === 'diarista';
+      })
+      .reduce((sum, p) => sum + p.valor, 0);
+  }, [pagamentos, jogadores, startupMonth]);
+
+  const receitaAvulsaConsolidado = useMemo(() => {
+    const mesLimit = obterMesAtual();
+    return lancamentos
+      .filter(l => l.tipo === 'receita' && l.data && l.data.substring(0, 7) >= startupMonth && l.data.substring(0, 7) <= mesLimit)
+      .reduce((sum, l) => sum + l.valor, 0);
+  }, [lancamentos, startupMonth]);
+
+  const receitaTotalConsolidado = receitaMensalistasConsolidado + receitaDiaristasConsolidado + receitaAvulsaConsolidado;
+
+  const despesaAluguelConsolidado = useMemo(() => {
+    const mesLimit = obterMesAtual();
+    return partidas
+      .filter(p => !p.cancelada && p.data && p.data.substring(0, 7) >= startupMonth && p.data.substring(0, 7) <= mesLimit)
+      .reduce((sum, p) => sum + getAluguelDoMes(p.data.substring(0, 7)), 0);
+  }, [partidas, aluguelCampoBase, startupMonth]);
+
+  const despesaAvulsaConsolidado = useMemo(() => {
+    const mesLimit = obterMesAtual();
+    return lancamentos
+      .filter(l => l.tipo === 'despesa' && l.data && l.data.substring(0, 7) >= startupMonth && l.data.substring(0, 7) <= mesLimit)
+      .reduce((sum, l) => sum + l.valor, 0);
+  }, [lancamentos, startupMonth]);
+
+  const despesaTotalConsolidado = despesaAluguelConsolidado + despesaAvulsaConsolidado;
+  const saldoLiquidoConsolidado = receitaTotalConsolidado - despesaTotalConsolidado;
+
+  const mesesDisponiveis = useMemo(() => {
+    const mesLimit = obterMesAtual(); // ex: '2026-06'
+    const mesSet = new Set<string>();
+    
+    // So adicionar mesLimit se for >= startupMonth
+    if (mesLimit >= startupMonth) {
+      mesSet.add(mesLimit);
+    } else {
+      mesSet.add(startupMonth);
+    }
+
+    partidas.forEach(p => {
+      if (p.data && p.data.length >= 7) {
+        const m = p.data.substring(0, 7);
+        if (m >= startupMonth && m <= mesLimit) {
+          mesSet.add(m);
+        }
+      }
+    });
+
+    lancamentos.forEach(l => {
+      if (l.data && l.data.length >= 7) {
+        const m = l.data.substring(0, 7);
+        if (m >= startupMonth && m <= mesLimit) {
+          mesSet.add(m);
+        }
+      }
+    });
+
+    pagamentos.forEach(p => {
+      if (p.mesRef && p.mesRef.length >= 7) {
+        if (p.mesRef >= startupMonth && p.mesRef <= mesLimit) {
+          mesSet.add(p.mesRef);
+        }
+      }
+    });
+
+    // Ordenar os meses cronologicamente para montar a sequência a partir do primeiro registro
+    const listaMeses = Array.from(mesSet).sort();
+    if (listaMeses.length > 0) {
+      const minMes = listaMeses[0] >= startupMonth ? listaMeses[0] : startupMonth;
+      const maxMes = mesLimit >= startupMonth ? mesLimit : startupMonth;
+      const [minY, minM] = minMes.split('-').map(Number);
+      const [maxY, maxM] = maxMes.split('-').map(Number);
+
+      const sequencia: string[] = [];
+      let curY = minY;
+      let curM = minM;
+      while (curY < maxY || (curY === maxY && curM <= maxM)) {
+        const mesStr = `${curY}-${String(curM).padStart(2, '0')}`;
+        sequencia.push(mesStr);
+        curM++;
+        if (curM > 12) {
+          curM = 1;
+          curY++;
+        }
+      }
+      return sequencia;
+    }
+    const fallbackSeq = [];
+    const [minY, minM] = startupMonth.split('-').map(Number);
+    const [maxY, maxM] = (mesLimit >= startupMonth ? mesLimit : startupMonth).split('-').map(Number);
+    let curY = minY;
+    let curM = minM;
+    while (curY < maxY || (curY === maxY && curM <= maxM)) {
+      const mesStr = `${curY}-${String(curM).padStart(2, '0')}`;
+      fallbackSeq.push(mesStr);
+      curM++;
+      if (curM > 12) {
+        curM = 1;
+        curY++;
+      }
+    }
+    return fallbackSeq;
+  }, [partidas, lancamentos, pagamentos, startupMonth]);
+
+  const consolidadoMensalHistorico = useMemo(() => {
+    // Ordem cronológica decrescente dos meses disponíveis para exibição histórica útil
+    const mesesSorted = [...mesesDisponiveis].reverse();
+    
+    const nomesMesesIndex: Record<string, string> = {
+      '01': 'Janeiro', '02': 'Fevereiro', '03': 'Março', '04': 'Abril',
+      '05': 'Maio', '06': 'Junho', '07': 'Julho', '08': 'Agosto',
+      '09': 'Setembro', '10': 'Outubro', '11': 'Novembro', '12': 'Dezembro'
+    };
+
+    return mesesSorted.map(mesRef => {
+      const [ano, mesId] = mesRef.split('-');
+      const nomeMes = nomesMesesIndex[mesId] || mesId;
+      const nomeCompleto = `${nomeMes} de ${ano}`;
+      
+      const partidasM = partidas.filter(p => !p.cancelada && p.data.startsWith(mesRef));
+      const pagamentosM = pagamentos.filter(p => p.mesRef === mesRef && p.status === 'pago');
+      
+      const recMensalistasM = pagamentosM
+        .filter(p => {
+          const j = jogadores.find(jg => jg.id === p.jogadorId);
+          return j && j.membroStatus === 'mensalista';
+        })
+        .reduce((sum, p) => sum + p.valor, 0);
+
+      const recDiaristasM = pagamentosM
+        .filter(p => {
+          const j = jogadores.find(jg => jg.id === p.jogadorId);
+          return j && j.membroStatus === 'diarista';
+        })
+        .reduce((sum, p) => sum + p.valor, 0);
+
+      const recAvulsaM = lancamentos
+        .filter(l => l.tipo === 'receita' && l.data.startsWith(mesRef))
+        .reduce((sum, l) => sum + l.valor, 0);
+
+      const receitaTotalM = recMensalistasM + recDiaristasM + recAvulsaM;
+
+      const despesaAluguelM = partidasM.length * getAluguelDoMes(mesRef);
+      const despesaAvulsaM = lancamentos
+        .filter(l => l.tipo === 'despesa' && l.data.startsWith(mesRef))
+        .reduce((sum, l) => sum + l.valor, 0);
+
+      const despesaTotalM = despesaAluguelM + despesaAvulsaM;
+
+      return {
+        id: mesRef,
+        mesRef,
+        nome: nomeCompleto,
+        partidasCount: partidasM.length,
+        receitaTotal: receitaTotalM,
+        receitaMensalistas: recMensalistasM,
+        receitaDiaristas: recDiaristasM,
+        receitaAvulsa: recAvulsaM,
+        despesaTotal: despesaTotalM,
+        despesaAluguel: despesaAluguelM,
+        despesaAvulsa: despesaAvulsaM,
+        saldo: receitaTotalM - despesaTotalM
+      };
+    });
+  }, [mesesDisponiveis, partidas, pagamentos, lancamentos, jogadores, aluguelCampoBase]);
+
+
   // --- ADAPTABILIDADES DO ESCOPO ---
   const partidasDoAno = useMemo(() => {
     const hoje = new Date();
@@ -386,6 +628,9 @@ export default function ControleCaixa({
       if (p.cancelada) return false;
       if (!p.data.startsWith(anoSelecionado)) return false;
 
+      const mesPartidaStr = p.data.substring(0, 7);
+      if (mesPartidaStr < startupMonth) return false;
+
       const mesPartida = parseInt(p.data.substring(5, 7));
       if (anoSelInt < anoAtual) {
         return true;
@@ -395,7 +640,7 @@ export default function ControleCaixa({
         return false;
       }
     });
-  }, [partidas, anoSelecionado]);
+  }, [partidas, anoSelecionado, startupMonth]);
 
   // Seletor de partidas dinâmico por escopo
   const partidasEscopo = useMemo(() => {
@@ -486,7 +731,7 @@ export default function ControleCaixa({
     }, 0);
 
     const receitaJogoTotal = receitaEstProjDiaristas + receitaEstProjMensalistasFraction;
-    const despesaAluguelJogo = aluguelCampoBase;
+    const despesaAluguelJogo = getAluguelDoMes(mesPartida);
 
     // Encontrar despesas avulsas atribuídas a esse jogo (ex: se na descrição houver o ID do jogo ou data)
     const despesasAdicionaisJogo = lancamentos
@@ -585,7 +830,7 @@ export default function ControleCaixa({
 
     const receitaTotal = recMensalistas + recDiaristas + recAvulsa;
 
-    const despesaAluguel = partidasM.length * aluguelCampoBase;
+    const despesaAluguel = partidasM.length * getAluguelDoMes(detalhesMesModal);
     const despesaAvulsa = lancamentosM
       .filter(l => l.tipo === 'despesa')
       .reduce((sum, l) => sum + l.valor, 0);
@@ -626,17 +871,32 @@ export default function ControleCaixa({
     e.preventDefault();
     if (!avulsoDescricao.trim() || avulsoValor <= 0) return;
 
-    onAddLancamento({
-      tipo: avulsoTipo,
-      descricao: avulsoDescricao,
-      valor: avulsoValor,
-      data: avulsoData,
-      categoria: avulsoCategoria
-    });
+    if (editingLancamentoId && onUpdateLancamento) {
+      onUpdateLancamento({
+        id: editingLancamentoId,
+        tipo: avulsoTipo,
+        descricao: avulsoDescricao,
+        valor: avulsoValor,
+        data: avulsoData,
+        categoria: avulsoCategoria,
+        partidaId: avulsoPartidaId || undefined
+      });
+    } else {
+      onAddLancamento({
+        tipo: avulsoTipo,
+        descricao: avulsoDescricao,
+        valor: avulsoValor,
+        data: avulsoData,
+        categoria: avulsoCategoria,
+        partidaId: avulsoPartidaId || undefined
+      });
+    }
 
     // Reset formulário
     setAvulsoDescricao('');
     setAvulsoValor(0);
+    setAvulsoPartidaId('');
+    setEditingLancamentoId('');
     setShowFormAvulso(false);
   };
 
@@ -645,23 +905,83 @@ export default function ControleCaixa({
     setIsEditingAluguel(false);
   };
 
+  const receitaVisualizar = visaoEscopo === 'mensal' 
+    ? receitaTotalGeral 
+    : visaoEscopo === 'anual' 
+    ? receitaTotalAno 
+    : receitaTotalConsolidado;
+
+  const receitaMensalistasVisualizar = visaoEscopo === 'mensal' 
+    ? receitaMensalistas 
+    : visaoEscopo === 'anual' 
+    ? receitaMensalistasAno 
+    : receitaMensalistasConsolidado;
+
+  const receitaDiaristasVisualizar = visaoEscopo === 'mensal' 
+    ? receitaDiaristas 
+    : visaoEscopo === 'anual' 
+    ? receitaDiaristasAno 
+    : receitaDiaristasConsolidado;
+
+  const receitaAvulsaVisualizar = visaoEscopo === 'mensal' 
+    ? receitaAvulsaTotal 
+    : visaoEscopo === 'anual' 
+    ? receitaAvulsaAno 
+    : receitaAvulsaConsolidado;
+
+  const despesaVisualizar = visaoEscopo === 'mensal' 
+    ? despesaTotalGeral 
+    : visaoEscopo === 'anual' 
+    ? despesaTotalAno 
+    : despesaTotalConsolidado;
+
+  const despesaAluguelVisualizar = visaoEscopo === 'mensal' 
+    ? despesaAluguelAutomatico 
+    : visaoEscopo === 'anual' 
+    ? despesaAluguelAno 
+    : despesaAluguelConsolidado;
+
+  const despesaAvulsaVisualizar = visaoEscopo === 'mensal' 
+    ? despesaAvulsaTotal 
+    : visaoEscopo === 'anual' 
+    ? despesaAvulsaAno 
+    : despesaAvulsaConsolidado;
+
+  const partidasCountVisualizar = visaoEscopo === 'mensal' 
+    ? partidasDoMes.length 
+    : visaoEscopo === 'anual' 
+    ? partidasDoAno.length 
+    : partidas.filter(p => !p.cancelada).length;
+
+  const saldoLiquidoVisualizar = visaoEscopo === 'mensal' 
+    ? saldoLiquidoMês 
+    : visaoEscopo === 'anual' 
+    ? saldoLiquidoAno 
+    : saldoLiquidoConsolidado;
+
   return (
     <div className="w-full max-w-7xl mx-auto space-y-6">
-      
       {/* CABEÇALHO */}
-      <div className="flex flex-col lg:flex-row lg:items-center lg:justify-between gap-4 bg-emerald-900/40 border border-white/10 rounded-2xl p-5 shadow-lg backdrop-blur-sm">
-        <div className="text-left">
-          <h2 id="titulo-caixa" className="font-display font-semibold text-lg text-white flex items-center gap-2 uppercase tracking-wide">
+      <div className="flex flex-col md:flex-row md:items-center md:justify-between gap-4 bg-emerald-955/40 border border-white/10 rounded-2xl p-5 shadow-lg backdrop-blur-sm">
+        <div className="text-left space-y-1">
+          <div className="flex items-center gap-2">
+            <span className="text-[9px] font-mono tracking-wider font-extrabold text-teal-400 bg-teal-500/15 border border-teal-550/20 px-2.5 py-0.5 rounded-full uppercase">
+              Módulo Admin
+            </span>
+          </div>
+          <h2 id="titulo-caixa" className="font-display font-black text-lg text-white flex items-center gap-2 uppercase tracking-wider">
             <TrendingUp className="w-5 h-5 text-teal-400" />
             Controle Financeiro Geral
           </h2>
-          <p className="text-xs text-emerald-300/85 font-sans mt-0.5">Gestão financeira consolidada, faturamento, rateio e auditorias administradoras.</p>
+          <p className="text-[11px] text-emerald-300/80 font-sans tracking-wide">
+            Gestão financeira consolidada do caixa, faturamento mensal, rateios proporcionais e caixa anual.
+          </p>
         </div>
 
         {/* CONTROLES DE ESCOPO E FILTROS */}
-        <div className="flex flex-wrap items-center gap-3">
+        <div className="flex flex-row flex-wrap items-center gap-3 md:justify-end shrink-0 w-full md:w-auto">
           {/* Seletor de Escopo (Pill Switch) */}
-          <div className="bg-emerald-950 p-1 border border-white/15 rounded-xl flex items-center shrink-0">
+          <div className="bg-black/45 p-1 border border-white/10 rounded-xl flex items-center shrink-0">
             <button
               id="switch-scope-mensal"
               type="button"
@@ -669,9 +989,9 @@ export default function ControleCaixa({
                 setVisaoEscopo('mensal');
                 setPartidaSelecionadaId('');
               }}
-              className={`px-3 py-1.5 text-xs font-bold rounded-lg transition-all cursor-pointer ${
+              className={`px-3.5 py-1.5 text-xs font-bold rounded-lg transition-all cursor-pointer text-center shrink-0 ${
                 visaoEscopo === 'mensal'
-                  ? 'bg-teal-500 text-emerald-950 shadow font-extrabold'
+                  ? 'bg-teal-500 text-emerald-950 shadow-md font-extrabold'
                   : 'text-emerald-300 hover:text-white font-medium'
               }`}
             >
@@ -684,20 +1004,37 @@ export default function ControleCaixa({
                 setVisaoEscopo('anual');
                 setPartidaSelecionadaId('');
               }}
-              className={`px-3 py-1.5 text-xs font-bold rounded-lg transition-all cursor-pointer ${
+              className={`px-3.5 py-1.5 text-xs font-bold rounded-lg transition-all cursor-pointer text-center shrink-0 ${
                 visaoEscopo === 'anual'
-                  ? 'bg-teal-500 text-emerald-950 shadow font-extrabold'
+                  ? 'bg-teal-500 text-emerald-950 shadow-md font-extrabold'
                   : 'text-emerald-300 hover:text-white font-medium'
               }`}
             >
               Consolidado Anual
             </button>
+            <button
+              id="switch-scope-consolidado"
+              type="button"
+              onClick={() => {
+                setVisaoEscopo('consolidado');
+                setPartidaSelecionadaId('');
+              }}
+              className={`px-3.5 py-1.5 text-xs font-bold rounded-lg transition-all cursor-pointer text-center shrink-0 ${
+                visaoEscopo === 'consolidado'
+                  ? 'bg-teal-500 text-emerald-950 shadow-md font-extrabold'
+                  : 'text-emerald-300 hover:text-white font-medium'
+              }`}
+            >
+              Consolidado Total
+            </button>
           </div>
 
-          <div className="flex items-center gap-2 shrink-0">
+          <div className="flex items-center gap-2.5 shrink-0">
             {visaoEscopo === 'mensal' ? (
-              <>
-                <label className="text-[10px] font-bold text-emerald-300 uppercase tracking-wider font-sans shrink-0">Filtrar Mês:</label>
+              <div className="flex items-center gap-2 shrink-0">
+                <label htmlFor="caixa-mes-seletor" className="text-[10px] font-bold text-emerald-300 uppercase tracking-wider font-sans shrink-0">
+                  Mês:
+                </label>
                 <select
                   id="caixa-mes-seletor"
                   value={mesSelecionado}
@@ -705,33 +1042,33 @@ export default function ControleCaixa({
                     setMesSelecionado(e.target.value);
                     setPartidaSelecionadaId(''); // reset partida ativa
                   }}
-                  className="bg-emerald-950 border border-white/10 text-white text-xs font-bold font-mono rounded-lg px-3 py-2 focus:outline-none focus:border-white cursor-pointer"
+                  className="bg-black/45 border border-white/10 text-white text-xs font-bold font-mono rounded-lg px-3 py-2 focus:outline-none focus:border-teal-555 cursor-pointer shadow-inner shrink-0"
                 >
-                  <option className="bg-emerald-955 text-white" value="2026-05">Maio / 2026</option>
-                  <option className="bg-emerald-955 text-white" value="2026-06">Junho / 2026</option>
+                  {[...mesesDisponiveis].reverse().map(m => {
+                    const nomesMesesIndex: Record<string, string> = {
+                      '01': 'Janeiro', '02': 'Fevereiro', '03': 'Março', '04': 'Abril',
+                      '05': 'Maio', '06': 'Junho', '07': 'Julho', '08': 'Agosto',
+                      '09': 'Setembro', '10': 'Outubro', '11': 'Novembro', '12': 'Dezembro'
+                    };
+                    const [ano, mesId] = m.split('-');
+                    const label = `${nomesMesesIndex[mesId] || mesId} / ${ano}`;
+                    return (
+                      <option className="bg-emerald-955 text-white animate-fade-in" key={m} value={m}>
+                        {label}
+                      </option>
+                    );
+                  })}
                 </select>
-              </>
+              </div>
+            ) : visaoEscopo === 'anual' ? (
+              <span className="bg-black/45 border border-white/10 text-teal-400 text-xs font-mono font-bold rounded-lg px-3.5 py-2 shadow-inner shrink-0">
+                Ano {anoSelecionado}
+              </span>
             ) : (
-              <span className="bg-emerald-950 border border-white/10 text-teal-400 text-xs font-extrabold font-mono rounded-lg px-3 py-2 shrink-0">
-                Ano {anoSelecionado} (Até o momento)
+              <span className="bg-teal-500/10 border border-teal-500/20 text-teal-400 text-xs font-mono font-bold rounded-lg px-3.5 py-2 shadow-inner shrink-0">
+                Todo o Histórico
               </span>
             )}
-
-            <button
-              id="btn-add-lancamento-caixa"
-              type="button"
-              onClick={() => {
-                setAvulsoData(`${mesSelecionado}-15`);
-                setAvulsoTipo('receita');
-                setAvulsoCategoria('outros_receita');
-                setShowFormAvulso(true);
-              }}
-              className="bg-teal-500 hover:bg-teal-400 text-bg shadow hover:shadow-teal-500/10 font-bold text-xs py-2 px-3.5 rounded-lg flex items-center gap-1.5 transition-colors cursor-pointer shrink-0"
-              style={{ color: '#022c22' }}
-            >
-              <PlusCircle className="w-3.5 h-3.5 text-emerald-950" />
-              Novo Lançamento
-            </button>
           </div>
         </div>
       </div>
@@ -742,29 +1079,29 @@ export default function ControleCaixa({
         {/* Receita TOTAL */}
         <div className="bg-emerald-900/30 border border-white/10 p-5 rounded-2xl relative overflow-hidden text-left shadow-md">
           <p className="text-[9px] text-emerald-300 uppercase font-bold tracking-wider leading-none">
-            {visaoEscopo === 'mensal' ? 'Receitas do Mês' : `Receitas do Ano (${anoSelecionado})`}
+            {visaoEscopo === 'mensal' ? 'Receitas do Mês' : visaoEscopo === 'anual' ? `Receitas do Ano (${anoSelecionado})` : 'Faturamento Histórico'}
           </p>
           <h4 className="text-2xl font-mono font-bold text-white mt-2">
-            R$ {(visaoEscopo === 'mensal' ? receitaTotalGeral : receitaTotalAno).toFixed(2)}
+            R$ {receitaVisualizar.toFixed(2)}
           </h4>
           <div className="space-y-1 mt-3.5 text-[10px] text-emerald-300/80 border-t border-white/5 pt-2.5">
             <div className="flex justify-between">
               <span>Mensalistas:</span>
               <strong className="text-white">
-                R$ {(visaoEscopo === 'mensal' ? receitaMensalistas : receitaMensalistasAno).toFixed(2)}
+                R$ {receitaMensalistasVisualizar.toFixed(2)}
               </strong>
             </div>
             <div className="flex justify-between">
               <span>Diaristas:</span>
               <strong className="text-white">
-                R$ {(visaoEscopo === 'mensal' ? receitaDiaristas : receitaDiaristasAno).toFixed(2)}
+                R$ {receitaDiaristasVisualizar.toFixed(2)}
               </strong>
             </div>
-            {((visaoEscopo === 'mensal' ? receitaAvulsaTotal : receitaAvulsaAno) > 0) && (
+            {(receitaAvulsaVisualizar > 0) && (
               <div className="flex justify-between text-teal-400 font-bold">
                 <span>Avulsos:</span>
                 <strong>
-                  R$ {(visaoEscopo === 'mensal' ? receitaAvulsaTotal : receitaAvulsaAno).toFixed(2)}
+                  R$ {receitaAvulsaVisualizar.toFixed(2)}
                 </strong>
               </div>
             )}
@@ -777,22 +1114,22 @@ export default function ControleCaixa({
         {/* Despesas Gerais */}
         <div className="bg-emerald-900/30 border border-white/10 p-5 rounded-2xl relative overflow-hidden text-left shadow-md">
           <p className="text-[9px] text-emerald-300 uppercase font-bold tracking-wider leading-none">
-            {visaoEscopo === 'mensal' ? 'Despesas do Mês' : `Despesas do Ano (${anoSelecionado})`}
+            {visaoEscopo === 'mensal' ? 'Despesas do Mês' : visaoEscopo === 'anual' ? `Despesas do Ano (${anoSelecionado})` : 'Custos Históricos'}
           </p>
           <h4 className="text-2xl font-mono font-bold text-rose-300 mt-2">
-            R$ {(visaoEscopo === 'mensal' ? despesaTotalGeral : despesaTotalAno).toFixed(2)}
+            R$ {despesaVisualizar.toFixed(2)}
           </h4>
           <div className="space-y-1 mt-3.5 text-[10px] text-rose-300/80 border-t border-white/5 pt-2.5">
             <div className="flex justify-between">
-              <span>Aluguel ({visaoEscopo === 'mensal' ? partidasDoMes.length : partidasDoAno.length} jogos):</span>
+              <span>Aluguel ({partidasCountVisualizar} {partidasCountVisualizar === 1 ? 'jogo' : 'jogos'}):</span>
               <strong className="text-white">
-                R$ {(visaoEscopo === 'mensal' ? despesaAluguelAutomatico : despesaAluguelAno).toFixed(2)}
+                R$ {despesaAluguelVisualizar.toFixed(2)}
               </strong>
             </div>
             <div className="flex justify-between">
               <span>Goleiro / Avulsas:</span>
               <strong className="text-white">
-                R$ {(visaoEscopo === 'mensal' ? despesaAvulsaTotal : despesaAvulsaAno).toFixed(2)}
+                R$ {despesaAvulsaVisualizar.toFixed(2)}
               </strong>
             </div>
           </div>
@@ -804,10 +1141,10 @@ export default function ControleCaixa({
         {/* Saldo Líquido */}
         <div className="bg-emerald-900/30 border border-white/10 p-5 rounded-2xl relative overflow-hidden text-left shadow-md">
           <p className="text-[9px] text-emerald-300 uppercase font-bold tracking-wider leading-none">
-            {visaoEscopo === 'mensal' ? 'Saldo Líquido' : `Saldo Líquido Ano (${anoSelecionado})`}
+            {visaoEscopo === 'mensal' ? 'Saldo Líquido' : visaoEscopo === 'anual' ? `Saldo Líquido Ano (${anoSelecionado})` : 'Lucro Consolidado'}
           </p>
           {(() => {
-            const val = visaoEscopo === 'mensal' ? saldoLiquidoMês : saldoLiquidoAno;
+            const val = saldoLiquidoVisualizar;
             return (
               <>
                 <h4 className={`text-2xl font-mono font-bold mt-2 ${val >= 0 ? 'text-teal-400' : 'text-rose-400'}`}>
@@ -839,7 +1176,7 @@ export default function ControleCaixa({
                 type="number"
                 value={tempAluguel}
                 onChange={(e) => setTempAluguel(Number(e.target.value))}
-                className="w-full bg-emerald-950 border border-white/20 text-white font-mono font-bold text-sm rounded px-2.5 py-1 focus:outline-none"
+                className="w-full bg-emerald-955 border border-white/20 text-white font-mono font-bold text-sm rounded px-2.5 py-1 focus:outline-none"
               />
               <div className="flex gap-1">
                 <button
@@ -868,7 +1205,9 @@ export default function ControleCaixa({
               <p className="text-[9px] text-emerald-300 mt-1 leading-normal font-sans">
                 {visaoEscopo === 'mensal'
                   ? `Taxa de aluguel por jogo agendado. Incide débito automático de R$ ${aluguelCampoBase.toFixed(2)} a cada partida.`
-                  : `Custo total de aluguel do campo acumulado este ano: R$ ${despesaAluguelAno.toFixed(2)}.`}
+                  : visaoEscopo === 'anual'
+                  ? `Custo total de aluguel do campo acumulado este ano: R$ ${despesaAluguelAno.toFixed(2)}.`
+                  : `Custo acumulado histórico de aluguel pago: R$ ${despesaAluguelConsolidado.toFixed(2)}.`}
               </p>
               <button
                 type="button"
@@ -883,19 +1222,25 @@ export default function ControleCaixa({
 
       </div>
 
-      {/* DEMONSTRATIVO MENSAL CONSOLIDADO DO ANO (EXIBIDO APENAS EM VISÃO ANUAL) */}
-      {visaoEscopo === 'anual' && (
+      {/* DEMONSTRATIVO MENSAL CONSOLIDADO (EXIBIDO EM VISÃO ANUAL OU CONSOLIDADO TOTAL) */}
+      {(visaoEscopo === 'anual' || visaoEscopo === 'consolidado') && (
         <div className="bg-emerald-900/40 border border-white/10 rounded-2xl p-5 shadow-xl backdrop-blur-sm space-y-4 text-left animate-fade-in text-white">
           <div className="border-b border-white/10 pb-3">
             <h3 className="font-display font-semibold text-sm text-teal-300 flex items-center gap-2 uppercase tracking-wide">
               <Calendar className="w-5 h-5 text-teal-400" />
-              Demonstrativo Mensal Consolidado - Ano {anoSelecionado}
+              {visaoEscopo === 'anual' 
+                ? `Demonstrativo Mensal Consolidado - Ano ${anoSelecionado}` 
+                : 'Demonstrativo Mensal Histórico Consolidado (Tudo)'}
             </h3>
-            <p className="text-xs text-emerald-300/80 font-sans mt-0.5">Visão verticalizada de todos os meses do ano de faturamento, gasto operacional e saldo acumulado.</p>
+            <p className="text-xs text-emerald-300/80 font-sans mt-0.5">
+              {visaoEscopo === 'anual'
+                ? 'Visão verticalizada de todos os meses do ano de faturamento, gasto operacional e saldo acumulado.'
+                : 'Histórico consolidado completo de faturamento, custos operacionais e saldos de competência.'}
+            </p>
           </div>
 
           <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-4">
-            {consolidadoMensalDoAno
+            {(visaoEscopo === 'anual' ? consolidadoMensalDoAno : consolidadoMensalHistorico)
               .filter(m => m.receitaTotal > 0 || m.despesaTotal > 0 || m.partidasCount > 0)
               .map((m) => {
                 const isPos = m.saldo >= 0;
@@ -971,7 +1316,7 @@ export default function ControleCaixa({
 
                     <div className="flex justify-between items-center pt-2 border-t border-white/5 mt-1">
                       <span className="text-[10.5px] text-emerald-400 font-sans">Resultado Líquido:</span>
-                      <span className={`font-mono font-extrabold text-xs ${isPos ? 'text-teal-400' : 'text-rose-400'}`}>
+                      <span className={`font-mono font-extrabold text-xs classNameIsPos ${isPos ? 'text-teal-400' : 'text-rose-400'}`}>
                         R$ {m.saldo.toFixed(2)}
                       </span>
                     </div>
@@ -979,90 +1324,419 @@ export default function ControleCaixa({
                 );
               })}
             
-            {consolidadoMensalDoAno.filter(m => m.receitaTotal > 0 || m.despesaTotal > 0 || m.partidasCount > 0).length === 0 && (
+            {(visaoEscopo === 'anual' ? consolidadoMensalDoAno : consolidadoMensalHistorico).filter(m => m.receitaTotal > 0 || m.despesaTotal > 0 || m.partidasCount > 0).length === 0 && (
               <div className="col-span-full text-center py-8 text-emerald-500 font-sans italic text-xs">
-                Nenhum registro consolidado encontrado para o ano {anoSelecionado}.
+                Nenhum registro consolidado encontrado.
               </div>
             )}
           </div>
         </div>
       )}
 
-      {/* FORMULÁRIO DE LANÇAMENTO AVULSO */}
+      {/* POPUP DE LANÇAMENTO AVULSO */}
       {showFormAvulso && (
-        <div className="bg-emerald-900/30 border border-white/15 p-5 rounded-2xl text-left shadow-lg animate-fade-in relative">
-          <button 
-            type="button"
-            onClick={() => setShowFormAvulso(false)}
-            className="absolute right-4 top-4 text-emerald-300 hover:text-white font-bold"
+        <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/85 backdrop-blur-md animate-fade-in text-white font-sans">
+          <div 
+            className="w-full max-w-md border border-white/10 rounded-2xl p-6 shadow-2xl flex flex-col justify-between overflow-hidden relative"
+            style={{ backgroundColor: '#021a14' }}
+            onClick={(e) => e.stopPropagation()}
           >
-            Fechar ×
-          </button>
-          
-          <h3 className="text-xs font-bold uppercase tracking-wider text-white mb-4 flex items-center gap-1">
-            <Sparkles className="w-3.5 h-3.5 text-teal-400 animate-pulse" /> Registrar Lançamento Avulso (Receita ou Despesa)
-          </h3>
-
-          <form onSubmit={handleSalvarLancamentoAvulso} className="grid grid-cols-1 sm:grid-cols-5 gap-3.5 items-end">
-            <div>
-              <label className="block text-[10px] font-bold text-emerald-300 uppercase tracking-wider mb-1 font-sans">Tipo:</label>
-              <select
-                value={avulsoTipo}
-                onChange={(e) => {
-                  const val = e.target.value as 'receita' | 'despesa';
-                  setAvulsoTipo(val);
-                  setAvulsoCategoria(val === 'receita' ? 'outros_receita' : 'outros_despesa');
-                }}
-                className="w-full bg-emerald-950 border border-white/10 text-white text-xs font-bold rounded-lg p-2.5 focus:outline-none"
-              >
-                <option value="receita">➕ RECEITA (Entrada)</option>
-                <option value="despesa">➖ DESPESA (Saída)</option>
-              </select>
-            </div>
-
-            <div className="sm:col-span-2">
-              <label className="block text-[10px] font-bold text-emerald-300 uppercase tracking-wider mb-1 font-sans">Descrição / Motivo:</label>
-              <input
-                type="text"
-                value={avulsoDescricao}
-                onChange={(e) => setAvulsoDescricao(e.target.value)}
-                placeholder="Ex: Compra de 2 bolas oficiais, Goleiro avulso, Patrocinador..."
-                className="w-full bg-emerald-950 border border-white/10 text-white text-xs rounded-lg p-2.5 focus:outline-none text-left"
-                required
-              />
-            </div>
-
-            <div>
-              <label className="block text-[10px] font-bold text-emerald-300 uppercase tracking-wider mb-1 font-sans">Valor (R$):</label>
-              <input
-                type="number"
-                value={avulsoValor || ''}
-                onChange={(e) => setAvulsoValor(Number(e.target.value))}
-                placeholder="100.00"
-                className="w-full bg-emerald-950 border border-white/10 text-white text-xs font-mono rounded-lg p-2.5 focus:outline-none"
-                min="0"
-                step="any"
-                required
-              />
-            </div>
-
-            <div>
+            {/* Header */}
+            <div className="flex items-center justify-between border-b border-white/10 pb-4 mb-4">
+              <div className="space-y-1 text-left">
+                <span className="text-[10px] font-mono tracking-wider font-bold text-teal-400 bg-teal-500/10 px-2.5 py-0.5 rounded-full uppercase">
+                  Gestão Financeira
+                </span>
+                <h3 className="font-display font-black text-sm text-white uppercase tracking-wider flex items-center gap-1.5">
+                  <Sparkles className="w-4 h-4 text-teal-400 animate-pulse" />
+                  {editingLancamentoId ? 'Editar Lançamento Avulso' : 'Registrar Lançamento Avulso'}
+                </h3>
+              </div>
               <button
-                type="submit"
-                className="w-full bg-white hover:bg-teal-50 text-black font-extrabold text-xs py-2.5 rounded-lg transition-colors cursor-pointer justify-center"
+                type="button"
+                onClick={() => {
+                  setShowFormAvulso(false);
+                  setAvulsoPartidaId('');
+                  setAvulsoDescricao('');
+                  setAvulsoValor(0);
+                  setEditingLancamentoId('');
+                }}
+                className="w-8 h-8 rounded-lg bg-black/20 hover:bg-white/10 border border-white/10 flex items-center justify-center text-emerald-300 hover:text-white transition-all cursor-pointer"
+                title="Fechar Lançamento"
               >
-                Lançar Registro
+                <X className="w-4 h-4" />
               </button>
             </div>
-          </form>
+
+            {/* Form Body */}
+            <form onSubmit={handleSalvarLancamentoAvulso} className="space-y-4 text-left">
+              <div>
+                <label className="block text-[10px] font-bold text-emerald-300 uppercase tracking-wider mb-1">Tipo de Operação:</label>
+                <select
+                  value={avulsoTipo}
+                  onChange={(e) => {
+                    const val = e.target.value as 'receita' | 'despesa';
+                    setAvulsoTipo(val);
+                    setAvulsoCategoria(val === 'receita' ? 'outros_receita' : 'outros_despesa');
+                  }}
+                  className="w-full bg-emerald-950 border border-white/10 text-white text-xs font-bold rounded-lg p-2.5 focus:outline-none focus:border-teal-500 cursor-pointer"
+                >
+                  <option value="receita">➕ RECEITA (Entrada de Caixa)</option>
+                  <option value="despesa">➖ DESPESA (Saída de Caixa)</option>
+                </select>
+              </div>
+
+              <div>
+                <label className="block text-[10px] font-bold text-emerald-300 uppercase tracking-wider mb-1">Associação / Vínculo:</label>
+                <select
+                  id="select-vinculo-partida"
+                  value={avulsoPartidaId}
+                  onChange={(e) => {
+                    const selectedId = e.target.value;
+                    setAvulsoPartidaId(selectedId);
+                    if (selectedId) {
+                      const pObj = partidasDoMes.find(p => p.id === selectedId);
+                      if (pObj) {
+                        setAvulsoData(pObj.data);
+                      }
+                    }
+                  }}
+                  className="w-full bg-emerald-950 border border-white/10 text-white text-xs font-bold rounded-lg p-2.5 focus:outline-none focus:border-teal-500 cursor-pointer"
+                >
+                  <option value="">🌐 Lançamento Transversal (Genérico do Mês)</option>
+                  {partidasDoMesSorted.map((p) => (
+                    <option key={p.id} value={p.id}>
+                      ⚽ Jogo: {p.titulo} ({p.data.split('-').reverse().join('/')})
+                    </option>
+                  ))}
+                </select>
+              </div>
+
+              <div>
+                <label className="block text-[10px] font-bold text-emerald-300 uppercase tracking-wider mb-1">Descrição / Motivo:</label>
+                <input
+                  type="text"
+                  value={avulsoDescricao}
+                  onChange={(e) => setAvulsoDescricao(e.target.value)}
+                  placeholder="Ex: Compra de 2 coletes, Copo descartável, Água..."
+                  className="w-full bg-emerald-950 border border-white/10 text-white text-xs rounded-lg p-2.5 focus:outline-none focus:border-teal-500 text-left"
+                  required
+                />
+              </div>
+
+              <div className="grid grid-cols-2 gap-3">
+                <div>
+                  <label className="block text-[10px] font-bold text-emerald-300 uppercase tracking-wider mb-1">Valor (R$):</label>
+                  <input
+                    type="number"
+                    value={avulsoValor || ''}
+                    onChange={(e) => setAvulsoValor(Number(e.target.value))}
+                    placeholder="100.00"
+                    className="w-full bg-emerald-950 border border-white/10 text-white text-xs font-mono rounded-lg p-2.5 focus:outline-none focus:border-teal-500"
+                    min="0.01"
+                    step="any"
+                    required
+                  />
+                </div>
+
+                <div>
+                  <label className="block text-[10px] font-bold text-emerald-350 uppercase tracking-wider mb-1">Data:</label>
+                  <input
+                    type="date"
+                    value={avulsoData}
+                    onChange={(e) => setAvulsoData(e.target.value)}
+                    className="w-full bg-emerald-950 border border-white/10 text-white text-xs rounded-lg p-2.5 focus:outline-none focus:border-teal-500"
+                    required
+                  />
+                </div>
+              </div>
+
+              <div className="pt-4 flex gap-3">
+                <button
+                  type="button"
+                  onClick={() => {
+                    setShowFormAvulso(false);
+                    setAvulsoPartidaId('');
+                    setAvulsoDescricao('');
+                    setAvulsoValor(0);
+                    setEditingLancamentoId('');
+                  }}
+                  className="flex-1 bg-white/5 hover:bg-white/10 text-white border border-white/10 font-bold text-xs py-2.5 rounded-lg transition-colors cursor-pointer justify-center text-center"
+                >
+                  Cancelar
+                </button>
+                <button
+                  type="submit"
+                  className="flex-1 bg-teal-500 hover:bg-teal-400 text-emerald-950 font-extrabold text-xs py-2.5 rounded-lg transition-colors cursor-pointer justify-center text-center"
+                >
+                  Confirmar
+                </button>
+              </div>
+            </form>
+          </div>
+        </div>
+      )}
+
+      {/* DETALHAMENTO POR PARTIDA DO MÊS */}
+      {visaoEscopo === 'mensal' && (
+        <div id="detalhamento-partidas-mes" className="bg-emerald-900/40 border border-white/10 rounded-2xl p-5 shadow-xl backdrop-blur-sm space-y-4 text-left text-white animate-fade-in">
+          <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between border-b border-white/10 pb-3 gap-2">
+            <div className="space-y-0.5">
+              <h3 className="font-display font-semibold text-sm text-teal-300 flex items-center gap-2 uppercase tracking-wide">
+                <span className="w-2.5 h-2.5 rounded-full bg-teal-400" />
+                detalhamento Financeiro por Partida (Mês)
+              </h3>
+              <p className="text-[10px] text-emerald-300/80 font-sans">
+                Acompanhamento individualizado de receitas arrecadadas (diaristas + mensalistas proporcional) e despesas de cada jogo.
+              </p>
+            </div>
+            {jogadorAtual?.role === 'admin' && (
+              <button
+                type="button"
+                onClick={() => {
+                  setAvulsoData(`${mesSelecionado}-15`);
+                  setAvulsoTipo('despesa');
+                  setAvulsoCategoria('outros_despesa');
+                  setAvulsoPartidaId('');
+                  setAvulsoDescricao('');
+                  setAvulsoValor(0);
+                  setShowFormAvulso(true);
+                }}
+                className="bg-emerald-950 hover:bg-emerald-900 border border-emerald-500/35 text-teal-300 font-bold text-[10px] uppercase tracking-wider px-3 py-1.5 rounded-lg flex items-center gap-1.5 transition-colors cursor-pointer shrink-0"
+              >
+                <PlusCircle className="w-3 h-3 text-teal-400" /> Novo Lançamento
+              </button>
+            )}
+          </div>
+
+          {partidasDoMesSorted.length === 0 ? (
+            <div className="text-center py-10 bg-emerald-950/20 border border-white/5 rounded-2xl">
+              <p className="text-emerald-500 font-sans italic text-xs">Nenhum jogo cadastrado para este mês ({mesSelecionado.split('-').reverse().join('/')}).</p>
+            </div>
+          ) : (
+            <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+              {partidasDoMesSorted.map((p) => {
+                const pDateFormatted = p.data.split('-').reverse().join('/');
+                
+                // Confirmados breakdown
+                const confirmadosAtletas = p.confirmados
+                  .map(id => jogadores.find(j => j.id === id))
+                  .filter(Boolean) as Jogador[];
+                const mensalistasCount = confirmadosAtletas.filter(j => j.membroStatus === 'mensalista' && j.posicao !== 'Goleiro').length;
+                const diaristasCount = confirmadosAtletas.filter(j => j.membroStatus === 'diarista' && j.posicao !== 'Goleiro').length;
+                const goleirosCount = confirmadosAtletas.filter(j => j.posicao === 'Goleiro').length;
+
+                // Receita calculada
+                const recDiaristasJogo = pagamentos
+                  .filter(pay => pay.partidaId === p.id && pay.status === 'pago')
+                  .reduce((sum, pay) => sum + pay.valor, 0);
+
+                const recMensalistasJogo = confirmadosAtletas
+                  .filter(j => j.membroStatus === 'mensalista' && j.posicao !== 'Goleiro')
+                  .reduce((sum, j) => {
+                    const pagMes = pagamentos.find(pay => pay.jogadorId === j.id && pay.mesRef === mesSelecionado && !pay.partidaId && pay.status === 'pago');
+                    if (pagMes) {
+                      return sum + (pagMes.valor / (numSabados || 4));
+                    }
+                    return sum;
+                  }, 0);
+
+                const recAvulsasJogo = lancamentos
+                  .filter(l => l.partidaId === p.id && l.tipo === 'receita')
+                  .reduce((sum, l) => sum + l.valor, 0);
+
+                const receitaTotalJogo = recDiaristasJogo + recMensalistasJogo + recAvulsasJogo;
+
+                // Despesa calculada
+                const despesasAvulsasJogo = lancamentos
+                  .filter(l => l.partidaId === p.id && l.tipo === 'despesa')
+                  .reduce((sum, l) => sum + l.valor, 0);
+
+                const despesaTotalJogo = aluguelCampoBase + despesasAvulsasJogo;
+                const saldoJogo = receitaTotalJogo - despesaTotalJogo;
+                const isPositive = saldoJogo >= 0;
+
+                // Capturar lançamentos avulsos específicos do jogo para listagem
+                const lancamentosExclusivosJogo = lancamentos.filter(l => l.partidaId === p.id);
+
+                return (
+                  <div 
+                    key={p.id}
+                    className="bg-black/25 border border-white/5 p-4 rounded-xl flex flex-col justify-between hover:border-teal-500/20 transition-all text-left space-y-3 shadow-md"
+                  >
+                    {/* Header do Jogo */}
+                    <div className="flex justify-between items-start border-b border-white/5 pb-2">
+                      <div className="space-y-0.5 font-sans">
+                        <span className="text-[9px] font-mono text-teal-400 bg-teal-950/40 px-2 py-0.5 rounded border border-teal-500/20 font-bold">
+                          {pDateFormatted}
+                        </span>
+                        <h4 className="font-sans font-bold text-white text-xs mt-1 truncate max-w-[200px]" title={p.titulo}>
+                          {p.titulo}
+                        </h4>
+                      </div>
+                      <div className="text-right">
+                        <span className="block text-[8px] uppercase tracking-wider text-emerald-300 font-sans">Saldo do Jogo</span>
+                        <span className={`text-xs font-mono font-black ${isPositive ? 'text-teal-400' : 'text-rose-455'}`}>
+                          {isPositive ? '+' : ''}R$ {saldoJogo.toFixed(2)}
+                        </span>
+                      </div>
+                    </div>
+
+                    {/* Presenças */}
+                    <div className="flex flex-wrap items-center gap-1.5 text-[9px] text-emerald-300 border-b border-white/5 pb-2 border-dashed">
+                      <Users className="w-2.5 h-2.5 text-teal-450" />
+                      <span>Confirmados:</span>
+                      <strong className="text-white font-mono">{confirmadosAtletas.length}</strong>
+                      <span>(</span>
+                      <span className="text-teal-400 font-mono font-bold">{mensalistasCount} Mens</span>
+                      <span>+</span>
+                      <span className="text-amber-300 font-mono font-bold">{diaristasCount} Diar</span>
+                      {goleirosCount > 0 && (
+                        <>
+                          <span>+</span>
+                          <span className="text-emerald-400 font-mono">{goleirosCount} Goleiros</span>
+                        </>
+                      )}
+                      <span>)</span>
+                    </div>
+
+                    {/* Detalhamento de Receita & Despesa */}
+                    <div className="grid grid-cols-2 gap-2 text-[10px] font-sans pb-1">
+                      {/* Receitas Breakdown */}
+                      <div className="space-y-1 border-r border-white/5 pr-2 text-left">
+                        <span className="text-[8px] uppercase font-bold text-emerald-400 tracking-wider">Arrecadação</span>
+                        <div className="flex justify-between text-[10px]">
+                          <span className="text-emerald-350">Diaristas (Pago):</span>
+                          <strong className="text-white font-mono">R$ {recDiaristasJogo.toFixed(2)}</strong>
+                        </div>
+                        <div className="flex justify-between text-[10px]" title="Soma proporcional de mensalidades dos assistentes ao jogo">
+                          <span className="text-emerald-355">Mensalistas (Rateio):</span>
+                          <strong className="text-white font-mono">R$ {recMensalistasJogo.toFixed(2)}</strong>
+                        </div>
+                        {recAvulsasJogo > 0 && (
+                          <div className="flex justify-between text-[10px] text-teal-400 font-bold">
+                            <span>Avulsos Jogo:</span>
+                            <span className="font-mono">R$ {recAvulsasJogo.toFixed(2)}</span>
+                          </div>
+                        )}
+                        <div className="flex justify-between border-t border-white/10 pt-1 text-[10.5px] font-bold text-teal-300">
+                          <span>Total Receita digital:</span>
+                          <span className="font-mono">R$ {receitaTotalJogo.toFixed(2)}</span>
+                        </div>
+                      </div>
+
+                      {/* Despesas Breakdown */}
+                      <div className="space-y-1 pl-2 text-left">
+                        <span className="text-[8px] uppercase font-bold text-rose-350 tracking-wider">Custos do Dia</span>
+                        <div className="flex justify-between text-[10px]">
+                          <span className="text-emerald-350">Aluguel do Campo:</span>
+                          <strong className="text-white font-mono">R$ {aluguelCampoBase.toFixed(2)}</strong>
+                        </div>
+                        <div className="flex justify-between text-[10px]">
+                          <span className="text-emerald-350">DIVERSAS / EXTRA:</span>
+                          <strong className="text-white font-mono">R$ {despesasAvulsasJogo.toFixed(2)}</strong>
+                        </div>
+                        <div className="flex justify-between border-t border-white/10 pt-1 text-[10.5px] font-bold text-rose-355">
+                          <span>Total Despesa:</span>
+                          <span className="font-mono">R$ {despesaTotalJogo.toFixed(2)}</span>
+                        </div>
+                      </div>
+                    </div>
+
+                    {/* Lançamentos específicos deste jogo */}
+                    {lancamentosExclusivosJogo.length > 0 && (
+                      <div className="bg-black/35 rounded-lg p-2 border border-white/5 space-y-1 text-left text-[9px] max-h-24 overflow-y-auto">
+                        <span className="text-teal-400 font-bold uppercase tracking-wider block text-[7.5px] mb-1">LANÇAMENTOS DESTE JOGO:</span>
+                        {lancamentosExclusivosJogo.map(l => (
+                          <div key={l.id} className="flex justify-between items-center text-white/90">
+                            <span className="truncate max-w-[130px] font-sans">• {l.descricao}</span>
+                            <div className="flex items-center gap-1 shrink-0">
+                              <span className={`font-mono font-bold ${l.tipo === 'receita' ? 'text-teal-450' : 'text-rose-455'}`}>
+                                {l.tipo === 'receita' ? '+' : '-'} R$ {l.valor.toFixed(2)}
+                              </span>
+                              {jogadorAtual?.role === 'admin' && (
+                                <div className="flex items-center gap-1 shrink-0">
+                                  <button
+                                    type="button"
+                                    onClick={() => {
+                                      setEditingLancamentoId(l.id);
+                                      setAvulsoTipo(l.tipo);
+                                      setAvulsoDescricao(l.descricao);
+                                      setAvulsoValor(l.valor);
+                                      setAvulsoData(l.data);
+                                      setAvulsoCategoria(l.categoria);
+                                      setAvulsoPartidaId(l.partidaId || '');
+                                      setShowFormAvulso(true);
+                                    }}
+                                    className="text-white/40 hover:text-teal-400 p-0.5 rounded transition-colors cursor-pointer"
+                                    title="Editar Lançamento"
+                                  >
+                                    <Pencil className="w-2.5 h-2.5" />
+                                  </button>
+                                  <button
+                                    type="button"
+                                    onClick={() => onRemoveLancamento(l.id)}
+                                    className="text-white/40 hover:text-rose-400 p-0.5 rounded cursor-pointer"
+                                    title="Excluir Lançamento"
+                                  >
+                                    ×
+                                  </button>
+                                </div>
+                              )}
+                            </div>
+                          </div>
+                        ))}
+                      </div>
+                    )}
+
+                    {/* Botão de rápido lançamento para esse jogo */}
+                    {jogadorAtual?.role === 'admin' && (
+                      <div className="pt-2 border-t border-white/5 flex gap-2">
+                        <button
+                          type="button"
+                          onClick={() => {
+                            setAvulsoData(p.data);
+                            setAvulsoTipo('despesa');
+                            setAvulsoCategoria('outros_despesa');
+                            setAvulsoPartidaId(p.id);
+                            setAvulsoDescricao(`Despesa Jogo: ${p.titulo.substring(0, 15)}`);
+                            setAvulsoValor(0);
+                            setShowFormAvulso(true);
+                          }}
+                          className="flex-1 bg-white/5 hover:bg-rose-500/10 hover:text-rose-300 border border-white/5 hover:border-rose-500/20 text-white/70 font-bold text-[9px] py-1.5 rounded uppercase tracking-wider transition-all cursor-pointer text-center"
+                        >
+                          ➕ Despesa extra
+                        </button>
+                        <button
+                          type="button"
+                          onClick={() => {
+                            setAvulsoData(p.data);
+                            setAvulsoTipo('receita');
+                            setAvulsoCategoria('outros_receita');
+                            setAvulsoPartidaId(p.id);
+                            setAvulsoDescricao(`Receita Extra Jogo: ${p.titulo.substring(0, 15)}`);
+                            setAvulsoValor(0);
+                            setShowFormAvulso(true);
+                          }}
+                          className="flex-1 bg-white/5 hover:bg-teal-500/10 hover:text-teal-300 border border-white/5 hover:border-teal-500/20 text-white/70 font-bold text-[9px] py-1.5 rounded uppercase tracking-wider transition-all cursor-pointer text-center"
+                        >
+                          ➕ Receita extra
+                        </button>
+                      </div>
+                    )}
+                  </div>
+                );
+              })}
+            </div>
+          )}
         </div>
       )}
 
       {/* SUB-ÁREAS FINANCEIRAS */}
-      <div className="grid grid-cols-1 lg:grid-cols-12 gap-6 items-start">
+      <div className="grid grid-cols-1 gap-6 w-full">
         
-        {/* SUBGERÊNCIA 1: FINANCEIRO E PAGAMENTOS DO JOGO ATUAL (Col: 7/12) */}
-        <div className="lg:col-span-7 bg-emerald-900/40 border border-white/10 rounded-2xl p-5 shadow-xl backdrop-blur-sm space-y-4 text-left">
+        {/* SUBGERÊNCIA 1: FINANCEIRO E PAGAMENTOS DO JOGO ATUAL */}
+        <div className="bg-emerald-900/40 border border-white/10 rounded-2xl p-5 shadow-xl backdrop-blur-sm space-y-4 text-left">
           <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between border-b border-white/10 pb-3.5 gap-2.5">
             <div className="space-y-0.5">
               <h3 className="font-display font-semibold text-sm text-teal-300 flex items-center gap-2 uppercase tracking-wide">
@@ -1209,8 +1883,8 @@ export default function ControleCaixa({
           )}
         </div>
 
-        {/* SUBGERÊNCIA 2: CONTROLE DE CAIXA ANUAL - HISTÓRICO DE LANÇAMENTOS DO MÊS (Col: 5/12) */}
-        <div className="lg:col-span-5 bg-emerald-900/40 border border-white/10 rounded-2xl p-5 shadow-xl backdrop-blur-sm space-y-4 text-left">
+        {/* SUBGERÊNCIA 2: CONTROLE DE CAIXA ANUAL - HISTÓRICO DE LANÇAMENTOS DO MÊS */}
+        <div className="bg-emerald-900/40 border border-white/10 rounded-2xl p-5 shadow-xl backdrop-blur-sm space-y-4 text-left">
           <div className="border-b border-white/10 pb-3">
             <h3 className="font-display font-semibold text-sm text-teal-300 flex items-center gap-2 uppercase tracking-wide font-sans">
               <span className="w-2.5 h-2.5 rounded-full bg-amber-400" />
@@ -1252,6 +1926,25 @@ export default function ControleCaixa({
                       <span className={`font-mono font-bold shrink-0 ${l.tipo === 'receita' ? 'text-teal-400' : 'text-rose-400'}`}>
                         {l.tipo === 'receita' ? '+' : '-'} R$ {l.valor.toFixed(2)}
                       </span>
+                      {jogadorAtual?.role === 'admin' && (
+                        <button
+                          type="button"
+                          onClick={() => {
+                            setEditingLancamentoId(l.id);
+                            setAvulsoTipo(l.tipo);
+                            setAvulsoDescricao(l.descricao);
+                            setAvulsoValor(l.valor);
+                            setAvulsoData(l.data);
+                            setAvulsoCategoria(l.categoria);
+                            setAvulsoPartidaId(l.partidaId || '');
+                            setShowFormAvulso(true);
+                          }}
+                          className="text-white/40 hover:text-teal-400 p-1.5 rounded hover:bg-white/5 transition-all cursor-pointer"
+                          title="Editar Lançamento"
+                        >
+                          <Pencil className="w-3.5 h-3.5" />
+                        </button>
+                      )}
                       <button
                         type="button"
                         onClick={() => onRemoveLancamento(l.id)}

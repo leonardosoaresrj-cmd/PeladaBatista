@@ -45,9 +45,9 @@ import MensalistasMes from './components/MensalistasMes';
 import HistoricoJogos from './components/HistoricoJogos';
 import { mesclarPartidasAutomáticas } from './utils/partidaHelper';
 import { isJogadorFuncionalmenteGold } from './utils/goldRules';
-import { obterTextoListaCompletaPartida, obterTextoListaRenovacao, obterStatusMembroEfetivo, obterDebitosDoJogador, obterTextoPartidaCancelada } from './utils/confirmationRules';
-import logoPelada from './assets/images/logo_pelada_batista_1780453160575.png';
-import { Calendar, Users, DollarSign, ShieldAlert, LogOut, Database, Award, User, Settings, UserCheck, History, CheckSquare, Check, X, Lock, Cake, TrendingUp, UserPlus } from 'lucide-react';
+import { obterTextoListaCompletaPartida, obterTextoListaRenovacao, obterStatusMembroEfetivo, obterDebitosDoJogador, obterTextoPartidaCancelada, obterJanelaRenovacaoParaMesRef, isFechamentoMensalistas } from './utils/confirmationRules';
+import logoPelada from './assets/images/logo_pelada.svg';
+import { Calendar, Users, DollarSign, ShieldAlert, LogOut, Database, Award, User, Settings, UserCheck, History, CheckSquare, Check, X, Lock, Cake, TrendingUp, UserPlus, AlertCircle } from 'lucide-react';
 
 export default function App() {
   // Carregar estados iniciais do banco local simulado
@@ -139,6 +139,12 @@ export default function App() {
     saveLancamentos(novos);
   };
 
+  const handleUpdateLancamento = (atualizado: LancamentoAvulso) => {
+    const novos = lancamentos.map(l => l.id === atualizado.id ? atualizado : l);
+    setLancamentos(novos);
+    saveLancamentos(novos);
+  };
+
   const handleLimparDadosDoMes = async (mesRef: string) => {
     // 1. Filtrar pagamentos que não pertencem ao mesRef
     const novosPagamentos = pagamentos.filter(p => p.mesRef !== mesRef);
@@ -219,7 +225,78 @@ export default function App() {
     }
   };
 
+  const handleResetDatabase = async (startingMonth: string) => {
+    // 1. Limpar partidas, pagamentos, despesas avulsas
+    setPartidas([]);
+    savePartidas([]);
+
+    setPagamentos([]);
+    savePagamentos([]);
+
+    setLancamentos([]);
+    saveLancamentos([]);
+
+    setPartidasDeletadas([]);
+    localStorage.setItem('futebol_partidas_deletadas', JSON.stringify([]));
+
+    // 2. Limpar cadastros de jogadores mantendo o administrador Leonardo Soares ativo
+    const adminEmail = 'leonardo.soares.rj@gmail.com';
+    const list = getSavedJogadores();
+    const adminOriginal = list.filter(j => j.email.toLowerCase().trim() === adminEmail);
+    setJogadores(adminOriginal);
+    saveJogadores(adminOriginal);
+
+    // 3. Atualizar configurações de início de recebimento
+    localStorage.setItem('futebol_startup_month', startingMonth);
+
+    // 4. Limpar do Supabase se estiver conectado
+    const supabase = getSupabase();
+    if (supabase) {
+      try {
+        await supabase.from('partidas').delete().neq('id', 'placeholder-doesnotexist');
+        await supabase.from('pagamentos').delete().neq('id', 'placeholder-doesnotexist');
+        await supabase.from('lancamentos').delete().neq('id', 'placeholder-doesnotexist');
+        await supabase.from('jogadores').delete().neq('email', adminEmail);
+      } catch (e) {
+        console.error('Erro ao limpar tabelas no Supabase:', e);
+      }
+    }
+
+    // 5. Recarregar dados para garantir sincronismo
+    fetchTodoDados();
+  };
+
   const handleUpdateAluguelCampoBase = (valor: number) => {
+    const currentMonthStr = '2026-06';
+    const oldVal = aluguelCampoBase;
+
+    // Preservar valores antigos no mapa para não alterar o faturamento histórico
+    const mapStr = localStorage.getItem('futebol_aluguel_mensal_map');
+    let map: Record<string, number> = {};
+    if (mapStr) {
+      try {
+        map = JSON.parse(mapStr);
+      } catch (e) {
+        console.error(e);
+      }
+    }
+
+    // Se Maio/2026 e Junho/2026 não estiverem definidos, assegure-se de que fiquem com o valor antigo
+    if (map['2026-05'] === undefined) map['2026-05'] = oldVal;
+    if (map['2026-06'] === undefined) map['2026-06'] = oldVal;
+
+    if (!localStorage.getItem('futebol_aluguel_campo_prior')) {
+      localStorage.setItem('futebol_aluguel_campo_prior', String(oldVal));
+    }
+
+    // Atualizar os meses futuros (Julho de 2026 em diante)
+    const futureMonths = ['2026-07', '2026-08', '2026-09', '2026-10', '2026-11', '2026-12'];
+    for (const m of futureMonths) {
+      map[m] = valor;
+    }
+
+    localStorage.setItem('futebol_aluguel_mensal_map', JSON.stringify(map));
+
     setAluguelCampoBase(valor);
     saveAluguelCampo(valor);
   };
@@ -322,7 +399,7 @@ export default function App() {
   const [perfilSobrenome, setPerfilSobrenome] = useState('');
   const [perfilPosicao, setPerfilPosicao] = useState<PosicaoJogador>('Meio');
   const [perfilMembroStatus, setPerfilMembroStatus] = useState<MembroStatus>('mensalista');
-  const [alertaRenovacaoPlano, setAlertaRenovacaoPlano] = useState<{aberto: boolean, inicio: string, fim: string} | null>(null);
+  const [alertaRenovacaoPlano, setAlertaRenovacaoPlano] = useState<{aberto: boolean, inicio: string, fim: string, tipo?: 'diarista_para_mensalista' | 'comum'} | null>(null);
   const [perfilFoto, setPerfilFoto] = useState('');
   const [perfilDataNascimento, setPerfilDataNascimento] = useState('');
   const [perfilSenha, setPerfilSenha] = useState('');
@@ -708,48 +785,26 @@ export default function App() {
     const ano = agora.getFullYear();
     const mes = agora.getMonth();
 
-    const inicio = new Date(ano, mes, 1, 0, 1, 0, 0);
-    while (inicio.getDay() !== 1) {
-      inicio.setDate(inicio.getDate() + 1);
-    }
+    const janelaAtual = obterJanelaRenovacaoParaMesRef(ano, mes);
+    let janelaEscolhida = janelaAtual;
 
-    const partidasDoMes = (partidas || []).filter(p => {
-      if (!p.data) return false;
-      const [pAno, pMes] = p.data.split('-').map(Number);
-      return pAno === ano && pMes === (mes + 1);
-    });
-
-    const sortedPartidas = [...partidasDoMes].sort((a, b) => a.data.localeCompare(b.data));
-
-    let primeiroJogoDataStr = '';
-    let dataReferenciaJogo: Date;
-
-    if (sortedPartidas.length > 0) {
-      primeiroJogoDataStr = sortedPartidas[0].data;
-      const [y, m, d] = primeiroJogoDataStr.split('-').map(Number);
-      dataReferenciaJogo = new Date(y, m - 1, d, 23, 59, 59);
-    } else {
-      const sab = new Date(ano, mes, 1, 23, 59, 59);
-      while (sab.getDay() !== 6) {
-        sab.setDate(sab.getDate() + 1);
+    if (agora > janelaAtual.fim) {
+      let proxMes = mes + 1;
+      let proxAno = ano;
+      if (proxMes > 11) {
+        proxMes = 0;
+        proxAno += 1;
       }
-      dataReferenciaJogo = sab;
-      primeiroJogoDataStr = `${sab.getFullYear()}-${(sab.getMonth() + 1).toString().padStart(2, '0')}-${sab.getDate().toString().padStart(2, '0')}`;
+      janelaEscolhida = obterJanelaRenovacaoParaMesRef(proxAno, proxMes);
     }
 
-    const diaSemanaJogo = dataReferenciaJogo.getDay();
-    const diffParaSexta = 5 - diaSemanaJogo;
-    const fim = new Date(dataReferenciaJogo);
-    fim.setDate(fim.getDate() + diffParaSexta);
-    fim.setHours(23, 59, 59, 999);
-
-    const estaAberta = agora >= inicio && agora <= fim;
+    const estaAberta = isFechamentoMensalistas(agora).emPeriodo;
 
     return {
       estaAberta,
-      inicio,
-      fim,
-      primeiroJogo: primeiroJogoDataStr
+      inicio: janelaEscolhida.inicio,
+      fim: janelaEscolhida.fim,
+      primeiroJogo: ""
     };
   };
 
@@ -992,6 +1047,56 @@ export default function App() {
     }
   };
 
+  const handleRegistrarVariosPagamentos = async (
+    jogadorId: string,
+    items: Array<{
+      mesRef: string;
+      status: 'pago' | 'pendente' | 'pendente_confirmacao' | 'cancelado';
+      dataPagamento: string | null;
+      valor: number;
+      partidaId?: string;
+    }>
+  ) => {
+    let atualizados = [...pagamentos];
+    const modificados: Pagamento[] = [];
+
+    for (const item of items) {
+      const existeIndex = item.partidaId
+        ? atualizados.findIndex(p => p.jogadorId === jogadorId && p.partidaId === item.partidaId)
+        : atualizados.findIndex(p => p.jogadorId === jogadorId && p.mesRef === item.mesRef && !p.partidaId);
+
+      let pagModificado: Pagamento;
+      if (existeIndex >= 0) {
+        pagModificado = {
+          ...atualizados[existeIndex],
+          status: item.status,
+          dataPagamento: item.dataPagamento,
+          valor: item.valor
+        };
+        atualizados[existeIndex] = pagModificado;
+      } else {
+        pagModificado = {
+          id: `pag-${Date.now()}-${Math.random().toString(36).substr(2, 5)}`,
+          jogadorId,
+          mesRef: item.mesRef,
+          status: item.status,
+          dataPagamento: item.dataPagamento,
+          valor: item.valor,
+          partidaId: item.partidaId
+        };
+        atualizados.push(pagModificado);
+      }
+      modificados.push(pagModificado);
+    }
+
+    setPagamentos(atualizados);
+    savePagamentos(atualizados);
+
+    for (const pag of modificados) {
+      await salvarPagamentoNoSupabase(pag);
+    }
+  };
+
   // Auxiliares Visuais de Estilo
   const getSessaoAvatarProps = (fotoId: string) => {
     return AVATAR_PRESETS.find(p => p.id === fotoId) || AVATAR_PRESETS[0];
@@ -1012,7 +1117,7 @@ export default function App() {
           {/* Logo / Emblema da Arena */}
           <div className="flex items-center gap-3">
             <img 
-              src="/logo_pelada_batista_1780453160575.png" 
+              src={logoPelada} 
               alt="Pelada Batista Logo" 
               className="w-14 h-14 object-contain drop-shadow-xl" 
               referrerPolicy="no-referrer"
@@ -1255,6 +1360,7 @@ export default function App() {
                   onNavigateToTab={setActiveTab}
                   onCriarPartida={handleCriarPartida}
                   onDeletarPartida={handleDeletarPartida}
+                  onCancelarPartida={handleCancelarPartida}
                   onActualizarPresenca={handleActualizarPresenca}
                   onRegistrarPagamento={handleRegistrarPagamento}
                 />
@@ -1299,6 +1405,7 @@ export default function App() {
                   jogadores={jogadoresEfetivos}
                   jogadorAtual={jogadorAtual}
                   onRegistrarPagamento={handleRegistrarPagamento}
+                  onRegistrarVariosPagamentos={handleRegistrarVariosPagamentos}
                   valor4Sabados={valor4Sabados}
                   valor5Sabados={valor5Sabados}
                   valorDiaria={valorDiaria}
@@ -1315,6 +1422,7 @@ export default function App() {
                   lancamentos={lancamentos}
                   onAddLancamento={handleAddLancamento}
                   onRemoveLancamento={handleRemoveLancamento}
+                  onUpdateLancamento={handleUpdateLancamento}
                   aluguelCampoBase={aluguelCampoBase}
                   onUpdateAluguelCampoBase={handleUpdateAluguelCampoBase}
                   valorDiaria={valorDiaria}
@@ -1372,6 +1480,7 @@ export default function App() {
                   valor5Sabados={valor5Sabados}
                   valorDiaria={valorDiaria}
                   onUpdateValoresConfig={handleUpdateValoresConfig}
+                  onResetDatabase={handleResetDatabase}
                 />
               )}
             </div>
@@ -1468,7 +1577,7 @@ export default function App() {
             </p>
             
             <div className="bg-amber-955/25 border border-amber-500/20 rounded-xl p-3 mb-5 text-[11px] text-amber-200 leading-relaxed font-sans">
-              <b>⚠️ Regulamento de Mensalistas:</b> No Arena Record, atletas com pendências financeiras de mensalidade passam temporariamente para o status de <b>Diarista</b> até a devida regularização do débito. Desse modo, você perde temporariamente a prioridade automática de mensalistas na lista de chamada oficial.
+              <b>⚠️ Regulamento de Mensalistas:</b> No Pelada Batista Sábado, atletas com pendências financeiras de mensalidade passam temporariamente para o status de <b>Diarista</b> até a devida regularização do débito. Desse modo, você perde temporariamente a prioridade automática de mensalistas na lista de chamada oficial.
             </div>
 
             <div className="flex gap-2.5">
@@ -1769,21 +1878,48 @@ export default function App() {
                   <select
                     value={perfilMembroStatus}
                     onChange={(e) => {
+                      const selectedStatus = e.target.value as MembroStatus;
+                      const isMudarDiaristaParaMensalista = jogadorAtual.membroStatus === 'diarista' && selectedStatus === 'mensalista';
+                      
+                      const isRenovacaoAtiva = checkJanelaRenovacaoGeral().estaAberta && !pagamentos.some(p => p.jogadorId === jogadorAtual.id && p.mesRef === `${new Date().getFullYear()}-${String(new Date().getMonth() + 1).padStart(2, '0')}` && !p.partidaId && p.status === 'pago');
+                      
                       const allowed = (
                         jogadorAtual.role === 'admin' ||
                         perfilPosicao === 'Goleiro' ||
-                        (checkJanelaRenovacaoGeral().estaAberta && !pagamentos.some(p => p.jogadorId === jogadorAtual.id && p.mesRef === `${new Date().getFullYear()}-${String(new Date().getMonth() + 1).padStart(2, '0')}` && !p.partidaId && p.status === 'pago'))
+                        isRenovacaoAtiva
                       );
+                      
+                      if (isMudarDiaristaParaMensalista && !allowed) {
+                        const agora = new Date();
+                        const y = agora.getFullYear();
+                        const m = agora.getMonth();
+                        
+                        let janela = obterJanelaRenovacaoParaMesRef(y, m);
+                        if (agora > janela.fim) {
+                          let proxMes = m + 1;
+                          let proxAno = y;
+                          if (proxMes > 11) {
+                            proxMes = 0;
+                            proxAno += 1;
+                          }
+                          janela = obterJanelaRenovacaoParaMesRef(proxAno, proxMes);
+                        }
+
+                        const dtInicio = janela.inicio.toLocaleDateString('pt-BR');
+                        const dtFim = janela.fim.toLocaleDateString('pt-BR');
+                        setAlertaRenovacaoPlano({ aberto: true, inicio: dtInicio, fim: dtFim, tipo: 'diarista_para_mensalista' });
+                        return;
+                      }
                       
                       if (!allowed) {
                         const info = checkJanelaRenovacaoGeral();
                         const dtInicio = info.inicio.toLocaleDateString('pt-BR');
                         const dtFim = info.fim.toLocaleDateString('pt-BR');
-                        setAlertaRenovacaoPlano({ aberto: true, inicio: dtInicio, fim: dtFim });
+                        setAlertaRenovacaoPlano({ aberto: true, inicio: dtInicio, fim: dtFim, tipo: 'comum' });
                         return;
                       }
 
-                      setPerfilMembroStatus(e.target.value as MembroStatus);
+                      setPerfilMembroStatus(selectedStatus);
                     }}
                     className="w-full bg-emerald-900 border border-white/10 rounded-xl px-2.5 py-2 text-xs text-white focus:outline-none disabled:opacity-50 disabled:cursor-not-allowed"
                     style={{ backgroundColor: '#064e3b' }}
@@ -1918,30 +2054,61 @@ export default function App() {
             
             {alertaRenovacaoPlano?.aberto && (
               <div className="absolute inset-0 z-50 flex items-center justify-center p-4 bg-emerald-950/80 backdrop-blur-sm rounded-2xl">
-                <div className="bg-rose-950 border border-rose-500/30 p-5 rounded-2xl shadow-2xl max-w-[280px] text-center space-y-4">
-                  <div className="flex justify-center">
-                    <div className="w-10 h-10 rounded-full bg-rose-500/20 text-rose-400 flex items-center justify-center">
-                      <Lock className="w-5 h-5" />
+                {alertaRenovacaoPlano.tipo === 'diarista_para_mensalista' ? (
+                  <div className="bg-emerald-950 border border-white/20 p-5 rounded-2xl shadow-2xl max-w-[310px] text-center space-y-4 animate-fade-in">
+                    <div className="flex justify-center">
+                      <div className="w-12 h-12 rounded-full bg-amber-500/10 border border-amber-500/30 text-amber-400 flex items-center justify-center animate-bounce">
+                        <AlertCircle className="w-6 h-6" />
+                      </div>
                     </div>
-                  </div>
-                  <div>
-                    <h4 className="text-sm font-bold text-rose-300 uppercase">Alteração Indisponível</h4>
-                    <p className="text-[11px] text-rose-200 mt-2 leading-relaxed">
-                      O plano de participação somente pode ser alterado durante o período da próxima renovação.
-                    </p>
-                    <div className="mt-3 bg-black/30 p-2 rounded-xl border border-rose-500/10">
-                      <p className="text-[9px] text-rose-400 font-mono uppercase">Período de Renovação</p>
-                      <p className="text-xs font-bold text-white mt-0.5">{alertaRenovacaoPlano.inicio} a {alertaRenovacaoPlano.fim}</p>
+                    <div className="space-y-2">
+                      <h4 className="text-sm font-bold text-white uppercase tracking-wider">Fora do Período de Renovação</h4>
+                      <p className="text-[11px] text-emerald-100 leading-relaxed">
+                        O período de renovação de mensalidade não está ativo neste momento.
+                      </p>
+                      <p className="bg-emerald-900/60 border border-white/5 rounded-xl p-3 text-emerald-250 text-[10px] text-left leading-relaxed">
+                        Por este motivo, seu status continuará registrado como <strong className="text-white font-semibold">Diarista</strong>. Você poderá solicitar a alteração para Mensalista no início do próximo ciclo de renovação da mensalidade!
+                      </p>
+                      
+                      <div className="mt-2 bg-black/30 p-2.5 rounded-xl border border-white/10">
+                        <p className="text-[9px] text-emerald-350 font-mono uppercase tracking-wide">Próxima Janela de Renovação</p>
+                        <p className="text-xs font-bold text-white mt-0.5">{alertaRenovacaoPlano.inicio} a {alertaRenovacaoPlano.fim}</p>
+                      </div>
                     </div>
+                    <button
+                      type="button"
+                      onClick={() => setAlertaRenovacaoPlano(null)}
+                      className="w-full bg-white hover:bg-emerald-100 text-black py-2 rounded-xl text-xs font-bold shadow-md transition-all active:scale-97 cursor-pointer uppercase tracking-wider text-[10px]"
+                    >
+                      Ciente e Fechar
+                    </button>
                   </div>
-                  <button
-                    type="button"
-                    onClick={() => setAlertaRenovacaoPlano(null)}
-                    className="w-full bg-rose-500 hover:bg-rose-400 text-black py-2 rounded-xl text-xs font-bold shadow-md transition-all active:scale-97"
-                  >
-                    Entendido
-                  </button>
-                </div>
+                ) : (
+                  <div className="bg-rose-950 border border-rose-500/30 p-5 rounded-2xl shadow-2xl max-w-[280px] text-center space-y-4">
+                    <div className="flex justify-center">
+                      <div className="w-10 h-10 rounded-full bg-rose-500/20 text-rose-400 flex items-center justify-center">
+                        <Lock className="w-5 h-5" />
+                      </div>
+                    </div>
+                    <div>
+                      <h4 className="text-sm font-bold text-rose-300 uppercase">Alteração Indisponível</h4>
+                      <p className="text-[11px] text-rose-200 mt-2 leading-relaxed">
+                        O plano de participação somente pode ser alterado durante o período da próxima renovação.
+                      </p>
+                      <div className="mt-3 bg-black/30 p-2 rounded-xl border border-rose-500/10">
+                        <p className="text-[9px] text-rose-400 font-mono uppercase">Período de Renovação</p>
+                        <p className="text-xs font-bold text-white mt-0.5">{alertaRenovacaoPlano.inicio} a {alertaRenovacaoPlano.fim}</p>
+                      </div>
+                    </div>
+                    <button
+                      type="button"
+                      onClick={() => setAlertaRenovacaoPlano(null)}
+                      className="w-full bg-rose-500 hover:bg-rose-400 text-black py-2 rounded-xl text-xs font-bold shadow-md transition-all active:scale-97"
+                    >
+                      Entendido
+                    </button>
+                  </div>
+                )}
               </div>
             )}
             

@@ -20,6 +20,7 @@ interface CalendarioJogosProps {
   onOpenAgendarModal?: () => void;
   onCriarPartida?: (novaPartida: Omit<Partida, 'id' | 'confirmados' | 'recusados' | 'createdAt'>) => void;
   onDeletarPartida?: (partidaId: string) => void;
+  onCancelarPartida?: (partidaId: string, cancelar: boolean) => void;
   onActualizarPresenca?: (partidaId: string, jogadorId: string, confirmado: boolean | null) => void;
   onRegistrarPagamento?: (jogadorId: string, mesRef: string, status: 'pago' | 'pendente' | 'pendente_confirmacao' | 'cancelado', dataPagamento: string | null, valor: number, partidaId?: string) => Promise<void>;
 }
@@ -34,6 +35,7 @@ export default function CalendarioJogos({
   onOpenAgendarModal,
   onCriarPartida,
   onDeletarPartida,
+  onCancelarPartida,
   onActualizarPresenca,
   onRegistrarPagamento,
 }: CalendarioJogosProps) {
@@ -72,7 +74,7 @@ export default function CalendarioJogos({
   });
   const [newGameHoraInicio, setNewGameHoraInicio] = useState('08:05'); // padrão: 08:00
   const [newGameHoraFim, setNewGameHoraFim] = useState('10:05'); // padrão: 10:00
-  const [newGameLocal, setNewGameLocal] = useState('Arena Record - Quadra Principal');
+  const [newGameLocal, setNewGameLocal] = useState('Pelada Batista Sábado - Quadra Principal');
   const [schedulerError, setSchedulerError] = useState('');
   const [schedulerSuccess, setSchedulerSuccess] = useState(false);
 
@@ -259,20 +261,46 @@ export default function CalendarioJogos({
             {Array.from({ length: primeiroDiaSemana }).map((_, i) => (
               <div key={`empty-day-${i}`} className="aspect-square bg-transparent rounded" />
             ))}
- 
+
             {Array.from({ length: diasNoMes }).map((_, i) => {
               const diaNum = i + 1;
               const dataString = formatDayString(diaNum);
               const partidasNoDia = partidas.filter(p => p.data === dataString);
               const temJogo = partidasNoDia.length > 0;
               const jogo = partidasNoDia[0];
-              const isPastMatch = temJogo && jogo.data < '2026-05-31';
- 
-              // Destacar Hoje: 2026-05-31
-              const matchesToday = dataString === '2026-05-31';
- 
+
+              // Obter data atual de forma dinâmica (YYYY-MM-DD em fuso local)
+              const d = new Date();
+              const hojeString = `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, '0')}-${String(d.getDate()).padStart(2, '0')}`;
+
+              const isPastMatch = temJogo && jogo.data < hojeString;
+              const matchesToday = dataString === hojeString;
+
               const isHistoricoAtivo = jogoPassadoSelecionado?.id === jogo?.id;
- 
+
+              let buttonStyleClass = '';
+              if (isHistoricoAtivo) {
+                buttonStyleClass = 'bg-emerald-500 text-black font-black shadow-lg ring-2 ring-emerald-300 cursor-pointer';
+              } else if (temJogo) {
+                if (jogo.data < hojeString) {
+                  // Jogo no passado (anterior a hoje)
+                  if (jogo.cancelada) {
+                    // 1 - Jogos Cancelados: piscante em vermelho com um icone ❌
+                    buttonStyleClass = 'bg-red-650 hover:bg-rose-900 border border-red-500/50 text-red-200 animate-pulse cursor-pointer shadow shadow-red-550/25';
+                  } else {
+                    // 2 - Jogos realizados: piscante em azul com um icone ✅
+                    buttonStyleClass = 'bg-blue-650 hover:bg-blue-600 border border-blue-450 text-blue-100 animate-pulse cursor-pointer shadow shadow-blue-500/25';
+                  }
+                } else {
+                  // Jogo futuro ou hoje (3 - Jogos futuros: piscante em verde)
+                  buttonStyleClass = 'bg-teal-500 text-emerald-950 font-black shadow shadow-teal-500/20 hover:bg-teal-400 animate-pulse cursor-pointer';
+                }
+              } else if (isAdmin) {
+                buttonStyleClass = 'bg-emerald-950/20 hover:bg-emerald-900/35 text-emerald-500 hover:text-white border border-emerald-500/10 hover:border-emerald-500 cursor-pointer';
+              } else {
+                buttonStyleClass = 'bg-emerald-950/20 text-emerald-700/40 cursor-default border border-transparent';
+              }
+
               return (
                 <button
                   id={`btn-dia-calendario-${diaNum}`}
@@ -285,7 +313,7 @@ export default function CalendarioJogos({
                       // CASO SEJA CLICADO EM UMA DATA SEM JOGO AGENDADO E SEJA ADMIN, ABRIR O POP UP DE CADASTRO DE NOVO JOGO
                       setSelectedDateForNewGame(dataString);
                       setNewGameTitulo('Pelada Batista Sábado');
-                      setNewGameLocal('Arena Record - Quadra Principal');
+                      setNewGameLocal('Pelada Batista Sábado - Quadra Principal');
                       setNewGameHoraInicio('08:05');
                       setNewGameHoraFim('10:05');
                       setSchedulerError('');
@@ -294,24 +322,18 @@ export default function CalendarioJogos({
                     }
                   }}
                   disabled={!temJogo && !isAdmin}
-                  className={`aspect-square rounded-xl flex flex-col items-center justify-center relative text-xs font-bold transition-all ${
-                    isHistoricoAtivo
-                      ? 'bg-emerald-500 text-black font-black shadow-lg ring-2 ring-emerald-300'
-                      : temJogo
-                      ? jogo.cancelada
-                        ? 'bg-red-950/85 hover:bg-rose-950 border border-rose-550/30 text-rose-350 line-through text-white/50 opacity-90 cursor-pointer'
-                        : isPastMatch
-                        ? 'bg-emerald-950/75 hover:bg-emerald-900 border border-emerald-500/15 text-emerald-100 cursor-pointer'
-                        : 'bg-teal-500 text-emerald-950 font-black shadow shadow-teal-500/20 hover:bg-teal-400 animate-pulse cursor-pointer'
-                      : isAdmin
-                      ? 'bg-emerald-950/20 hover:bg-emerald-900/35 text-emerald-500 hover:text-white border border-emerald-500/10 hover:border-emerald-500 cursor-pointer'
-                      : 'bg-emerald-950/20 text-emerald-700/40 cursor-default border border-transparent'
-                  }`}
+                  className={`aspect-square rounded-xl flex flex-col items-center justify-center relative text-xs font-bold transition-all ${buttonStyleClass}`}
                 >
                   <span className="z-10">{diaNum}</span>
                   {temJogo ? (
                     <span className="absolute bottom-1 text-[9px] select-none text-center">
-                      {jogo.cancelada ? '🚫' : '⚽'}
+                      {jogo.data < hojeString
+                        ? jogo.cancelada
+                          ? '❌'
+                          : '✅'
+                        : jogo.cancelada
+                        ? '🚫'
+                        : '⚽'}
                     </span>
                   ) : isAdmin ? (
                     <span className="absolute bottom-1 text-[7.5px] text-emerald-400 font-extrabold tracking-tight opacity-50 hover:opacity-100">+ NOVO</span>
@@ -323,25 +345,28 @@ export default function CalendarioJogos({
               );
             })}
           </div>
- 
+
           {/* Legenda Explicativa de Status */}
           <div className="flex flex-wrap items-center gap-x-4 gap-y-2 mt-5 text-[10px] text-emerald-300 bg-emerald-950/50 p-3 rounded-xl border border-white/5">
-            <span className="flex items-center gap-1.5">
-              <span className="w-2.5 h-2.5 rounded bg-emerald-950/75 border border-emerald-500/15" />
-              Jogo Passado (Clique para Ver Detalhes)
+            <span className="flex items-center gap-1.5 font-bold uppercase tracking-wider text-[8px] text-emerald-400 w-full mb-0.5">
+              Legenda de Status
             </span>
-            <span className="flex items-center gap-1.5">
+            <span className="flex items-center gap-1.5 text-blue-300 animate-pulse font-medium">
+              <span className="w-2.5 h-2.5 rounded bg-blue-650 border border-blue-450" />
+              ✅ Jogo Realizado (Passado)
+            </span>
+            <span className="flex items-center gap-1.5 text-rose-300 animate-pulse font-medium">
+              <span className="w-2.5 h-2.5 rounded bg-red-650 border border-red-500/50" />
+              ❌ Jogo Cancelado (Passado)
+            </span>
+            <span className="flex items-center gap-1.5 text-teal-300 animate-pulse font-medium">
               <span className="w-2.5 h-2.5 rounded bg-teal-500" />
-              Jogo Ativo/Próximo (Levará à Confirmação)
-            </span>
-            <span className="flex items-center gap-1.5 text-rose-350">
-              <span className="w-2.5 h-2.5 rounded bg-rose-955/65 border border-rose-550/30" />
-              🚫 Jogo Cancelado (Fortuito)
+              ⚽ Jogo Futuro / Agendado
             </span>
             {isAdmin && (
               <span className="flex items-center gap-1.5">
                 <span className="w-2.5 h-2.5 rounded bg-emerald-950/25 border border-emerald-500/40" />
-                Vazio (Admin: clique para agendar novo jogo)
+                Vazio (Admin: agendar)
               </span>
             )}
           </div>
@@ -604,10 +629,10 @@ export default function CalendarioJogos({
                 
                 let hasDebits = false;
                 if (!isAdmin && isMensalista) {
-                  const vD = parseFloat(localStorage.getItem('racha_valor_diaria') || '20');
+                  const vD = parseFloat(localStorage.getItem('racha_valor_diaria') || '30');
                   const v4 = parseFloat(localStorage.getItem('racha_valor_4s') || '85');
                   const v5 = parseFloat(localStorage.getItem('racha_valor_5s') || '105');
-                  hasDebits = obterDebitosDoJogador(jogadorAtual.id, 'mensalista', jogadorAtual.posicao, partidas, pagamentos, vD, v4, v5).length > 0;
+                  hasDebits = obterDebitosDoJogador(jogadorAtual.id, originalStatus, jogadorAtual.posicao, partidas, pagamentos, vD, v4, v5).length > 0;
                 }
 
                 return (
@@ -650,7 +675,7 @@ export default function CalendarioJogos({
                           return;
                         }
 
-                        const vD = parseFloat(localStorage.getItem('racha_valor_diaria') || '20');
+                        const vD = parseFloat(localStorage.getItem('racha_valor_diaria') || '30');
                         const v4 = parseFloat(localStorage.getItem('racha_valor_4s') || '85');
                         const v5 = parseFloat(localStorage.getItem('racha_valor_5s') || '105');
 
@@ -790,46 +815,68 @@ export default function CalendarioJogos({
                 </div>
               </div>
 
-              {/* Ações de Administração: Deletar Jogo */}
+               {/* Ações de Administração: Cancelar e Deletar Jogo */}
               {isAdmin && (
                 <div className="border-t border-white/10 pt-4 flex flex-col sm:flex-row sm:items-center justify-between gap-3 font-sans">
                   <span className="text-[10px] text-emerald-450 font-bold uppercase tracking-wider">Ações de Administrador:</span>
-                  {!showConfirmDelete ? (
+                  <div className="flex items-center gap-2 shrink-0">
+                    {/* Botão Cancelar/Reativar Partida */}
                     <button
-                      id="btn-deletar-partida-popup"
+                      id="btn-cancelar-partida-popup"
                       type="button"
-                      onClick={() => setShowConfirmDelete(true)}
-                      className="bg-rose-900/80 hover:bg-rose-700 text-rose-200 hover:text-white border border-rose-500/30 font-bold text-xs px-3 py-2 rounded-xl transition-all flex items-center gap-1.5 cursor-pointer shadow-md"
+                      onClick={() => {
+                        if (onCancelarPartida) {
+                          onCancelarPartida(activePartidaPopup.id, !activePartidaPopup.cancelada);
+                        }
+                      }}
+                      className={`text-xs font-bold px-3 py-2 rounded-xl transition-all flex items-center gap-1.5 cursor-pointer shadow-md whitespace-nowrap ${
+                        activePartidaPopup.cancelada
+                          ? 'bg-emerald-600/90 hover:bg-emerald-500 text-white'
+                          : 'bg-amber-600/80 hover:bg-amber-500 text-amber-100 hover:text-white border border-amber-500/30'
+                      }`}
                     >
-                      <Trash2 className="w-3.5 h-3.5" />
-                      Deletar Jogo (Admin)
+                      <AlertTriangle className="w-3.5 h-3.5" />
+                      {activePartidaPopup.cancelada ? 'Reativar Partida' : 'Cancelar Partida'}
                     </button>
-                  ) : (
-                    <div className="flex items-center gap-2 bg-rose-950/65 p-2 rounded-xl border border-rose-500/40 animate-fade-in">
-                      <span className="text-[11px] text-rose-200 font-bold">Confirmar exclusão?</span>
+
+                    {/* Botão Deletar Jogo */}
+                    {!showConfirmDelete ? (
                       <button
-                        id="btn-confirmar-deletar-partida"
+                        id="btn-deletar-partida-popup"
                         type="button"
-                        onClick={() => {
-                          if (onDeletarPartida) {
-                            onDeletarPartida(activePartidaPopup.id);
-                            setPartidaDetalhadaPopupId(null);
-                            setShowConfirmDelete(false);
-                          }
-                        }}
-                        className="bg-rose-600 hover:bg-rose-700 text-white font-extrabold text-xs px-3 py-1.5 rounded-lg transition-colors cursor-pointer"
+                        onClick={() => setShowConfirmDelete(true)}
+                        className="bg-rose-900/80 hover:bg-rose-700 text-rose-200 hover:text-white border border-rose-500/30 font-bold text-xs px-3 py-2 rounded-xl transition-all flex items-center gap-1.5 cursor-pointer shadow-md whitespace-nowrap"
                       >
-                        Sim
+                        <Trash2 className="w-3.5 h-3.5" />
+                        Deletar Jogo (Admin)
                       </button>
-                      <button
-                        type="button"
-                        onClick={() => setShowConfirmDelete(false)}
-                        className="bg-emerald-900 hover:bg-emerald-800 text-emerald-100 text-xs px-3 py-1.5 rounded-lg transition-colors cursor-pointer"
-                      >
-                        Não
-                      </button>
-                    </div>
-                  )}
+                    ) : (
+                      <div className="flex items-center gap-2 bg-rose-950/65 p-2 rounded-xl border border-rose-500/40 animate-fade-in shrink-0">
+                        <span className="text-[11px] text-rose-200 font-bold">Excluir?</span>
+                        <button
+                          id="btn-confirmar-deletar-partida"
+                          type="button"
+                          onClick={() => {
+                            if (onDeletarPartida) {
+                              onDeletarPartida(activePartidaPopup.id);
+                              setPartidaDetalhadaPopupId(null);
+                              setShowConfirmDelete(false);
+                            }
+                          }}
+                          className="bg-rose-600 hover:bg-rose-700 text-white font-extrabold text-xs px-3 py-1.5 rounded-lg transition-colors cursor-pointer"
+                        >
+                          Sim
+                        </button>
+                        <button
+                          type="button"
+                          onClick={() => setShowConfirmDelete(false)}
+                          className="bg-emerald-900 hover:bg-emerald-800 text-emerald-100 text-xs px-3 py-1.5 rounded-lg transition-colors cursor-pointer"
+                        >
+                          Não
+                        </button>
+                      </div>
+                    )}
+                  </div>
                 </div>
               )}
             </div>
@@ -938,7 +985,7 @@ export default function CalendarioJogos({
                   <input
                     type="text"
                     required
-                    placeholder="Ex: Arena Record - Quadra Principal"
+                    placeholder="Ex: Pelada Batista Sábado - Quadra Principal"
                     value={newGameLocal}
                     onChange={(e) => setNewGameLocal(e.target.value)}
                     className="w-full bg-emerald-900 border border-white/10 text-white placeholder-emerald-600 rounded-lg p-2.5 text-xs focus:outline-none focus:border-emerald-500"
@@ -1096,35 +1143,18 @@ export default function CalendarioJogos({
 
             <div className="flex flex-col gap-2 pt-2">
               {jogadorAtual.membroStatus !== 'diarista' && (
-                <>
-                  <button
-                    type="button"
-                    id="btn-quitar-debitos-pix"
-                    onClick={() => {
-                      setShowInadimplenteModal(false);
-                      setDebitosParaPagarDiarista(debitosPendentes);
-                      setShowPixCheckoutDiarista(true);
-                    }}
-                    className="w-full py-2.5 bg-teal-500 hover:bg-teal-400 text-emerald-950 font-black text-xs rounded-xl transition-all shadow-md active:scale-97 text-center cursor-pointer uppercase flex items-center justify-center gap-1.5"
-                  >
-                    <span>⚡ Quitar Débitos via PIX</span>
-                  </button>
-
-                  <button
-                    type="button"
-                    id="btn-confirmar-inadimplente-prosseguir"
-                    onClick={() => {
-                      setShowInadimplenteModal(false);
-                      if (dadosConfirmacaoPendente && onActualizarPresenca) {
-                        onActualizarPresenca(dadosConfirmacaoPendente.partidaId, dadosConfirmacaoPendente.jogadorId, dadosConfirmacaoPendente.confirmado);
-                        setDadosConfirmacaoPendente(null);
-                      }
-                    }}
-                    className="w-full py-2.5 bg-rose-500 hover:bg-rose-400 text-black font-black text-xs rounded-xl transition-all shadow-md active:scale-97 text-center cursor-pointer uppercase"
-                  >
-                    Confirmar Presença e Regularizar depois
-                  </button>
-                </>
+                <button
+                  type="button"
+                  id="btn-quitar-debitos-pix"
+                  onClick={() => {
+                    setShowInadimplenteModal(false);
+                    setDebitosParaPagarDiarista(debitosPendentes);
+                    setShowPixCheckoutDiarista(true);
+                  }}
+                  className="w-full py-2.5 bg-teal-500 hover:bg-teal-400 text-emerald-950 font-black text-xs rounded-xl transition-all shadow-md active:scale-97 text-center cursor-pointer uppercase flex items-center justify-center gap-1.5"
+                >
+                  <span>⚡ Quitar Débitos via PIX</span>
+                </button>
               )}
               <button
                 type="button"

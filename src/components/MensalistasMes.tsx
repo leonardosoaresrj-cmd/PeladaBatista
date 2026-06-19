@@ -3,10 +3,11 @@
  * SPDX-License-Identifier: Apache-2.0
  */
 
-import React, { useState, useMemo } from 'react';
+import React, { useState, useMemo, useEffect } from 'react';
 import { Jogador, Pagamento } from '../types';
 import { AVATAR_PRESETS } from '../data';
 import { Users, Search, UserCheck, Award, Star, Mail, Calendar } from 'lucide-react';
+import { obterJanelaRenovacaoParaMesRef, isFechamentoMensalistas } from '../utils/confirmationRules';
 
 interface MensalistasMesProps {
   jogadores: Jogador[];
@@ -30,15 +31,110 @@ export default function MensalistasMes({
   onRegistrarLogAutomacao
 }: MensalistasMesProps) {
   const [filtroPesquisa, setFiltroPesquisa] = useState('');
-  const [mesSelecionado, setMesSelecionado] = useState('2026-06');
+  const [mesSelecionado, setMesSelecionado] = useState(() => {
+    const d = new Date();
+    const y = d.getFullYear();
+    const m = String(d.getMonth() + 1).padStart(2, '0');
+    return `${y}-${m}`;
+  });
+
+  const startupMonth = useMemo(() => {
+    return localStorage.getItem('futebol_startup_month') || '2026-05';
+  }, []);
+
+  useEffect(() => {
+    if (mesSelecionado < startupMonth) {
+      setMesSelecionado(startupMonth);
+    }
+  }, [mesSelecionado, startupMonth]);
+
   const [removerConfirmId, setRemoverConfirmId] = useState<string | null>(null);
 
-  const opcoesMeses = [
-    { value: '2026-05', label: 'Maio / 2026' },
-    { value: '2026-06', label: 'Junho / 2026' },
-    { value: '2026-07', label: 'Julho / 2026' },
-    { value: '2026-08', label: 'Agosto / 2026' },
-  ];
+  // Obter período de renovação dos mensalistas
+  const janelaRenovacao = useMemo(() => {
+    const agora = new Date();
+    const y = agora.getFullYear();
+    const m = agora.getMonth();
+    
+    let janela = obterJanelaRenovacaoParaMesRef(y, m);
+    if (agora > janela.fim) {
+      let proxMes = m + 1;
+      let proxAno = y;
+      if (proxMes > 11) {
+        proxMes = 0;
+        proxAno += 1;
+      }
+      janela = obterJanelaRenovacaoParaMesRef(proxAno, proxMes);
+    }
+    
+    const infoFechamento = isFechamentoMensalistas(agora);
+    
+    return {
+      inicio: janela.inicio.toLocaleDateString('pt-BR'),
+      fim: janela.fim.toLocaleDateString('pt-BR'),
+      estaAberta: infoFechamento.emPeriodo
+    };
+  }, []);
+
+  const obterMesAtual = (): string => {
+    const d = new Date();
+    const y = d.getFullYear();
+    const m = String(d.getMonth() + 1).padStart(2, '0');
+    return `${y}-${m}`;
+  };
+
+  const opcoesMeses = useMemo(() => {
+    const mesLimit = obterMesAtual(); // ex: '2026-06'
+    const mesSet = new Set<string>();
+    
+    if (mesLimit >= startupMonth) {
+      mesSet.add(mesLimit);
+    } else {
+      mesSet.add(startupMonth);
+    }
+
+    pagamentos.forEach(p => {
+      if (p.mesRef && p.mesRef.length >= 7) {
+        if (p.mesRef >= startupMonth && p.mesRef <= mesLimit) {
+          mesSet.add(p.mesRef);
+        }
+      }
+    });
+
+    const listaMeses = Array.from(mesSet).sort();
+    if (listaMeses.length > 0) {
+      const minMes = listaMeses[0] >= startupMonth ? listaMeses[0] : startupMonth;
+      const maxMes = mesLimit >= startupMonth ? mesLimit : startupMonth;
+      const [minY, minM] = minMes.split('-').map(Number);
+      const [maxY, maxM] = maxMes.split('-').map(Number);
+
+      const sequencia: string[] = [];
+      let curY = minY;
+      let curM = minM;
+      while (curY < maxY || (curY === maxY && curM <= maxM)) {
+        const mesStr = `${curY}-${String(curM).padStart(2, '0')}`;
+        sequencia.push(mesStr);
+        curM++;
+        if (curM > 12) {
+          curM = 1;
+          curY++;
+        }
+      }
+      
+      const nomesMesesIndex: Record<string, string> = {
+        '01': 'Janeiro', '02': 'Fevereiro', '03': 'Março', '04': 'Abril',
+        '05': 'Maio', '06': 'Junho', '07': 'Julho', '08': 'Agosto',
+        '09': 'Setembro', '10': 'Outubro', '11': 'Novembro', '12': 'Dezembro'
+      };
+
+      return sequencia.map(m => {
+        const [ano, mesId] = m.split('-');
+        const label = `${nomesMesesIndex[mesId] || mesId} / ${ano}`;
+        return { value: m, label };
+      });
+    }
+    return [{ value: startupMonth, label: 'Maio / 2026' }];
+  }, [pagamentos, startupMonth]);
 
   // Calcular sábados do mês selecionado
   const countSabados = useMemo(() => {
@@ -129,7 +225,7 @@ export default function MensalistasMes({
             Mensalistas Ativos da Temporada
           </h2>
           <p className="text-xs text-emerald-300/85 font-sans mt-0.5">
-            Membros oficiais e vitalícios que compõem o elenco da pelada Arena Record.
+            Membros oficiais e vitalícios que compõem o elenco da pelada Pelada Batista Sábado.
           </p>
         </div>
 
@@ -140,6 +236,29 @@ export default function MensalistasMes({
             <span className="text-emerald-300 font-sans">Elenco Oficial: </span>
             <strong className="text-white font-mono">{mensalistasAtivos.length} Atletas</strong>
           </div>
+        </div>
+      </div>
+
+      {/* Banner de Janela de Renovação */}
+      <div id="banner-janela-renovacao-mensalistas" className="bg-emerald-950/40 border border-emerald-500/20 rounded-2xl p-4 flex flex-col sm:flex-row sm:items-center sm:justify-between gap-4 text-left shadow-lg backdrop-blur-sm">
+        <div className="flex items-start gap-3">
+          <div className="w-10 h-10 rounded-xl bg-emerald-500/10 border border-emerald-500/30 flex items-center justify-center shrink-0 text-emerald-400 mt-0.5">
+            <Calendar className="w-5 h-5" />
+          </div>
+          <div className="space-y-0.5">
+            <h4 className="text-xs font-bold text-white uppercase tracking-wider">Período de Renovação da Mensalidade</h4>
+            <p className="text-[11px] text-emerald-250 leading-relaxed">
+              O período de renovação oficial compreende de segunda-feira após o último sábado do mês anterior até a sexta-feira antes do segundo sábado do mês de renovação.
+            </p>
+          </div>
+        </div>
+        <div className="bg-emerald-900/60 border border-white/5 rounded-xl px-4 py-2.5 shrink-0 flex flex-col justify-center sm:text-right">
+          <span className="text-[9px] text-emerald-350 font-mono uppercase tracking-wider block">
+            {janelaRenovacao.estaAberta ? '🟢 Janela de Renovação Ativa' : '⏳ Status de Renovação'}
+          </span>
+          <span className="text-xs font-bold text-white font-mono mt-0.5 block">
+            {janelaRenovacao.inicio} a {janelaRenovacao.fim}
+          </span>
         </div>
       </div>
 
@@ -191,15 +310,6 @@ export default function MensalistasMes({
             <p className="text-xs text-emerald-300/80">
               Acompanhe quem já quitou a mensalidade deste período ou registre pagamentos diretamente. Valor: <strong className="text-white">R$ {valorMensalidadeMês.toFixed(2)}</strong> ({countSabados} sábados).
             </p>
-            {whatsappAutomacaoAtiva && (
-              <button 
-                type="button"
-                onClick={dispararMensalistasWhatsApp}
-                className="mt-2 text-[10px] uppercase font-bold tracking-widest bg-amber-500 hover:bg-amber-400 text-amber-950 px-3 py-1.5 rounded-lg inline-flex items-center gap-1.5 shadow"
-              >
-                📢 Disparar Lista no WhatsApp
-              </button>
-            )}
           </div>
           <div className="flex items-center gap-2">
             <span className="text-xs font-mono font-bold bg-teal-500/10 border border-teal-500/20 text-teal-300 px-3 py-1 rounded-full whitespace-nowrap">
@@ -266,6 +376,11 @@ export default function MensalistasMes({
                             ? 'Cancelado/Indevido 🚫'
                             : 'Pendente ❌'}
                     </span>
+                    {status === 'pago' && pagamento?.dataPagamento && (
+                      <span className="block text-[8.5px] font-mono text-emerald-400 font-bold mt-0.5">
+                        📅 {pagamento.dataPagamento.split('-').reverse().join('/')}
+                      </span>
+                    )}
                   </div>
 
                   {/* Botão de Quitação para ADMINISTRADOR */}

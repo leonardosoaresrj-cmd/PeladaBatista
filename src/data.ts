@@ -224,22 +224,22 @@ create policy "Admins gerenciam configurações do racha" on racha_configuracoes
   );
 `;
 
-// Carregar dados iniciais guardados de jogadores (limpando histórico de teste)
+// Carregar dados iniciais guardados de jogadores (com persistência real)
 export function getSavedJogadores(): Jogador[] {
   const json = localStorage.getItem('futebol_jogadores');
   let list: Jogador[] = [];
   if (json) {
     try {
       list = JSON.parse(json);
-      // Mantém única e exclusivamente a conta do administrador Leonardo Soares
-      list = list.filter(j => j.email.toLowerCase().trim() === 'leonardo.soares.rj@gmail.com');
     } catch (e) {
       list = [];
     }
   }
   
-  if (list.length === 0) {
-    list = [...INITIAL_JOGADORES];
+  // Garante que o administrador Leonardo Soares sempre exista na lista
+  const hasAdmin = list.some(j => j.email.toLowerCase().trim() === 'leonardo.soares.rj@gmail.com');
+  if (!hasAdmin) {
+    list.unshift(...INITIAL_JOGADORES);
   }
   
   localStorage.setItem('futebol_jogadores', JSON.stringify(list));
@@ -247,13 +247,19 @@ export function getSavedJogadores(): Jogador[] {
 }
 
 export function saveJogadores(jogadores: Jogador[]) {
-  // Permite salvar novos jogadores limpos
   localStorage.setItem('futebol_jogadores', JSON.stringify(jogadores));
 }
 
-// Limpar todo o histórico de partidas antigas
+// Carregar partidas salvas no localStorage
 export function getSavedPartidas(): Partida[] {
-  localStorage.setItem('futebol_partidas', JSON.stringify([]));
+  const json = localStorage.getItem('futebol_partidas');
+  if (json) {
+    try {
+      return JSON.parse(json);
+    } catch (e) {
+      return [];
+    }
+  }
   return [];
 }
 
@@ -261,9 +267,16 @@ export function savePartidas(partidas: Partida[]) {
   localStorage.setItem('futebol_partidas', JSON.stringify(partidas));
 }
 
-// Limpar todo o histórico de pagamentos antigos
+// Carregar pagamentos salvos no localStorage
 export function getSavedPagamentos(): Pagamento[] {
-  localStorage.setItem('futebol_pagamentos', JSON.stringify([]));
+  const json = localStorage.getItem('futebol_pagamentos');
+  if (json) {
+    try {
+      return JSON.parse(json);
+    } catch (e) {
+      return [];
+    }
+  }
   return [];
 }
 
@@ -271,9 +284,16 @@ export function savePagamentos(pagamentos: Pagamento[]) {
   localStorage.setItem('futebol_pagamentos', JSON.stringify(pagamentos));
 }
 
-// Limpar todo histórico de lançamentos de caixa
+// Carregar lançamentos salvos no localStorage
 export function getSavedLancamentos(): any[] {
-  localStorage.removeItem('futebol_lancamentos_caixa');
+  const json = localStorage.getItem('futebol_lancamentos_caixa');
+  if (json) {
+    try {
+      return JSON.parse(json);
+    } catch (e) {
+      return [];
+    }
+  }
   return [];
 }
 

@@ -30,8 +30,10 @@ export function obterSábadosNoIntervalo(dataInicioStr: string, dataFimStr: stri
  * garantindo que novos sábados sem registros apareçam automaticamente.
  */
 export function mesclarPartidasAutomáticas(partidasSalvas: Partida[]): Partida[] {
-  // Definindo um intervalo de geração automática para cobrir 2026 e 2027
-  const sabados = obterSábadosNoIntervalo('2026-01-01', '2027-12-31');
+  // Definindo um intervalo de geração automática para cobrir 25 e 26/27, iniciando em startupMonth
+  const startupMonth = typeof window !== 'undefined' ? localStorage.getItem('futebol_startup_month') || '2026-05' : '2026-05';
+  const dataInicioGen = `${startupMonth}-01`;
+  const sabados = obterSábadosNoIntervalo(dataInicioGen, '2027-12-31');
   
   // Criar cópia dos matches salvos
   const result: Partida[] = [...partidasSalvas];

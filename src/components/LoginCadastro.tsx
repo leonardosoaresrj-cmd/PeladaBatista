@@ -7,6 +7,8 @@ import React, { useState } from 'react';
 import { Jogador, PosicaoJogador, MembroStatus } from '../types';
 import { AVATAR_PRESETS } from '../data';
 import { KeyRound, Mail, User, Calendar, Shield, Users, Check, AlertCircle, ArrowLeft, Send, Loader2 } from 'lucide-react';
+import logoPelada from '../assets/images/logo_pelada.svg';
+import { isFechamentoMensalistas, obterJanelaRenovacaoParaMesRef } from '../utils/confirmationRules';
 
 interface LoginCadastroProps {
   jogadores: Jogador[];
@@ -34,11 +36,14 @@ export default function LoginCadastro({ jogadores, onLoginSuccess, onRegistrar }
   const [posicao, setPosicao] = useState<PosicaoJogador>('Meio');
   const [dataNascimento, setDataNascimento] = useState('');
   const [foto, setFoto] = useState('');
-  const [membroStatus, setMembroStatus] = useState<MembroStatus>('mensalista');
+  const [membroStatus, setMembroStatus] = useState<MembroStatus>(() => {
+    return isFechamentoMensalistas().emPeriodo ? 'mensalista' : 'diarista';
+  });
   const [email, setEmail] = useState('');
   const [pin, setPin] = useState('');
   const [singupSuccess, setSingupSuccess] = useState(false);
   const [signupError, setSignupError] = useState('');
+  const [showForaRenovacaoModal, setShowForaRenovacaoModal] = useState(false);
 
   // Password Recovery State
   const [isRecoveryMode, setIsRecoveryMode] = useState(false);
@@ -152,6 +157,18 @@ export default function LoginCadastro({ jogadores, onLoginSuccess, onRegistrar }
     onLoginSuccess(found);
   };
 
+  const handleMembroStatusChange = (status: MembroStatus) => {
+    if (status === 'mensalista') {
+      const infoFechamento = isFechamentoMensalistas();
+      if (!infoFechamento.emPeriodo) {
+        setShowForaRenovacaoModal(true);
+        setMembroStatus('mensalista');
+        return;
+      }
+    }
+    setMembroStatus(status);
+  };
+
   const handleSignUpSubmit = (e: React.FormEvent) => {
     e.preventDefault();
     setSignupError('');
@@ -174,13 +191,23 @@ export default function LoginCadastro({ jogadores, onLoginSuccess, onRegistrar }
       return;
     }
 
+    let finalMembroStatus = membroStatus;
+    if (membroStatus === 'mensalista') {
+      const infoFechamento = isFechamentoMensalistas();
+      if (!infoFechamento.emPeriodo) {
+        finalMembroStatus = 'diarista';
+        setMembroStatus('diarista');
+        setShowForaRenovacaoModal(true);
+      }
+    }
+
     onRegistrar({
       nome: nome.trim(),
       sobrenome: sobrenome.trim(),
       posicao,
       dataNascimento,
       foto,
-      membroStatus,
+      membroStatus: finalMembroStatus,
       email: email.toLowerCase().trim(),
       senha: pin,
       isGold: false,
@@ -204,8 +231,13 @@ export default function LoginCadastro({ jogadores, onLoginSuccess, onRegistrar }
         {/* Banner do Estádio */}
         <div className="bg-gradient-to-r from-emerald-950 to-emerald-900 py-6 px-6 relative border-b border-white/10 text-center">
           <div className="absolute inset-0 bg-radial-gradient from-white/5 to-transparent pointer-events-none" />
-          <div className="inline-flex items-center justify-center w-12 h-12 rounded-full bg-white/10 border border-white/20 text-white mb-2">
-            <Users className="w-6 h-6" />
+          <div className="inline-flex items-center justify-center w-16 h-16 rounded-full bg-slate-900/40 border border-white/15 p-2 text-white mb-2 shadow-inner hover:scale-105 transition-transform duration-300">
+            <img 
+              src={logoPelada} 
+              alt="Pelada Batista Logo" 
+              className="w-full h-full object-contain filter drop-shadow(0 2px 8px rgba(0,0,0,0.4))"
+              referrerPolicy="no-referrer"
+            />
           </div>
           <h2 className="text-2xl font-display font-bold text-white tracking-wide">PELADA BATISTA SÁBADO</h2>
           <p className="text-xs text-emerald-400 font-semibold tracking-widest uppercase mt-0.5">Gestão de Partidas de Futebol e Finanças</p>
@@ -413,15 +445,7 @@ export default function LoginCadastro({ jogadores, onLoginSuccess, onRegistrar }
                 </div>
               )}
 
-              {singupSuccess && (
-                <div className="flex flex-col gap-2 bg-emerald-950/50 border border-white/10 text-emerald-200 text-xs px-3 py-3 rounded-lg">
-                  <div className="flex items-center gap-1.5 text-emerald-400 font-bold">
-                    <Check className="w-4 h-4" />
-                    <span>Cadastro Pré-Registrado!</span>
-                  </div>
-                  <p>Sua conta foi criada no portal com sucesso. Para segurança do campeonato, um **administrador do jogo** deve aprovar seu cadastro antes de habilitar seu login com este PIN.</p>
-                </div>
-              )}
+
 
               <div className="grid grid-cols-2 gap-3">
                 <div>
@@ -478,7 +502,7 @@ export default function LoginCadastro({ jogadores, onLoginSuccess, onRegistrar }
                   <select
                     id="select-membro"
                     value={membroStatus}
-                    onChange={(e) => setMembroStatus(e.target.value as MembroStatus)}
+                    onChange={(e) => handleMembroStatusChange(e.target.value as MembroStatus)}
                     className="w-full bg-emerald-950 border border-white/10 text-white rounded-lg px-2.5 py-1.5 text-sm focus:outline-none focus:border-white transition-all font-sans"
                   >
                     {posicao === 'Goleiro' ? (
@@ -613,6 +637,98 @@ export default function LoginCadastro({ jogadores, onLoginSuccess, onRegistrar }
           )}
         </div>
       </div>
+
+      {/* Modal Aviso Período de Renovação Encerrado */}
+      {showForaRenovacaoModal && (() => {
+        const agora = new Date();
+        const y = agora.getFullYear();
+        const m = agora.getMonth();
+        let janela = obterJanelaRenovacaoParaMesRef(y, m);
+        if (agora > janela.fim) {
+          let proxMes = m + 1;
+          let proxAno = y;
+          if (proxMes > 11) {
+            proxMes = 0;
+            proxAno += 1;
+          }
+          janela = obterJanelaRenovacaoParaMesRef(proxAno, proxMes);
+        }
+        const dtInicio = janela.inicio.toLocaleDateString('pt-BR');
+        const dtFim = janela.fim.toLocaleDateString('pt-BR');
+
+        return (
+          <div className="fixed inset-0 bg-slate-950/80 backdrop-blur-sm flex items-center justify-center p-4 z-50 animate-fade-in">
+            <div className="w-full max-w-md bg-emerald-950 border border-white/20 rounded-2xl shadow-2xl p-6 text-center space-y-4">
+              <div className="w-16 h-16 rounded-full bg-amber-500/10 border border-amber-500/30 flex items-center justify-center mx-auto text-amber-400 animate-bounce">
+                <AlertCircle className="w-8 h-8" />
+              </div>
+              
+              <h3 className="text-xl font-display font-bold text-white tracking-wide">Fora do Período de Renovação</h3>
+              
+              <div className="text-emerald-200 text-sm leading-relaxed space-y-3">
+                <p>
+                  O período de renovação de mensalidade não está ativo neste momento.
+                </p>
+                <p className="bg-emerald-900/60 border border-white/5 rounded-lg p-3.5 text-emerald-350 text-xs text-left leading-relaxed">
+                  Por este motivo, seu perfil será cadastrado como <strong className="text-white font-semibold">Diarista</strong>. Você poderá solicitar a alteração do seu status para Mensalista no início do próximo ciclo de renovação da mensalidade!
+                </p>
+
+                <div className="mt-2 bg-black/30 p-2.5 rounded-xl border border-white/10">
+                  <p className="text-[9px] text-emerald-350 font-mono uppercase tracking-wide">Próxima Janela de Renovação</p>
+                  <p className="text-xs font-bold text-white mt-0.5">{dtInicio} a {dtFim}</p>
+                </div>
+              </div>
+
+              <button
+                id="btn-confirm-fora-renovacao"
+                type="button"
+                onClick={() => {
+                  setShowForaRenovacaoModal(false);
+                  setMembroStatus('diarista');
+                }}
+                className="w-full bg-white hover:bg-emerald-100 text-black font-bold py-2.5 rounded-lg text-sm transition-all shadow-md uppercase tracking-wider text-[11px] cursor-pointer"
+              >
+                Ciente e Continuar como Diarista
+              </button>
+            </div>
+          </div>
+        );
+      })()}
+
+      {/* Modal Confirmação de Pré-Registrado */}
+      {singupSuccess && (
+        <div className="fixed inset-0 bg-slate-950/80 backdrop-blur-sm flex items-center justify-center p-4 z-50 animate-fade-in">
+          <div className="w-full max-w-md bg-emerald-950 border border-white/20 rounded-2xl shadow-2xl p-6 text-center space-y-4">
+            <div className="w-16 h-16 rounded-full bg-emerald-500/10 border border-emerald-500/30 flex items-center justify-center mx-auto text-emerald-400 animate-pulse">
+              <Check className="w-8 h-8 stroke-[3.5px]" />
+            </div>
+            
+            <h3 className="text-xl font-display font-bold text-white tracking-wide">Cadastro Pré-Registrado!</h3>
+            
+            <div className="text-emerald-250 text-sm leading-relaxed space-y-3">
+              <p className="text-emerald-100">
+                Sua conta foi criada no portal com sucesso!
+              </p>
+              <p className="bg-emerald-900/60 border border-white/5 rounded-lg p-3.5 text-emerald-350 text-xs text-left leading-relaxed">
+                Para manter a integridade e segurança do campeonato, um <strong className="text-white font-semibold">administrador do jogo</strong> precisa verificar e aprovar o seu cadastro antes de liberar o acesso de login com o seu PIN cadastrado.
+              </p>
+            </div>
+
+            <button
+              id="btn-login-success-close"
+              type="button"
+              onClick={() => {
+                setSingupSuccess(false);
+                setIsLogin(true);
+              }}
+              className="w-full bg-white hover:bg-emerald-100 text-black font-semibold py-2.5 rounded-lg text-sm transition-all shadow-md uppercase tracking-wider text-[11px] cursor-pointer flex items-center justify-center gap-1.5 hover:scale-[1.01] active:scale-[0.99]"
+            >
+              <ArrowLeft className="w-4 h-4 text-black" />
+              Voltar para Tela de Login
+            </button>
+          </div>
+        </div>
+      )}
     </div>
   );
 }

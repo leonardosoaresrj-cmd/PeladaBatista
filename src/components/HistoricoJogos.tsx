@@ -3,10 +3,22 @@
  * SPDX-License-Identifier: Apache-2.0
  */
 
-import React, { useState } from 'react';
+import React, { useState, useMemo } from 'react';
 import { Jogador, Partida } from '../types';
 import { AVATAR_PRESETS } from '../data';
 import { Calendar, Users, MapPin, Clock, Search, HelpCircle, Award, Shield, User, CircleDot, Trash2 } from 'lucide-react';
+import {
+  AreaChart,
+  Area,
+  BarChart,
+  Bar,
+  XAxis,
+  YAxis,
+  CartesianGrid,
+  Tooltip,
+  Legend,
+  ResponsiveContainer
+} from 'recharts';
 
 interface HistoricoJogosProps {
   partidas: Partida[];
@@ -21,9 +33,135 @@ export default function HistoricoJogos({
   jogadorAtual,
   onDeletarPartida,
 }: HistoricoJogosProps) {
-  const [mesSelecionado, setMesSelecionado] = useState('2026-05');
+  const obterMesAtual = (): string => {
+    const d = new Date();
+    const y = d.getFullYear();
+    const m = String(d.getMonth() + 1).padStart(2, '0');
+    return `${y}-${m}`;
+  };
+
+  const mesesDisponiveis = useMemo(() => {
+    const mesLimit = obterMesAtual(); // ex: '2026-06'
+    const mesSet = new Set<string>();
+    mesSet.add(mesLimit);
+
+    partidas.forEach(p => {
+      if (p.data && p.data.length >= 7) {
+        const m = p.data.substring(0, 7);
+        if (m <= mesLimit) {
+          mesSet.add(m);
+        }
+      }
+    });
+
+    const listaMeses = Array.from(mesSet).sort();
+    if (listaMeses.length > 0) {
+      const minMes = listaMeses[0];
+      const maxMes = mesLimit;
+      const [minY, minM] = minMes.split('-').map(Number);
+      const [maxY, maxM] = maxMes.split('-').map(Number);
+
+      const sequencia: string[] = [];
+      let curY = minY;
+      let curM = minM;
+      while (curY < maxY || (curY === maxY && curM <= maxM)) {
+        const mesStr = `${curY}-${String(curM).padStart(2, '0')}`;
+        sequencia.push(mesStr);
+        curM++;
+        if (curM > 12) {
+          curM = 1;
+          curY++;
+        }
+      }
+      return sequencia;
+    }
+    return [mesLimit];
+  }, [partidas]);
+
+  const [mesSelecionado, setMesSelecionado] = useState(() => {
+    const d = new Date();
+    const y = d.getFullYear();
+    const m = String(d.getMonth() + 1).padStart(2, '0');
+    return `${y}-${m}`;
+  });
   const [buscaNome, setBuscaNome] = useState('');
   const [idConfirmacaoExclusao, setIdConfirmacaoExclusao] = useState<string | null>(null);
+
+  const [metricType, setMetricType] = useState<'presencas' | 'unicos'>('presencas');
+  const [showMensalistas, setShowMensalistas] = useState(true);
+  const [showDiaristas, setShowDiaristas] = useState(true);
+  const [showGoleiros, setShowGoleiros] = useState(true);
+
+  const anoSelecionado = mesSelecionado.split('-')[0] || '2026';
+
+  const chartData = useMemo(() => {
+    const mesesNomes = ['Jan', 'Fev', 'Mar', 'Abr', 'Mai', 'Jun', 'Jul', 'Ago', 'Set', 'Out', 'Nov', 'Dez'];
+    const data = mesesNomes.map((nome, index) => {
+      const mesNum = String(index + 1).padStart(2, '0');
+      const mesPrefixo = `${anoSelecionado}-${mesNum}`;
+
+      const partidasDoMesLocal = partidas.filter(
+        (p) => !p.cancelada && p.data.startsWith(mesPrefixo)
+      );
+
+      // Metricas de presenças (soma de todas as participações)
+      let mensalistasPres = 0;
+      let diaristasPres = 0;
+      let goleirosPres = 0;
+
+      // Metricas de jogadores únicos no mês
+      const mensalistasSet = new Set<string>();
+      const diaristasSet = new Set<string>();
+      const goleirosSet = new Set<string>();
+
+      partidasDoMesLocal.forEach((p) => {
+        const confirmadosIds = p.confirmados || [];
+        confirmadosIds.forEach((id) => {
+          const jogador = jogadores.find((j) => j.id === id);
+          if (jogador && jogador.status === 'ativo') {
+            if (jogador.posicao === 'Goleiro') {
+              goleirosPres++;
+              goleirosSet.add(id);
+            } else if (jogador.membroStatus === 'mensalista') {
+              mensalistasPres++;
+              mensalistasSet.add(id);
+            } else if (jogador.membroStatus === 'diarista') {
+              diaristasPres++;
+              diaristasSet.add(id);
+            }
+          }
+        });
+      });
+
+      const mVal = metricType === 'presencas' ? mensalistasPres : mensalistasSet.size;
+      const dVal = metricType === 'presencas' ? diaristasPres : diaristasSet.size;
+      const gVal = metricType === 'presencas' ? goleirosPres : goleirosSet.size;
+
+      return {
+        mes: nome,
+        mesCompleto: `${nome}/${anoSelecionado}`,
+        mensalistas: showMensalistas ? mVal : 0,
+        diaristas: showDiaristas ? dVal : 0,
+        goleiros: showGoleiros ? gVal : 0,
+        mReal: showMensalistas ? mVal : 0,
+        dReal: showDiaristas ? dVal : 0,
+        gReal: showGoleiros ? gVal : 0,
+      };
+    });
+
+    // Calcular a Curva S (valores acumulados mês a mês)
+    let acumulado = 0;
+    const dataWithS = data.map((item) => {
+      const somaMes = item.mReal + item.dReal + item.gReal;
+      acumulado += somaMes;
+      return {
+        ...item,
+        Acumulado: acumulado,
+      };
+    });
+
+    return dataWithS;
+  }, [partidas, jogadores, anoSelecionado, metricType, showMensalistas, showDiaristas, showGoleiros]);
 
   // Formatar data em formato amigável (Dia, DD/MM/AAAA)
   const formatarDataAmigavel = (dataStr: string) => {
@@ -114,8 +252,20 @@ export default function HistoricoJogos({
             onChange={(e) => setMesSelecionado(e.target.value)}
             className="bg-emerald-950 border border-white/10 text-white text-xs font-bold font-mono rounded-lg px-3 py-2 cursor-pointer focus:outline-none focus:border-white"
           >
-            <option className="bg-emerald-955 text-white" value="2026-05">Maio / 2026</option>
-            <option className="bg-emerald-955 text-white" value="2026-06">Junho / 2026</option>
+            {[...mesesDisponiveis].reverse().map(m => {
+              const nomesMesesIndex: Record<string, string> = {
+                '01': 'Janeiro', '02': 'Fevereiro', '03': 'Março', '04': 'Abril',
+                '05': 'Maio', '06': 'Junho', '07': 'Julho', '08': 'Agosto',
+                '09': 'Setembro', '10': 'Outubro', '11': 'Novembro', '12': 'Dezembro'
+              };
+              const [ano, mesId] = m.split('-');
+              const label = `${nomesMesesIndex[mesId] || mesId} / ${ano}`;
+              return (
+                <option className="bg-emerald-955 text-white" key={m} value={m}>
+                  {label}
+                </option>
+              );
+            })}
           </select>
         </div>
       </div>
@@ -156,6 +306,220 @@ export default function HistoricoJogos({
             <h4 className="text-xl font-mono font-bold text-white mt-1">{totalDiaristasUnicos}</h4>
             <p className="text-[9px] text-emerald-400 mt-0.5">Diaristas atuantes no mês</p>
           </div>
+        </div>
+      </div>
+
+      {/* Dashboard de Gráficos e Estatísticas de Envolvimento */}
+      <div id="analytics-dashboard" className="bg-emerald-900/40 border border-white/10 rounded-2xl p-5 shadow-xl backdrop-blur-sm space-y-4">
+        <div className="flex flex-col xl:flex-row xl:items-center xl:justify-between border-b border-white/10 pb-3.5 gap-3">
+          <div>
+            <h3 className="font-display font-semibold text-sm text-teal-300 flex items-center gap-2 uppercase tracking-wide">
+              <span>📊 Dashboard Analítico de Presenças (Ano {anoSelecionado})</span>
+            </h3>
+            <p className="text-[11px] text-emerald-300/80 font-sans mt-0.5">
+              Análise visual do engajamento de mensalistas, diaristas e goleiros pelos meses da temporada.
+            </p>
+          </div>
+
+          {/* Filtros e Controles Rápidos */}
+          <div className="flex flex-wrap items-center gap-3 lg:self-end">
+            {/* Seletor do tipo de métrica */}
+            <div className="bg-black/45 p-1 border border-white/10 rounded-xl flex items-center shrink-0">
+              <button
+                type="button"
+                onClick={() => setMetricType('presencas')}
+                className={`px-3 py-1.5 text-[9px] font-black uppercase tracking-wider rounded-lg transition-all duration-200 cursor-pointer ${
+                  metricType === 'presencas'
+                    ? 'bg-teal-500 text-white shadow font-extrabold'
+                    : 'text-emerald-300 hover:text-white'
+                }`}
+              >
+                Atuações (Soma)
+              </button>
+              <button
+                type="button"
+                onClick={() => setMetricType('unicos')}
+                className={`px-3 py-1.5 text-[9px] font-black uppercase tracking-wider rounded-lg transition-all duration-200 cursor-pointer ${
+                  metricType === 'unicos'
+                    ? 'bg-teal-500 text-white shadow font-extrabold'
+                    : 'text-emerald-300 hover:text-white'
+                }`}
+              >
+                Atletas Únicos
+              </button>
+            </div>
+
+            {/* Checkboxes de Filtros de Categorias */}
+            <div className="flex items-center gap-3.5 bg-black/30 px-3 py-2 border border-white/5 rounded-xl text-xs">
+              <label className="flex items-center gap-1.5 cursor-pointer text-white font-medium select-none">
+                <input
+                  type="checkbox"
+                  checked={showMensalistas}
+                  onChange={(e) => setShowMensalistas(e.target.checked)}
+                  className="accent-teal-500 cursor-pointer w-3.5 h-3.5"
+                />
+                <span className="text-[10px] text-emerald-300 font-bold uppercase tracking-wider">Mensalistas</span>
+              </label>
+
+              <label className="flex items-center gap-1.5 cursor-pointer text-white font-medium select-none">
+                <input
+                  type="checkbox"
+                  checked={showDiaristas}
+                  onChange={(e) => setShowDiaristas(e.target.checked)}
+                  className="accent-amber-500 cursor-pointer w-3.5 h-3.5"
+                />
+                <span className="text-[10px] text-amber-300 font-bold uppercase tracking-wider">Diaristas</span>
+              </label>
+
+              <label className="flex items-center gap-1.5 cursor-pointer text-white font-medium select-none">
+                <input
+                  type="checkbox"
+                  checked={showGoleiros}
+                  onChange={(e) => setShowGoleiros(e.target.checked)}
+                  className="accent-blue-500 cursor-pointer w-3.5 h-3.5"
+                />
+                <span className="text-[10px] text-blue-300 font-bold uppercase tracking-wider">Goleiros</span>
+              </label>
+            </div>
+          </div>
+        </div>
+
+        {/* Grid com os 2 Gráficos */}
+        <div className="grid grid-cols-1 lg:grid-cols-2 gap-6 pb-2">
+          
+          {/* Gráfico 1: Curva S Acumulada */}
+          <div className="bg-black/20 border border-white/5 p-4 rounded-xl flex flex-col space-y-3">
+            <div className="flex items-center justify-between border-b border-white/5 pb-2">
+              <h4 className="text-xs font-bold text-white uppercase tracking-wider">
+                1. Curva S - Acumulado do Ano
+              </h4>
+              <span className="text-[9px] font-mono text-teal-400 bg-teal-500/10 border border-teal-500/20 px-2.5 py-1 rounded-md font-bold uppercase">
+                Acumulado Mensal
+              </span>
+            </div>
+            
+            <div className="w-full h-[260px] md:h-[285px]">
+              <ResponsiveContainer width="100%" height="100%">
+                <AreaChart
+                  data={chartData}
+                  margin={{ top: 15, right: 15, left: -22, bottom: 5 }}
+                >
+                  <defs>
+                    <linearGradient id="colorAcumulado" x1="0" y1="0" x2="0" y2="1">
+                      <stop offset="5%" stopColor="#14b8a6" stopOpacity={0.4}/>
+                      <stop offset="95%" stopColor="#14b8a6" stopOpacity={0}/>
+                    </linearGradient>
+                  </defs>
+                  <CartesianGrid strokeDasharray="3 3" stroke="rgba(255,255,255,0.04)" />
+                  <XAxis 
+                    dataKey="mes" 
+                    stroke="rgba(255,255,255,0.4)" 
+                    fontSize={11}
+                    fontWeight="bold"
+                    tickLine={false}
+                  />
+                  <YAxis 
+                    stroke="rgba(255,255,255,0.4)" 
+                    fontSize={11} 
+                    fontWeight="bold"
+                    tickLine={false}
+                  />
+                  <Tooltip
+                    contentStyle={{
+                      backgroundColor: 'rgba(5, 46, 22, 0.95)',
+                      borderColor: 'rgba(255, 255, 255, 0.1)',
+                      borderRadius: '12px',
+                      color: '#ffffff',
+                      fontFamily: 'sans-serif',
+                      fontSize: '11px',
+                      boxShadow: '0 25px 50px -12px rgba(0, 0, 0, 0.5)'
+                    }}
+                    labelStyle={{ fontWeight: 'bold', color: '#2dd4bf' }}
+                  />
+                  <Area 
+                    type="monotone" 
+                    dataKey="Acumulado" 
+                    stroke="#14b8a6" 
+                    strokeWidth={3}
+                    fillOpacity={1} 
+                    fill="url(#colorAcumulado)" 
+                    name="Acumulado Geral"
+                  />
+                </AreaChart>
+              </ResponsiveContainer>
+            </div>
+            <p className="text-[10px] text-emerald-400/80 text-center font-sans">
+              Evolução linear crescente das participações/atletas no decorrer de {anoSelecionado}.
+            </p>
+          </div>
+
+          {/* Gráfico 2: Barras Verticais de Presenças */}
+          <div className="bg-black/20 border border-white/5 p-4 rounded-xl flex flex-col space-y-3">
+            <div className="flex items-center justify-between border-b border-white/5 pb-2">
+              <h4 className="text-xs font-bold text-white uppercase tracking-wider">
+                2. Quantidade de Atletas Presentes
+              </h4>
+              <span className="text-[9px] font-mono text-emerald-400 bg-emerald-500/10 border border-emerald-500/20 px-2.5 py-1 rounded-md font-bold uppercase">
+                Frequência Mensal
+              </span>
+            </div>
+
+            <div className="w-full h-[260px] md:h-[285px]">
+              <ResponsiveContainer width="100%" height="100%">
+                <BarChart
+                  data={chartData}
+                  margin={{ top: 15, right: 15, left: -22, bottom: 5 }}
+                  barGap={3}
+                >
+                  <CartesianGrid strokeDasharray="3 3" stroke="rgba(255,255,255,0.04)" />
+                  <XAxis 
+                    dataKey="mes" 
+                    stroke="rgba(255,255,255,0.4)" 
+                    fontSize={11}
+                    fontWeight="bold"
+                    tickLine={false}
+                  />
+                  <YAxis 
+                    stroke="rgba(255,255,255,0.4)" 
+                    fontSize={11} 
+                    fontWeight="bold"
+                    tickLine={false}
+                  />
+                  <Tooltip
+                    contentStyle={{
+                      backgroundColor: 'rgba(5, 46, 22, 0.95)',
+                      borderColor: 'rgba(255, 255, 255, 0.1)',
+                      borderRadius: '12px',
+                      color: '#ffffff',
+                      fontFamily: 'sans-serif',
+                      fontSize: '11px',
+                      boxShadow: '0 25px 50px -12px rgba(0, 0, 0, 0.5)'
+                    }}
+                    labelStyle={{ fontWeight: 'bold', color: '#2dd4bf' }}
+                  />
+                  <Legend 
+                    verticalAlign="top" 
+                    height={36} 
+                    iconSize={8}
+                    wrapperStyle={{ fontSize: '10px', color: '#ffffff', textTransform: 'uppercase', fontWeight: 'bold' }}
+                  />
+                  {showMensalistas && (
+                    <Bar dataKey="mensalistas" name="Mensalistas" fill="#34d399" radius={[4, 4, 0, 0]} />
+                  )}
+                  {showDiaristas && (
+                    <Bar dataKey="diaristas" name="Diaristas" fill="#fbbf24" radius={[4, 4, 0, 0]} />
+                  )}
+                  {showGoleiros && (
+                    <Bar dataKey="goleiros" name="Goleiros" fill="#60a5fa" radius={[4, 4, 0, 0]} />
+                  )}
+                </BarChart>
+              </ResponsiveContainer>
+            </div>
+            <p className="text-[10px] text-emerald-400/80 text-center font-sans">
+              Volatilidade e presença por categoria de jogador em cada mês analisado.
+            </p>
+          </div>
+
         </div>
       </div>
 

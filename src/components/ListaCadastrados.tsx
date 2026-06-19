@@ -6,8 +6,8 @@
 import React, { useState } from 'react';
 import { Jogador, PosicaoJogador, MembroStatus, Partida, Pagamento, RoleUsuario } from '../types';
 import { AVATAR_PRESETS } from '../data';
-import { Users, Trash2, Shield, Calendar, Edit2, Check, X, ShieldAlert, Award, Share2, Send, Copy } from 'lucide-react';
-import { obterTextoListaCompletaPartida, gerarLinkCompartilhamento } from '../utils/confirmationRules';
+import { Users, Trash2, Shield, Calendar, Edit2, Check, X, ShieldAlert, Award, Share2, Send, Copy, History, DollarSign, ArrowLeftRight } from 'lucide-react';
+import { obterTextoListaCompletaPartida, gerarLinkCompartilhamento, obterJanelaRenovacaoParaMesRef, isFechamentoMensalistas } from '../utils/confirmationRules';
 
 interface ListaCadastradosProps {
   jogadores: Jogador[];
@@ -59,6 +59,107 @@ export default function ListaCadastrados({
   const [copiedShare, setCopiedShare] = useState(false);
   const [showAutoToast, setShowAutoToast] = useState(false);
   const [autoToastMsg, setAutoToastMsg] = useState('');
+  const [jogadorHistoricoSelecionado, setJogadorHistoricoSelecionado] = useState<Jogador | null>(null);
+  const [anoHistorico, setAnoHistorico] = useState<string>('2026');
+
+  // Computa o histórico detalhado mês a mês do jogador
+  const obterHistoricoMensalDoJogador = (j: Jogador, ano: string) => {
+    // Meses de referência da temporada
+    const mesesCobranca = [`${ano}-05`, `${ano}-06`, `${ano}-07`, `${ano}-08`];
+    const mesesNomes: Record<string, string> = {
+      [`${ano}-05`]: `Maio / ${ano}`,
+      [`${ano}-06`]: `Junho / ${ano}`,
+      [`${ano}-07`]: `Julho / ${ano}`,
+      [`${ano}-08`]: `Agosto / ${ano}`
+    };
+
+    return mesesCobranca.map((mes) => {
+      const isGoleiro = j.posicao === 'Goleiro';
+      const isIsento = j.membroStatus === 'isento';
+
+      // Filtrar todos os pagamentos daquele mês que não foram cancelados
+      const pagamentosDoMes = pagamentos.filter(
+        (p) => p.jogadorId === j.id && p.mesRef === mes && p.status !== 'cancelado'
+      );
+
+      // Soma de todos os valores realmente quitados neste mês
+      const totalPago = pagamentosDoMes
+        .filter((p) => p.status === 'pago')
+        .reduce((sum, p) => sum + p.valor, 0);
+
+      let situacao: 'Mensalista' | 'Diarista' | 'Isento' = 'Diarista';
+      let quitado = false;
+      let detalhesStatus = 'Sem histórico';
+      let rebaixadoTemporario = false;
+
+      if (isGoleiro || isIsento) {
+        situacao = 'Isento';
+        quitado = true;
+        detalhesStatus = 'Isento';
+      } else if (j.membroStatus === 'mensalista') {
+        // Encontrar pagamento mensal (onde partidaId está ausente)
+        const pagMensal = pagamentosDoMes.find((p) => !p.partidaId);
+
+        if (pagMensal?.status === 'pago') {
+          situacao = 'Mensalista';
+          quitado = true;
+          detalhesStatus = 'Quitado (Mensalidade)';
+        } else if (pagMensal?.status === 'pendente_confirmacao') {
+          situacao = 'Mensalista';
+          quitado = false;
+          detalhesStatus = 'Aguardando Aprovação de PIX';
+        } else {
+          // Inadimplente: temporariamente rebaixado a Diarista conforme regulamento
+          situacao = 'Diarista';
+          quitado = false;
+          detalhesStatus = pagMensal ? 'Mensalidade Pendente' : 'Inadimplente';
+          rebaixadoTemporario = true;
+        }
+      } else {
+        // Diarista regular
+        situacao = 'Diarista';
+
+        // Filtrar as partidas fechadas ou passadas daquele mês onde o jogador estava confirmado
+        const dataHojeStr = new Date().toISOString().split('T')[0];
+        const partidasConfirmadas = partidas.filter(
+          (p) => !p.cancelada && p.data.substring(0, 7) === mes && p.data < dataHojeStr && p.confirmados.includes(j.id)
+        );
+
+        if (partidasConfirmadas.length === 0) {
+          quitado = true;
+          detalhesStatus = 'Nenhuma Pelada Confirmada';
+        } else {
+          // Verificar se todos os pagamentos de diária foram realizados
+          const todasPagas = partidasConfirmadas.every((ptId) => {
+            const pgEncontrado = pagamentosDoMes.find((p) => p.partidaId === ptId.id);
+            return pgEncontrado?.status === 'pago';
+          });
+
+          quitado = todasPagas;
+
+          const nPagas = partidasConfirmadas.filter((ptId) => {
+            const pgEncontrado = pagamentosDoMes.find((p) => p.partidaId === ptId.id);
+            return pgEncontrado?.status === 'pago';
+          }).length;
+
+          detalhesStatus = todasPagas
+            ? 'Quitado'
+            : `${nPagas} de ${partidasConfirmadas.length} Jogos Pagos`;
+        }
+      }
+
+      return {
+        mesValue: mes,
+        mesLabel: mesesNomes[mes] || mes,
+        situacao,
+        quitado,
+        detalhesStatus,
+        totalPago,
+        rebaixadoTemporario,
+        pagamentos: pagamentosDoMes
+      };
+    });
+  };
 
   const handlePresencaAdminClick = async (jog: Jogador, confirmado: boolean) => {
     if (!proximaPartida || !onActualizarPresenca) return;
@@ -85,55 +186,28 @@ export default function ListaCadastrados({
   const checkJanelaRenovacao = () => {
     const agora = new Date();
     const ano = agora.getFullYear();
-    const mes = agora.getMonth(); // 0-11
+    const mes = agora.getMonth();
 
-    // Primeira segunda-feira do mês às 00:01
-    const inicio = new Date(ano, mes, 1, 0, 1, 0, 0);
-    while (inicio.getDay() !== 1) { // 1 = Segunda
-      inicio.setDate(inicio.getDate() + 1);
-    }
+    const janelaAtual = obterJanelaRenovacaoParaMesRef(ano, mes);
+    let janelaEscolhida = janelaAtual;
 
-    // Primeiro jogo do mês
-    const partidasDoMes = (partidas || []).filter(p => {
-      if (!p.data) return false;
-      const [pAno, pMes] = p.data.split('-').map(Number);
-      return pAno === ano && pMes === (mes + 1);
-    });
-
-    // Ordenar partidas por data crescente
-    const sortedPartidas = [...partidasDoMes].sort((a, b) => a.data.localeCompare(b.data));
-
-    let primeiroJogoDataStr = '';
-    let dataReferenciaJogo: Date;
-
-    if (sortedPartidas.length > 0) {
-      primeiroJogoDataStr = sortedPartidas[0].data;
-      const [y, m, d] = primeiroJogoDataStr.split('-').map(Number);
-      dataReferenciaJogo = new Date(y, m - 1, d, 23, 59, 59);
-    } else {
-      // Fallback: Primeiro sábado do mês
-      const sab = new Date(ano, mes, 1, 23, 59, 59);
-      while (sab.getDay() !== 6) { // 6 = Sábado
-        sab.setDate(sab.getDate() + 1);
+    if (agora > janelaAtual.fim) {
+      let proxMes = mes + 1;
+      let proxAno = ano;
+      if (proxMes > 11) {
+        proxMes = 0;
+        proxAno += 1;
       }
-      dataReferenciaJogo = sab;
-      primeiroJogoDataStr = `${sab.getFullYear()}-${(sab.getMonth() + 1).toString().padStart(2, '0')}-${sab.getDate().toString().padStart(2, '0')}`;
+      janelaEscolhida = obterJanelaRenovacaoParaMesRef(proxAno, proxMes);
     }
 
-    // Sexta-feira do primeiro jogo do mês às 23:59
-    const diaSemanaJogo = dataReferenciaJogo.getDay();
-    const diffParaSexta = 5 - diaSemanaJogo; // 5 = Sexta
-    const fim = new Date(dataReferenciaJogo);
-    fim.setDate(fim.getDate() + diffParaSexta);
-    fim.setHours(23, 59, 59, 999);
-
-    const estaAberta = agora >= inicio && agora <= fim;
+    const estaAberta = isFechamentoMensalistas(agora).emPeriodo;
 
     return {
       estaAberta,
-      inicio,
-      fim,
-      primeiroJogo: primeiroJogoDataStr
+      inicio: janelaEscolhida.inicio,
+      fim: janelaEscolhida.fim,
+      primeiroJogo: ""
     };
   };
 
@@ -481,6 +555,19 @@ export default function ListaCadastrados({
               </>
             ) : (
               <>
+                {jogadorAtual.role === 'admin' && (
+                  <button
+                    id={`btn-historico-atleta-${j.id}`}
+                    type="button"
+                    onClick={() => setJogadorHistoricoSelecionado(j)}
+                    className="text-[11px] font-bold text-teal-300 hover:text-white hover:bg-teal-950/40 bg-teal-950/20 border border-teal-500/20 px-3 py-1.5 rounded-lg transition-colors flex items-center gap-1 cursor-pointer"
+                    title="Visualizar histórico mensal do atleta"
+                  >
+                    <History className="w-3.5 h-3.5 text-teal-400" />
+                    Histórico
+                  </button>
+                )}
+
                 <button
                   id={`btn-editar-atleta-${j.id}`}
                   type="button"
@@ -720,6 +807,165 @@ export default function ListaCadastrados({
           </div>
         </div>
       )}
+
+      {/* POPUP DE HISTÓRICO MENSAL - DISPONÍVEL APENAS PARA ADMINISTRADORES */}
+      {jogadorHistoricoSelecionado && jogadorAtual.role === 'admin' && (() => {
+        const j = jogadorHistoricoSelecionado;
+        const historico = obterHistoricoMensalDoJogador(j, anoHistorico);
+        const jersey = AVATAR_PRESETS.find(p => p.id === j.foto) || AVATAR_PRESETS[0];
+
+        return (
+          <div id="modal-historico-atleta" className="fixed inset-0 bg-black/80 backdrop-blur-md z-50 flex items-center justify-center p-4">
+            <div className="bg-emerald-950 border border-emerald-500/20 rounded-3xl w-full max-w-lg shadow-2xl flex flex-col overflow-hidden animate-slide-in text-sans">
+              
+              {/* Cabeçalho */}
+              <div className="p-5 border-b border-white/10 bg-emerald-900/40 flex items-center justify-between">
+                <div className="flex items-center gap-3">
+                  <div 
+                    className="w-12 h-12 rounded-full flex items-center justify-center shrink-0 shadow-lg border border-white/10 overflow-hidden relative" 
+                    style={{ backgroundColor: jersey.color }}
+                  >
+                    {j.foto && (j.foto.startsWith('http') || j.foto.startsWith('data:')) ? (
+                      <img src={j.foto} className="w-full h-full object-cover rounded-full" alt="Avatar" referrerPolicy="no-referrer" />
+                    ) : (
+                      <span className="text-lg font-bold font-display" style={{ color: jersey.text === '⚪' ? '#fff' : '#000' }}>
+                        {j.posicao === 'Goleiro' ? '🧤' : j.posicao === 'Defesa' ? '🛡️' : j.posicao === 'Meio' ? '🧠' : '🚀'}
+                      </span>
+                    )}
+                  </div>
+                  <div>
+                    <h3 className="text-base font-bold text-white leading-tight">
+                      Histórico de {j.nome} {j.sobrenome}
+                    </h3>
+                    <p className="text-[11px] text-emerald-300 font-medium mt-0.5 tracking-wide">
+                      Posição: <span className="text-white">{j.posicao}</span> • Registro: <span className="text-white font-semibold uppercase">{j.membroStatus}</span>
+                    </p>
+                  </div>
+                </div>
+                <button
+                  id="btn-fechar-historico-modal"
+                  type="button"
+                  onClick={() => setJogadorHistoricoSelecionado(null)}
+                  className="w-8 h-8 rounded-full bg-white/5 hover:bg-white/10 text-emerald-400 hover:text-white transition-colors flex items-center justify-center cursor-pointer"
+                >
+                  <X className="w-5 h-5" />
+                </button>
+              </div>
+
+              {/* Corpo */}
+              <div className="p-5 overflow-y-auto max-h-[60vh] space-y-4">
+                <div className="flex items-center justify-between bg-emerald-900/20 p-2.5 rounded-xl border border-white/5 font-sans">
+                  <span className="text-[10px] text-emerald-400 font-extrabold uppercase tracking-widest">
+                    Relação de Competências
+                  </span>
+                  <div className="flex items-center gap-1.5 shrink-0">
+                    <span className="text-[9px] text-emerald-300 font-bold uppercase tracking-wider">Ano:</span>
+                    <select
+                      id="select-ano-historico"
+                      value={anoHistorico}
+                      onChange={(e) => setAnoHistorico(e.target.value)}
+                      className="bg-emerald-950 text-white border border-emerald-500/30 text-[10px] font-bold py-1 px-1.5 rounded focus:outline-none focus:border-emerald-500 cursor-pointer"
+                    >
+                      <option value="2025">2025</option>
+                      <option value="2026">2026</option>
+                      <option value="2027">2027</option>
+                    </select>
+                  </div>
+                </div>
+
+                <div className="space-y-3">
+                  {historico.map((m) => {
+                    return (
+                      <div key={m.mesValue} className="p-3.5 bg-emerald-900/10 border border-white/5 rounded-2xl space-y-3 flex flex-col justify-between hover:bg-emerald-900/20 transition-all">
+                        <div className="flex justify-between items-start gap-3">
+                          <div className="space-y-0.5">
+                            <span className="text-xs font-black text-white block">{m.mesLabel}</span>
+                            <div className="flex items-center gap-1.5 mt-1">
+                              {/* Situação badge */}
+                              <span className={`px-2 py-0.5 rounded text-[8.5px] font-black uppercase tracking-wider ${
+                                m.situacao === 'Isento'
+                                  ? 'bg-purple-900/60 text-purple-200 border border-purple-500/25'
+                                  : m.rebaixadoTemporario
+                                  ? 'bg-amber-950/80 text-amber-300 border border-amber-500/20'
+                                  : m.situacao === 'Mensalista'
+                                  ? 'bg-emerald-900/60 text-emerald-400 border border-emerald-500/25'
+                                  : 'bg-blue-900/60 text-blue-200 border border-blue-500/25'
+                              }`}>
+                                {m.rebaixadoTemporario ? '⚠️ DIARISTA (PENDÊNCIA)' : m.situacao}
+                              </span>
+
+                              {/* Quitado status badge */}
+                              <span className={`px-2 py-0.5 rounded text-[8.5px] font-black uppercase tracking-wider ${
+                                m.quitado
+                                  ? 'bg-teal-900/60 text-teal-400 border border-teal-500/25'
+                                  : 'bg-rose-950/80 text-rose-455 border border-rose-500/20'
+                              }`}>
+                                {m.quitado ? 'Quitado' : 'Débito'}
+                              </span>
+                            </div>
+                          </div>
+
+                          <div className="text-right space-y-0.5 shrink-0">
+                            <span className="text-[9.5px] uppercase tracking-wider text-emerald-400 font-mono block">Pago no Mês</span>
+                            <span className="text-sm font-extrabold text-white font-mono block">R$ {m.totalPago.toFixed(2)}</span>
+                          </div>
+                        </div>
+
+                        {/* Detalhes de Pagamento associados no mês (Peladas ou Mensalidades) */}
+                        {m.pagamentos.length > 0 ? (
+                          <div className="bg-black/20 p-2.5 rounded-xl border border-white/5 space-y-1.5">
+                            <span className="text-[8.5px] text-emerald-400 font-bold uppercase tracking-widest block border-b border-white/5 pb-1">Registros Vinculados:</span>
+                            {m.pagamentos.map((pag) => {
+                              // Se tem partidaId, busca título
+                              const matchedPartida = partidas.find(pt => pt.id === pag.partidaId);
+                              const detailsLabel = matchedPartida
+                                ? `⚽ Diária: ${matchedPartida.titulo}`
+                                : `🛡️ Mensalidade de ${m.mesLabel}`;
+
+                              return (
+                                <div key={pag.id} className="flex justify-between items-center text-[10px] text-emerald-200 tracking-wide font-mono">
+                                  <span className="truncate max-w-[200px]">{detailsLabel}</span>
+                                  <div className="flex items-center gap-1.5 shrink-0">
+                                    {pag.status === 'pago' && pag.dataPagamento && (
+                                      <span className="text-[9px] font-mono text-emerald-400 bg-emerald-950/40 px-1 rounded border border-emerald-500/15">
+                                        Data: {pag.dataPagamento.split('-').reverse().join('/')}
+                                      </span>
+                                    )}
+                                    <span className={`text-[8px] font-bold px-1 rounded ${
+                                      pag.status === 'pago'
+                                        ? 'bg-teal-950/20 text-teal-400'
+                                        : 'bg-rose-955/20 text-rose-455'
+                                    }`}>
+                                      {pag.status === 'pago' ? 'PG' : 'PENDENTE'}
+                                    </span>
+                                    <span className="font-bold text-white">R$ {pag.valor.toFixed(2)}</span>
+                                  </div>
+                                </div>
+                              );
+                            })}
+                          </div>
+                        ) : (
+                          <div className="text-[10px] text-emerald-500/70 font-mono italic pl-1">
+                            {m.situacao === 'Isento' ? 'Jogador com isenção ativa nesta temporada.' : 'Nenhum lançamento ou registro de pagamento para este mês.'}
+                          </div>
+                        )}
+                      </div>
+                    );
+                  })}
+                </div>
+              </div>
+
+              {/* Rodapé */}
+              <div className="p-4 border-t border-white/10 bg-emerald-900/40 text-center">
+                <p className="text-[9.5px] text-emerald-350 leading-relaxed max-w-sm mx-auto">
+                  💡 <b>Regulamento de Inadimplência:</b> Mensalistas que possuem débitos ativos ({historico.filter(x => !x.quitado && x.rebaixadoTemporario).length > 0 ? 'Inadimplente ⚠️' : 'Nenhum'}) são rebaixados a Diaristas temporariamente.
+                </p>
+              </div>
+
+            </div>
+          </div>
+        );
+      })()}
 
       {/* AUTO TOAST NOTIFICATION FOR ROBOT/AUTOMATION STATUS */}
       {showAutoToast && (

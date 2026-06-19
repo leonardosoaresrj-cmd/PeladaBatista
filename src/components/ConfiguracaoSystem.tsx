@@ -22,6 +22,7 @@ interface ConfiguracaoSystemProps {
   valor5Sabados: number;
   valorDiaria: number;
   onUpdateValoresConfig: (v4: number, v5: number, vD: number) => void;
+  onResetDatabase?: (startingMonth: string) => void;
 }
 
 export default function ConfiguracaoSystem({
@@ -38,6 +39,7 @@ export default function ConfiguracaoSystem({
   valor5Sabados,
   valorDiaria,
   onUpdateValoresConfig,
+  onResetDatabase,
 }: ConfiguracaoSystemProps) {
   const [copied, setCopied] = useState(false);
   const [successMsg, setSuccessMsg] = useState('');
@@ -68,6 +70,16 @@ export default function ConfiguracaoSystem({
   const [localVD, setLocalVD] = useState(valorDiaria);
   const [successTarifasMsg, setSuccessTarifasMsg] = useState('');
 
+  // States locais para reset do banco
+  const [resetMesRef, setResetMesRef] = useState(() => {
+    const d = new Date();
+    const y = d.getFullYear();
+    const m = String(d.getMonth() + 1).padStart(2, '0');
+    return `${y}-${m}`;
+  });
+  const [resetSuccess, setResetSuccess] = useState(false);
+  const [showResetConfirm, setShowResetConfirm] = useState(false);
+
   useEffect(() => {
     const creds = obterCredenciaisSupabase();
     setSupaUrl(creds.url);
@@ -78,7 +90,7 @@ export default function ConfiguracaoSystem({
     setMpAccessToken(localStorage.getItem('mercado_pago_access_token') || '');
     setMpPublicKey(localStorage.getItem('mercado_pago_public_key') || '');
     setDiretoPixChave(localStorage.getItem('direto_pix_chave') || '');
-    setDiretoPixNome(localStorage.getItem('direto_pix_nome') || 'Arena Record');
+    setDiretoPixNome(localStorage.getItem('direto_pix_nome') || 'Pelada Batista Sábado');
     setDiretoPixCidade(localStorage.getItem('direto_pix_cidade') || 'SAO PAULO');
   }, []);
 
@@ -583,6 +595,77 @@ https://peladabatista.onrender.com`}
                 Salvar Configurações de Tarifas
               </button>
             </form>
+          </div>
+
+          {/* RESET DA BASE DE DADOS */}
+          <div className="bg-rose-950/20 border border-rose-500/25 rounded-2xl p-5 shadow-xl backdrop-blur-sm space-y-4">
+            <h3 className="font-display font-semibold text-sm text-rose-400 flex items-center gap-2 uppercase tracking-wide">
+              <Database className="w-4 h-4 text-rose-400" />
+              Reset Geral da Base de Dados
+            </h3>
+            
+            <p className="text-xs text-rose-200/90 leading-relaxed font-sans">
+              Apaga todo o histórico de partidas, pagamentos e depósitos passados, retornando o banco de dados a um estado de novos cadastros. <strong>O histórico de dados começará a ser contado a partir do mês escolhido abaixo</strong>, que será estabelecido como a data inicial oficial do sistema de cobranças.
+            </p>
+
+            <div className="space-y-3">
+              <div>
+                <label className="block text-[10px] font-bold text-rose-300 uppercase tracking-widest mb-1.5 font-sans">
+                  Mês Inicial para Coleta de Dados:
+                </label>
+                <input
+                  type="month"
+                  value={resetMesRef}
+                  onChange={(e) => setResetMesRef(e.target.value)}
+                  className="w-full bg-emerald-950/60 border border-white/15 text-white text-xs font-mono rounded-lg p-2.5 focus:outline-none focus:border-rose-400"
+                />
+              </div>
+
+              {resetSuccess && (
+                <div className="p-2.5 bg-rose-950/50 border border-rose-500/30 text-rose-350 text-[10.5px] rounded-xl font-sans font-bold">
+                  ✓ Base de dados reiniciada com sucesso! Histórico limpo iniciando em {resetMesRef.split('-').reverse().join('/')}.
+                </div>
+              )}
+
+              {!showResetConfirm ? (
+                <button
+                  type="button"
+                  onClick={() => setShowResetConfirm(true)}
+                  className="w-full bg-rose-600 hover:bg-rose-500 text-white font-extrabold text-xs py-2.5 rounded-xl transition-all shadow-md active:scale-97 cursor-pointer font-sans uppercase"
+                >
+                  Executar Reset Completo do Banco
+                </button>
+              ) : (
+                <div className="bg-rose-950/45 border border-rose-500/30 p-3 rounded-xl space-y-2.5 text-center">
+                  <p className="text-[10px] text-rose-300 font-bold uppercase leading-tight font-sans">
+                    ⚠️ CONFIRMAR EXCLUSÃO HISTÓRICA? Todos os jogos, pagamentos e caixa serão limpos!
+                  </p>
+                  <div className="flex gap-2.5">
+                    <button
+                      type="button"
+                      onClick={() => {
+                        setShowResetConfirm(false);
+                        if (onResetDatabase) {
+                          onResetDatabase(resetMesRef);
+                        }
+                        setResetSuccess(true);
+                        setTimeout(() => setResetSuccess(false), 4500);
+                      }}
+                      className="flex-1 bg-rose-600 hover:bg-rose-500 text-white font-extrabold text-[10px] py-2 rounded-lg transition-all cursor-pointer uppercase font-sans border-0"
+                    >
+                      Sim, Resetar
+                    </button>
+                    <button
+                      type="button"
+                      onClick={() => setShowResetConfirm(false)}
+                      className="flex-1 bg-emerald-900 border border-white/15 text-white font-extrabold text-[10px] py-2 rounded-lg transition-all cursor-pointer uppercase font-sans"
+                    >
+                      Cancelar
+                    </button>
+                  </div>
+                </div>
+              )}
+            </div>
           </div>
 
           {/* PAINEL DE PAGAMENTOS MERCADO PAGO E PIX DIRETO */}

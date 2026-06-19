@@ -60,7 +60,7 @@ export default function CheckoutPixModal({
 
   const [directPixInfo, setDirectPixInfo] = useState({
     chave: '',
-    nome: 'Arena Record',
+    nome: 'Pelada Batista Sábado',
     cidade: 'SAO PAULO'
   });
 
@@ -82,7 +82,7 @@ export default function CheckoutPixModal({
 
       setDirectPixInfo({
         chave: localStorage.getItem('direto_pix_chave') || '',
-        nome: localStorage.getItem('direto_pix_nome') || 'Arena Record',
+        nome: localStorage.getItem('direto_pix_nome') || 'Pelada Batista Sábado',
         cidade: localStorage.getItem('direto_pix_cidade') || 'SAO PAULO'
       });
     }

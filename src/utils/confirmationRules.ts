@@ -41,51 +41,47 @@ export function getJanelaConfirmacao(dataJogoStr: string): { inicio: Date; fim: 
  * Determina se a data informada cai no período de fechamento da lista de mensalistas.
  * O período é compreendido SEMPRE da última semana do mês anterior até o fim da primeira semana do mês atual.
  */
+export function obterJanelaRenovacaoParaMesRef(refAno: number, refMes: number): { inicio: Date; fim: Date } {
+  // 1. Encontrar o último sábado do mês anterior (refMes - 1)
+  const ultimoDiaMesAnterior = new Date(refAno, refMes, 0); // O dia 0 do refMes é o último dia do refMes-1
+  let ultimoSabadoAnt = new Date(ultimoDiaMesAnterior);
+  while (ultimoSabadoAnt.getDay() !== 6) {
+    ultimoSabadoAnt.setDate(ultimoSabadoAnt.getDate() - 1);
+  }
+  
+  const inicioRenovacao = new Date(ultimoSabadoAnt);
+  inicioRenovacao.setDate(ultimoSabadoAnt.getDate() + 2); // Primeira segunda-feira após o último sábado (2 dias após sábado)
+  inicioRenovacao.setHours(0, 0, 0, 0);
+
+  // 2. Encontrar o 2º sábado do mês de referência (refMes)
+  const primeiroDiaRef = new Date(refAno, refMes, 1);
+  let primeiroSabadoRef = new Date(primeiroDiaRef);
+  while (primeiroSabadoRef.getDay() !== 6) {
+    primeiroSabadoRef.setDate(primeiroSabadoRef.getDate() + 1);
+  }
+  const segundoSabadoRef = new Date(primeiroSabadoRef);
+  segundoSabadoRef.setDate(primeiroSabadoRef.getDate() + 7);
+
+  const fimRenovacao = new Date(segundoSabadoRef);
+  fimRenovacao.setDate(segundoSabadoRef.getDate() - 1); // Sexta-feira anterior
+  fimRenovacao.setHours(23, 59, 59, 999);
+
+  return { inicio: inicioRenovacao, fim: fimRenovacao };
+}
+
+/**
+ * Determina se a data informada cai no período de fechamento da lista de mensalistas.
+ * O período é compreendido SEMPRE da primeira segunda-feira após o último sábado do mês anterior até a sexta-feira antes do 2º sábado do mês de renovação.
+ */
 export function isFechamentoMensalistas(data: Date = new Date()): { emPeriodo: boolean; descricao: string } {
   const dia = data.getDate();
   const mes = data.getMonth(); // 0-indexed (0 = Jan, 11 = Dez)
   const ano = data.getFullYear();
 
-  // Para saber se estamos no período de renovação, precisamos verificar a janela atual.
-  // A janela de renovação do mês M começa no domingo após o último sábado do mês M-1
-  // e termina na sexta-feira antes do 2º sábado do mês M.
-  
-  // Vamos verificar tanto para o mês corrente como mês de referência, 
-  // quanto para o mes+1 como mês de referência (se estivermos no final do mês corrente).
-
-  // Função auxiliar para pegar a janela de renovação para um mês de referência
-  const getJanelaParaMesRef = (refAno: number, refMes: number) => {
-    // 1. Encontrar o último sábado do mês anterior (refMes - 1)
-    const ultimoDiaMesAnterior = new Date(refAno, refMes, 0); // O dia 0 do refMes é o último dia do refMes-1
-    let ultimoSabadoAnt = new Date(ultimoDiaMesAnterior);
-    while (ultimoSabadoAnt.getDay() !== 6) {
-      ultimoSabadoAnt.setDate(ultimoSabadoAnt.getDate() - 1);
-    }
-    
-    const inicioRenovacao = new Date(ultimoSabadoAnt);
-    inicioRenovacao.setDate(ultimoSabadoAnt.getDate() + 1); // Domingo seguinte
-    inicioRenovacao.setHours(0, 0, 0, 0);
-
-    // 2. Encontrar o 2º sábado do mês de referência (refMes)
-    const primeiroDiaRef = new Date(refAno, refMes, 1);
-    let primeiroSabadoRef = new Date(primeiroDiaRef);
-    while (primeiroSabadoRef.getDay() !== 6) {
-      primeiroSabadoRef.setDate(primeiroSabadoRef.getDate() + 1);
-    }
-    const segundoSabadoRef = new Date(primeiroSabadoRef);
-    segundoSabadoRef.setDate(primeiroSabadoRef.getDate() + 7);
-
-    const fimRenovacao = new Date(segundoSabadoRef);
-    fimRenovacao.setDate(segundoSabadoRef.getDate() - 1); // Sexta-feira anterior
-    fimRenovacao.setHours(23, 59, 59, 999);
-
-    return { inicio: inicioRenovacao, fim: fimRenovacao };
-  };
-
-  // Testa a janela usando o mês atual como referência
-  const janelaAtual = getJanelaParaMesRef(ano, mes);
+  // Testa a janela usando o mês atual de renovação
+  const janelaAtual = obterJanelaRenovacaoParaMesRef(ano, mes);
   // Testa a janela usando o próximo mês como referência (caso estejamos no fim do mês atual)
-  const janelaProximo = getJanelaParaMesRef(ano, mes + 1);
+  const janelaProximo = obterJanelaRenovacaoParaMesRef(ano, mes + 1);
 
   if (data >= janelaAtual.inicio && data <= janelaAtual.fim) {
     const nomeMes = getMesNome(mes);
@@ -192,8 +188,58 @@ export function obterDebitosDoJogador(
   }[] = [];
 
   if (membroStatus === 'mensalista') {
-    // Meses a verificar
-    const meses = ['2026-05', '2026-06'];
+    // Meses a verificar (inicializado dinamicamente a partir do primeiro registro ou mês atual)
+    const obterMesAtual = (): string => {
+      const d = new Date();
+      const y = d.getFullYear();
+      const m = String(d.getMonth() + 1).padStart(2, '0');
+      return `${y}-${m}`;
+    };
+
+    const mesLimit = obterMesAtual(); // ex: '2026-06'
+    const mesSet = new Set<string>();
+    mesSet.add(mesLimit);
+
+    partidas.forEach(p => {
+      if (p.data && p.data.length >= 7) {
+        const m = p.data.substring(0, 7);
+        if (m <= mesLimit) {
+          mesSet.add(m);
+        }
+      }
+    });
+
+    pagamentos.forEach(p => {
+      if (p.mesRef && p.mesRef.length >= 7) {
+        if (p.mesRef <= mesLimit) {
+          mesSet.add(p.mesRef);
+        }
+      }
+    });
+
+    const listaMeses = Array.from(mesSet).sort();
+    let meses: string[] = [];
+    if (listaMeses.length > 0) {
+      const minMes = listaMeses[0];
+      const maxMes = mesLimit;
+      const [minY, minM] = minMes.split('-').map(Number);
+      const [maxY, maxM] = maxMes.split('-').map(Number);
+
+      let curY = minY;
+      let curM = minM;
+      while (curY < maxY || (curY === maxY && curM <= maxM)) {
+        const mesStr = `${curY}-${String(curM).padStart(2, '0')}`;
+        meses.push(mesStr);
+        curM++;
+        if (curM > 12) {
+          curM = 1;
+          curY++;
+        }
+      }
+    } else {
+      meses = [mesLimit];
+    }
+
     for (const mes of meses) {
       const [ano, mesNum] = mes.split('-').map(Number);
       
