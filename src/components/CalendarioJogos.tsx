@@ -1042,8 +1042,8 @@ export default function CalendarioJogos({
                   ⏰ Regra Oficial do Regulamento:
                 </p>
                 <div className="space-y-1 text-[11px] leading-relaxed text-emerald-300">
-                  <p>• <b>Início:</b> Terça-feira às 00:00</p>
-                  <p>• <b>Término:</b> Sexta-feira às 23:59</p>
+                  <p>• <b>Início:</b> {foraPeriodoInfo.inicio}</p>
+                  <p>• <b>Término:</b> {foraPeriodoInfo.fim}</p>
                 </div>
               </div>
 

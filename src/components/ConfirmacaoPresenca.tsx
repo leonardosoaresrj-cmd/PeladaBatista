@@ -1394,9 +1394,9 @@ export default function ConfirmacaoPresenca({
                   <label className="text-[10.5px] text-emerald-300 font-bold uppercase block tracking-wider mb-1">Status de Membro:</label>
                   <select
                     disabled={
-                      editPosicao === 'Goleiro' || 
+                      jogadorAtual.role !== 'admin' && 
                       (
-                        jogadorAtual.role !== 'admin' && 
+                        editPosicao === 'Goleiro' || 
                         (
                           jogadorAtual.id !== jogadorSelecionadoModal.id || 
                           !isFechamentoMensalistas().emPeriodo || 
@@ -1408,12 +1408,13 @@ export default function ConfirmacaoPresenca({
                     onChange={(e) => setEditMembro(e.target.value as MembroStatus)}
                     className="w-full bg-neutral-900 border border-white/10 rounded-xl p-2.5 text-xs text-white focus:outline-none focus:border-emerald-500 disabled:opacity-50"
                   >
-                    {editPosicao === 'Goleiro' ? (
+                    {editPosicao === 'Goleiro' && jogadorAtual.role !== 'admin' ? (
                       <option value="isento">Isento</option>
                     ) : (
                       <>
                         <option value="mensalista">Mensalista</option>
                         <option value="diarista">Diarista</option>
+                        <option value="isento">Isento</option>
                       </>
                     )}
                   </select>
@@ -1676,8 +1677,8 @@ export default function ConfirmacaoPresenca({
                   ⏰ Regra Oficial do Regulamento:
                 </p>
                 <div className="space-y-1 text-[11px] leading-relaxed text-emerald-300">
-                  <p>• <b>Início:</b> Terça-feira às 00:00</p>
-                  <p>• <b>Término:</b> Sexta-feira às 23:59</p>
+                  <p>• <b>Início:</b> {foraPeriodoInfo.inicio}</p>
+                  <p>• <b>Término:</b> {foraPeriodoInfo.fim}</p>
                 </div>
               </div>
 

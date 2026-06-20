@@ -358,19 +358,22 @@ export default function ListaCadastrados({
                     disabled={
                       jogadorAtual.role !== 'admin' && 
                       (
-                        !janelaInfo.estaAberta || 
-                        pagamentos.some(p => p.jogadorId === j.id && p.mesRef === `${new Date().getFullYear()}-${String(new Date().getMonth() + 1).padStart(2, '0')}` && !p.partidaId && p.status === 'pago')
-                      ) && 
-                      editPosicao !== 'Goleiro'
+                        editPosicao === 'Goleiro' || 
+                        (
+                          !janelaInfo.estaAberta || 
+                          pagamentos.some(p => p.jogadorId === j.id && p.mesRef === `${new Date().getFullYear()}-${String(new Date().getMonth() + 1).padStart(2, '0')}` && !p.partidaId && p.status === 'pago')
+                        )
+                      )
                     }
                     className="bg-emerald-950 border border-white/10 text-white text-[11px] rounded px-1.5 py-1 focus:outline-none disabled:opacity-50 disabled:cursor-not-allowed"
                   >
-                    {editPosicao === 'Goleiro' ? (
+                    {editPosicao === 'Goleiro' && jogadorAtual.role !== 'admin' ? (
                       <option className="bg-emerald-950 text-white" value="isento">Isento</option>
                     ) : (
                       <>
                         <option className="bg-emerald-950 text-white" value="mensalista">Mensalista</option>
                         <option className="bg-emerald-950 text-white" value="diarista">Diarista</option>
+                        <option className="bg-emerald-950 text-white" value="isento">Isento</option>
                       </>
                     )}
                   </select>
