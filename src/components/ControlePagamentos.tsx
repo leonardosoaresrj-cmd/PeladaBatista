@@ -69,7 +69,7 @@ export default function ControlePagamentos({
   });
 
   const startupMonth = useMemo(() => {
-    return localStorage.getItem('futebol_startup_month') || '2026-05';
+    return localStorage.getItem('futebol_startup_month') || '2026-06';
   }, []);
 
   useEffect(() => {
@@ -227,7 +227,8 @@ export default function ControlePagamentos({
       pagamentos,
       valorDiaria,
       valor4Sabados,
-      valor5Sabados
+      valor5Sabados,
+      jogadorAtual.createdAt
     );
   }, [jogadorAtual, partidas, pagamentos, valorDiaria, valor4Sabados, valor5Sabados]);
 

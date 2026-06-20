@@ -31,7 +31,7 @@ export function obterSábadosNoIntervalo(dataInicioStr: string, dataFimStr: stri
  */
 export function mesclarPartidasAutomáticas(partidasSalvas: Partida[]): Partida[] {
   // Definindo um intervalo de geração automática para cobrir 25 e 26/27, iniciando em startupMonth
-  const startupMonth = typeof window !== 'undefined' ? localStorage.getItem('futebol_startup_month') || '2026-05' : '2026-05';
+  const startupMonth = typeof window !== 'undefined' ? localStorage.getItem('futebol_startup_month') || '2026-06' : '2026-06';
   const dataInicioGen = `${startupMonth}-01`;
   const sabados = obterSábadosNoIntervalo(dataInicioGen, '2027-12-31');
   

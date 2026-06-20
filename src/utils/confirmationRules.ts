@@ -169,7 +169,8 @@ export function obterDebitosDoJogador(
   pagamentos: Pagamento[],
   valorDiaria: number,
   valor4Sabados: number,
-  valor5Sabados: number
+  valor5Sabados: number,
+  jogadorCadastroData?: string
 ) {
   if (posicao === 'Goleiro') return [];
 
@@ -238,6 +239,11 @@ export function obterDebitosDoJogador(
       }
     } else {
       meses = [mesLimit];
+    }
+
+    if (jogadorCadastroData && jogadorCadastroData.length >= 7) {
+      const mesCadastro = jogadorCadastroData.substring(0, 7);
+      meses = meses.filter(m => m >= mesCadastro);
     }
 
     for (const mes of meses) {

@@ -39,7 +39,7 @@ export default function MensalistasMes({
   });
 
   const startupMonth = useMemo(() => {
-    return localStorage.getItem('futebol_startup_month') || '2026-05';
+    return localStorage.getItem('futebol_startup_month') || '2026-06';
   }, []);
 
   useEffect(() => {

@@ -6,7 +6,7 @@
 import React from 'react';
 import { Jogador, Partida } from '../types';
 import { AVATAR_PRESETS } from '../data';
-import { ShieldCheck, UserPlus, Check, X } from 'lucide-react';
+import { ShieldCheck, UserPlus, Check, X, Trash2 } from 'lucide-react';
 
 interface PainelAdminProps {
   jogadores: Jogador[];
@@ -20,8 +20,8 @@ export default function PainelAdmin({
   jogadorAtual,
   onAprovarJogador,
 }: PainelAdminProps) {
-  // Filtro de jogadores pendentes de aprovação
-  const pendentes = jogadores.filter(j => j.status === 'pendente_aprovacao');
+  // Filtro de jogadores pendentes de aprovação e solicitações de exclusão de conta
+  const pendentes = jogadores.filter(j => j.status === 'pendente_aprovacao' || j.status === 'solicitou_exclusao');
 
   return (
     <div className="w-full max-w-7xl mx-auto space-y-6">
@@ -39,12 +39,12 @@ export default function PainelAdmin({
 
       <div className="w-full">
         
-        {/* PARTE 1: APROVAÇÕES DE CADASTRO */}
+        {/* PARTE 1: APROVAÇÕES E SOLICITAÇÕES */}
         <div className="bg-emerald-900/40 border border-white/10 rounded-2xl p-5 shadow-xl backdrop-blur-sm space-y-4">
           <div className="flex items-center justify-between border-b border-white/10 pb-3">
             <h3 className="font-display font-semibold text-sm text-white flex items-center gap-2 uppercase tracking-wide">
               <UserPlus className="w-5 h-5 text-emerald-400" />
-              Solicitações de Acesso Pendentes ({pendentes.length})
+              Solicitações Requerendo Aprovação ({pendentes.length})
             </h3>
             <span className="text-xs font-mono font-bold text-amber-400 bg-amber-950/60 border border-amber-500/25 px-2.5 py-0.5 rounded-full uppercase tracking-wider">
               Aprovação Requerida
@@ -52,7 +52,7 @@ export default function PainelAdmin({
           </div>
 
           <p className="text-xs text-emerald-300/80 font-sans leading-relaxed">
-            De acordo com o regulamento do portal, novos atletas solicitam acesso informando seus dados básicos, porém dependem da autorização direta da gerência para logar e participar da confirmação de jogos.
+            De acordo com as regras da pelada, novos cadastros e solicitações de exclusão de perfil de jogador passam pela verificação direta do administrador antes de serem consolidados definitivamente no sistema.
           </p>
 
           {pendentes.length === 0 ? (
@@ -63,11 +63,16 @@ export default function PainelAdmin({
             <div className="space-y-3">
               {pendentes.map((p) => {
                 const avatar = AVATAR_PRESETS.find(a => a.id === p.foto) || AVATAR_PRESETS[0];
+                const isExclusao = p.status === 'solicitou_exclusao';
                 return (
                   <div 
                     id={`pendente-row-${p.id}`}
                     key={p.id}
-                    className="p-4 bg-emerald-955/40 hover:bg-emerald-955/65 border border-white/5 rounded-xl flex flex-col sm:flex-row sm:items-center sm:justify-between gap-4 transition-all"
+                    className={`p-4 border rounded-xl flex flex-col sm:flex-row sm:items-center sm:justify-between gap-4 transition-all ${
+                      isExclusao 
+                        ? 'bg-rose-955/20 border-rose-500/20 hover:bg-rose-955/35' 
+                        : 'bg-emerald-955/40 hover:bg-emerald-955/65 border-white/5'
+                    }`}
                   >
                     {/* Perfil básico */}
                     <div className="flex items-center gap-3">
@@ -88,7 +93,18 @@ export default function PainelAdmin({
                         )}
                       </div>
                       <div>
-                        <h4 className="text-xs font-bold text-white leading-none">{p.nome} {p.sobrenome}</h4>
+                        <div className="flex items-center gap-2 flex-wrap">
+                          <h4 className="text-xs font-bold text-white leading-none">{p.nome} {p.sobrenome}</h4>
+                          {isExclusao ? (
+                            <span className="text-[8px] font-black uppercase text-rose-400 bg-rose-950/60 border border-rose-500/30 px-1.5 py-0.5 rounded leading-none">
+                              ⚠️ PEDIDO DE EXCLUSÃO
+                            </span>
+                          ) : (
+                            <span className="text-[8px] font-black uppercase text-teal-400 bg-teal-950/60 border border-teal-500/30 px-1.5 py-0.5 rounded leading-none">
+                              🆕 NOVO CADASTRO
+                            </span>
+                          )}
+                        </div>
                         <p className="text-[10px] text-emerald-350 font-mono mt-1">{p.email}</p>
                         
                         <div className="flex gap-1.5 mt-2">
@@ -104,28 +120,61 @@ export default function PainelAdmin({
 
                     {/* Botões de Ação */}
                     <div className="flex items-center gap-2 self-end sm:self-center shrink-0">
-                      <button
-                        id={`btn-aprovar-atleta-${p.id}`}
-                        type="button"
-                        onClick={() => onAprovarJogador(p.id, true)}
-                        className="bg-white hover:bg-emerald-50 text-emerald-950 font-bold text-xs px-3.5 py-2 rounded-lg transition-colors flex items-center gap-1 shadow"
-                      >
-                        <Check className="w-3.5 h-3.5 text-emerald-800" />
-                        Aprovar
-                      </button>
-                      <button
-                        id={`btn-negar-atleta-${p.id}`}
-                        type="button"
-                        onClick={() => {
-                          if (confirm(`Remover solicitação de ${p.nome}?`)) {
-                            onAprovarJogador(p.id, false);
-                          }
-                        }}
-                        className="bg-emerald-950 border border-white/10 text-rose-350 hover:bg-rose-955/20 hover:text-white font-bold text-xs px-3.5 py-2 rounded-lg transition-colors flex items-center gap-1"
-                      >
-                        <X className="w-3.5 h-3.5" />
-                        Recusar
-                      </button>
+                      {isExclusao ? (
+                        <>
+                          <button
+                            id={`btn-aprovar-exclusao-${p.id}`}
+                            type="button"
+                            onClick={() => {
+                              if (confirm(`Tem certeza que deseja DEFERIR a exclusão definitiva do perfil de ${p.nome} ${p.sobrenome}? Todas as informações dele serão permanentemente deletadas.`)) {
+                                onAprovarJogador(p.id, false); // Em App.tsx, aprovar=false no handleAprovarJogador exclui/remove definitivamente.
+                              }
+                            }}
+                            className="bg-rose-600 hover:bg-rose-500 text-white font-bold text-xs px-3.5 py-2 rounded-lg transition-colors flex items-center gap-1 shadow"
+                          >
+                            <Trash2 className="w-3.5 h-3.5" />
+                            Aprovar Exclusão
+                          </button>
+                          <button
+                            id={`btn-rejeitar-exclusao-${p.id}`}
+                            type="button"
+                            onClick={() => {
+                              if (confirm(`Deseja REJEITAR a solicitação de exclusão de ${p.nome} ${p.sobrenome} e mantê-lo ativo no elenco?`)) {
+                                onAprovarJogador(p.id, true); // Devolve status para 'ativo'.
+                              }
+                            }}
+                            className="bg-emerald-950 border border-white/10 text-emerald-300 hover:text-white font-bold text-xs px-3.5 py-2 rounded-lg transition-colors flex items-center gap-1"
+                          >
+                            <X className="w-3.5 h-3.5" />
+                            Rejeitar / Manter
+                          </button>
+                        </>
+                      ) : (
+                        <>
+                          <button
+                            id={`btn-aprovar-atleta-${p.id}`}
+                            type="button"
+                            onClick={() => onAprovarJogador(p.id, true)}
+                            className="bg-white hover:bg-emerald-50 text-emerald-950 font-bold text-xs px-3.5 py-2 rounded-lg transition-colors flex items-center gap-1 shadow"
+                          >
+                            <Check className="w-3.5 h-3.5 text-emerald-800" />
+                            Aprovar
+                          </button>
+                          <button
+                            id={`btn-negar-atleta-${p.id}`}
+                            type="button"
+                            onClick={() => {
+                              if (confirm(`Remover solicitação de ${p.nome}?`)) {
+                                onAprovarJogador(p.id, false);
+                              }
+                            }}
+                            className="bg-emerald-950 border border-white/10 text-rose-350 hover:bg-rose-955/20 hover:text-white font-bold text-xs px-3.5 py-2 rounded-lg transition-colors flex items-center gap-1"
+                          >
+                            <X className="w-3.5 h-3.5" />
+                            Recusar
+                          </button>
+                        </>
+                      )}
                     </div>
                   </div>
                 );

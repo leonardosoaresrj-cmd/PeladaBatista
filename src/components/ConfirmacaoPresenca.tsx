@@ -245,7 +245,8 @@ export default function ConfirmacaoPresenca({
         pagamentos,
         vDiaria,
         v4,
-        v5
+        v5,
+        targetPlayer.createdAt
       );
 
       if (jogadorAtual.role !== 'admin' && originalStatus === 'diarista' && id === jogadorAtual.id && partidaSelecionada) {
@@ -659,7 +660,7 @@ export default function ConfirmacaoPresenca({
                     const vD = parseFloat(localStorage.getItem('racha_valor_diaria') || '30');
                     const v4 = parseFloat(localStorage.getItem('racha_valor_4s') || '85');
                     const v5 = parseFloat(localStorage.getItem('racha_valor_5s') || '105');
-                    hasDebits = obterDebitosDoJogador(jogadorAtual.id, originalStatus, jogadorAtual.posicao, partidas, pagamentos, vD, v4, v5).length > 0;
+                    hasDebits = obterDebitosDoJogador(jogadorAtual.id, originalStatus, jogadorAtual.posicao, partidas, pagamentos, vD, v4, v5, jogadorAtual.createdAt).length > 0;
                   }
 
                   return (

@@ -47,7 +47,7 @@ import { mesclarPartidasAutomáticas } from './utils/partidaHelper';
 import { isJogadorFuncionalmenteGold } from './utils/goldRules';
 import { obterTextoListaCompletaPartida, obterTextoListaRenovacao, obterStatusMembroEfetivo, obterDebitosDoJogador, obterTextoPartidaCancelada, obterJanelaRenovacaoParaMesRef, isFechamentoMensalistas } from './utils/confirmationRules';
 import logoPelada from './assets/images/logo_pelada.svg';
-import { Calendar, Users, DollarSign, ShieldAlert, LogOut, Database, Award, User, Settings, UserCheck, History, CheckSquare, Check, X, Lock, Cake, TrendingUp, UserPlus, AlertCircle } from 'lucide-react';
+import { Calendar, Users, DollarSign, ShieldAlert, LogOut, Database, Award, User, Settings, UserCheck, History, CheckSquare, Check, X, Lock, Cake, TrendingUp, UserPlus, AlertCircle, Trash2 } from 'lucide-react';
 
 function calcularIdade(dataNascimento: string) {
   if (!dataNascimento) return 0;
@@ -444,7 +444,7 @@ export default function App() {
       const sessaoAlertaAdminChave = `alerta_admin_aprovacoes_mostrada_${jogadorAtual.id}`;
       const jaMostradoAdmin = sessionStorage.getItem(sessaoAlertaAdminChave);
       
-      const pendentes = jogadores.filter(j => j.status === 'pendente_aprovacao');
+      const pendentes = jogadores.filter(j => j.status === 'pendente_aprovacao' || j.status === 'solicitou_exclusao');
       if (pendentes.length > 0 && !jaMostradoAdmin) {
         setMostrarPopUpAlertaAdminAprovacoes(true);
         sessionStorage.setItem(sessaoAlertaAdminChave, 'true');
@@ -490,7 +490,8 @@ export default function App() {
           pagamentos,
           valorDiaria,
           valor4Sabados,
-          valor5Sabados
+          valor5Sabados,
+          jogadorAtual.createdAt
         );
 
         if (jogadorAtual.membroStatus === 'mensalista') {
@@ -1714,8 +1715,8 @@ export default function App() {
                   <UserPlus className="w-5 h-5 animate-pulse" />
                 </div>
                 <div>
-                  <h3 className="font-display font-black text-sm uppercase tracking-wide text-teal-300">Novos Cadastros Pendentes</h3>
-                  <p className="text-[10px] text-emerald-400/80 font-mono">Solicitações de entrada aguardando aprovação</p>
+                  <h3 className="font-display font-black text-sm uppercase tracking-wide text-teal-300">Solicitações de Acesso & Desligamento</h3>
+                  <p className="text-[10px] text-emerald-400/80 font-mono">Solicitações de atletas aguardando deliberação de cadastro ou exclusão</p>
                 </div>
               </div>
               <button
@@ -1729,62 +1730,115 @@ export default function App() {
             </div>
             
             <p className="text-xs text-emerald-200 leading-relaxed font-sans mb-4 shrink-0">
-              Olá, Administrador <b>{jogadorAtual.nome}</b>. Identificamos novos atletas aguardando liberação de acesso para participar da nossa lista de jogos:
+              Olá, Administrador <b>{jogadorAtual.nome}</b>. Identificamos solicitações pendentes de novos atletas ou desligamento de perfil de jogador:
             </p>
             
-            <div className="flex-grow overflow-y-auto space-y-3 pr-1 mb-5 select-none scrollbar-thin">
-              {jogadores.filter(j => j.status === 'pendente_aprovacao').map((j) => (
-                <div 
-                  key={j.id} 
-                  className="p-3.5 bg-emerald-900/40 rounded-xl border border-white/5 flex flex-col sm:flex-row sm:items-center justify-between gap-3 transition-all hover:bg-emerald-900/60"
-                >
-                  <div className="flex items-center gap-3 min-w-0">
-                    <div 
-                      className="w-9 h-9 rounded-full flex items-center justify-center text-xs font-bold shrink-0 shadow-inner overflow-hidden text-black font-sans"
-                      style={{ 
-                        backgroundColor: getSessaoAvatarProps ? getSessaoAvatarProps(j.foto || '').color : '#10b981',
-                        color: getSessaoAvatarProps && getSessaoAvatarProps(j.foto || '').text === '⚪' ? '#fff' : '#000'
-                      }}
-                    >
-                      {j.foto && (j.foto.startsWith('http') || j.foto.startsWith('data:')) ? (
-                        <img src={j.foto} className="w-full h-full object-cover rounded-full" alt="" referrerPolicy="no-referrer" />
+            <div className="flex-grow overflow-y-auto space-y-3 pr-1 mb-5 select-none scrollbar-thin font-sans">
+              {jogadores.filter(j => j.status === 'pendente_aprovacao' || j.status === 'solicitou_exclusao').map((j) => {
+                const isExclusao = j.status === 'solicitou_exclusao';
+                return (
+                  <div 
+                    key={j.id} 
+                    className={`p-3.5 rounded-xl border flex flex-col sm:flex-row sm:items-center justify-between gap-3 transition-all ${
+                      isExclusao 
+                        ? 'bg-rose-955/20 border-rose-500/20 hover:bg-rose-955/35'
+                        : 'bg-emerald-900/40 border-white/5 hover:bg-emerald-900/60'
+                    }`}
+                  >
+                    <div className="flex items-center gap-3 min-w-0">
+                      <div 
+                        className="w-9 h-9 rounded-full flex items-center justify-center text-xs font-bold shrink-0 shadow-inner overflow-hidden text-black font-sans"
+                        style={{ 
+                          backgroundColor: getSessaoAvatarProps ? getSessaoAvatarProps(j.foto || '').color : '#10b981',
+                          color: getSessaoAvatarProps && getSessaoAvatarProps(j.foto || '').text === '⚪' ? '#fff' : '#000'
+                        }}
+                      >
+                        {j.foto && (j.foto.startsWith('http') || j.foto.startsWith('data:')) ? (
+                          <img src={j.foto} className="w-full h-full object-cover rounded-full" alt="" referrerPolicy="no-referrer" />
+                        ) : (
+                          j.nome.substring(0, 1).toUpperCase()
+                        )}
+                      </div>
+                      <div className="min-w-0 text-left">
+                        <div className="flex items-center gap-1.5 flex-wrap">
+                          <p className="text-xs font-bold text-white truncate leading-tight">{j.nome} {j.sobrenome}</p>
+                          {isExclusao ? (
+                            <span className="text-[8px] font-black uppercase text-rose-400 bg-rose-950/60 border border-rose-500/25 px-1 py-0.5 rounded leading-none">
+                              Exclusão
+                            </span>
+                          ) : (
+                            <span className="text-[8px] font-black uppercase text-teal-400 bg-teal-950/60 border border-teal-500/25 px-1 py-0.5 rounded leading-none">
+                              Cadastro
+                            </span>
+                          )}
+                        </div>
+                        <p className="text-[10px] text-emerald-300/80 mt-1 font-sans flex flex-wrap items-center gap-1.5 leading-none">
+                          <span className="bg-emerald-950 text-emerald-400 px-1.5 py-0.5 rounded font-bold">{j.posicao}</span>
+                          <span>•</span>
+                          <span>{j.membroStatus === 'mensalista' ? '🟢 Mensalista' : j.membroStatus === 'isento' ? '⭐ Isento' : '🔵 Diarista'}</span>
+                        </p>
+                      </div>
+                    </div>
+                    
+                    <div className="flex gap-2 shrink-0">
+                      {isExclusao ? (
+                        <>
+                          <button
+                            type="button"
+                            onClick={() => {
+                              if (confirm(`Aprovar exclusão definitiva e deletar atleta ${j.nome} ${j.sobrenome}?`)) {
+                                handleAprovarJogador(j.id, false);
+                              }
+                            }}
+                            className="px-3 py-1.5 bg-rose-600 hover:bg-rose-500 text-white font-black text-[10px] uppercase rounded-lg transition-all flex items-center gap-1 cursor-pointer active:scale-95"
+                          >
+                            <Trash2 className="w-3.5 h-3.5" />
+                            Aprovar
+                          </button>
+                          <button
+                            type="button"
+                            onClick={() => {
+                              if (confirm(`Rejeitar exclusão de ${j.nome} e mantê-lo ativo?`)) {
+                                handleAprovarJogador(j.id, true);
+                              }
+                            }}
+                            className="px-3 py-1.5 bg-emerald-950 hover:bg-emerald-900 border border-white/10 text-emerald-300 font-bold text-[10px] uppercase rounded-lg transition-all flex items-center gap-1 cursor-pointer active:scale-95"
+                          >
+                            <X className="w-3.5 h-3.5" />
+                            Rejeitar / Manter
+                          </button>
+                        </>
                       ) : (
-                        j.nome.substring(0, 1).toUpperCase()
+                        <>
+                          <button
+                            type="button"
+                            onClick={() => handleAprovarJogador(j.id, true)}
+                            className="px-3 py-1.5 bg-teal-500 hover:bg-teal-400 text-emerald-950 font-black text-[10px] uppercase rounded-lg transition-all flex items-center gap-1 cursor-pointer active:scale-95"
+                          >
+                            <Check className="w-3.5 h-3.5" />
+                            Aprovar
+                          </button>
+                          <button
+                            type="button"
+                            onClick={() => {
+                              if (confirm(`Remover solicitação de ${j.nome}?`)) {
+                                handleAprovarJogador(j.id, false);
+                              }
+                            }}
+                            className="px-3 py-1.5 bg-rose-500/10 hover:bg-rose-500 border border-rose-500/30 hover:border-transparent text-rose-300 hover:text-white font-bold text-[10px] uppercase rounded-lg transition-all flex items-center gap-1 cursor-pointer active:scale-95"
+                          >
+                            <X className="w-3.5 h-3.5" />
+                            Rejeitar
+                          </button>
+                        </>
                       )}
                     </div>
-                    <div className="min-w-0">
-                      <p className="text-xs font-bold text-white truncate leading-tight">{j.nome} {j.sobrenome}</p>
-                      <p className="text-[10px] text-emerald-300/80 mt-0.5 font-sans flex flex-wrap items-center gap-1.5 leading-none">
-                        <span className="bg-emerald-950 text-emerald-400 px-1.5 py-0.5 rounded font-bold">{j.posicao}</span>
-                        <span>•</span>
-                        <span>{j.mensalistaStatus === 'mensalista' ? '🟢 Mensalista' : j.mensalistaStatus === 'isento' ? '⭐ Isento' : '🔵 Diarista'}</span>
-                      </p>
-                    </div>
                   </div>
-                  
-                  <div className="flex gap-2 shrink-0">
-                    <button
-                      type="button"
-                      onClick={() => handleAprovarJogador(j.id, true)}
-                      className="px-3 py-1.5 bg-teal-500 hover:bg-teal-400 text-emerald-950 font-black text-[10px] uppercase rounded-lg transition-all flex items-center gap-1 cursor-pointer active:scale-95"
-                    >
-                      <Check className="w-3.5 h-3.5" />
-                      Aprovar
-                    </button>
-                    <button
-                      type="button"
-                      onClick={() => handleAprovarJogador(j.id, false)}
-                      className="px-3 py-1.5 bg-rose-500/10 hover:bg-rose-500 border border-rose-500/30 hover:border-transparent text-rose-300 hover:text-white font-bold text-[10px] uppercase rounded-lg transition-all flex items-center gap-1 cursor-pointer active:scale-95"
-                    >
-                      <X className="w-3.5 h-3.5" />
-                      Rejeitar
-                    </button>
-                  </div>
-                </div>
-              ))}
-              {jogadores.filter(j => j.status === 'pendente_aprovacao').length === 0 && (
+                );
+              })}
+              {jogadores.filter(j => j.status === 'pendente_aprovacao' || j.status === 'solicitou_exclusao').length === 0 && (
                 <div className="text-center py-6 text-emerald-400/60 italic text-xs">
-                  Todos os cadastros pendentes já foram processados!
+                  Todas as solicitações pendentes já foram processadas!
                 </div>
               )}
             </div>

@@ -7,7 +7,7 @@ import React, { useState } from 'react';
 import { Jogador, PosicaoJogador, MembroStatus, Partida, Pagamento, RoleUsuario } from '../types';
 import { AVATAR_PRESETS } from '../data';
 import { Users, Trash2, Shield, Calendar, Edit2, Check, X, ShieldAlert, Award, Share2, Send, Copy, History, DollarSign, ArrowLeftRight } from 'lucide-react';
-import { obterTextoListaCompletaPartida, gerarLinkCompartilhamento, obterJanelaRenovacaoParaMesRef, isFechamentoMensalistas } from '../utils/confirmationRules';
+import { obterTextoListaCompletaPartida, gerarLinkCompartilhamento, obterJanelaRenovacaoParaMesRef, isFechamentoMensalistas, obterDebitosDoJogador } from '../utils/confirmationRules';
 
 interface ListaCadastradosProps {
   jogadores: Jogador[];
@@ -60,6 +60,7 @@ export default function ListaCadastrados({
   const [showAutoToast, setShowAutoToast] = useState(false);
   const [autoToastMsg, setAutoToastMsg] = useState('');
   const [jogadorHistoricoSelecionado, setJogadorHistoricoSelecionado] = useState<Jogador | null>(null);
+  const [jogadorExclusaoModal, setJogadorExclusaoModal] = useState<Jogador | null>(null);
   const [anoHistorico, setAnoHistorico] = useState<string>('2026');
 
   // Computa o histórico detalhado mês a mês do jogador
@@ -588,11 +589,13 @@ export default function ListaCadastrados({
                     id={`btn-excluir-atleta-${j.id}`}
                     type="button"
                     onClick={() => {
-                      const msg = j.id === jogadorAtual.id
-                        ? 'Tem certeza que deseja excluir sua conta e informações do portal definitivamente?'
-                        : `Tem certeza que deseja excluir as informações de ${j.nome} ${j.sobrenome} definitivamente?`;
-                      if (confirm(msg)) {
-                        onExcluirJogador(j.id);
+                      if (j.id === jogadorAtual.id) {
+                        setJogadorExclusaoModal(j);
+                      } else {
+                        const msg = `Tem certeza que deseja excluir as informações de ${j.nome} ${j.sobrenome} definitivamente?`;
+                        if (confirm(msg)) {
+                          onExcluirJogador(j.id);
+                        }
                       }
                     }}
                     className="text-[11px] font-bold text-rose-350 hover:bg-rose-950/30 hover:text-white bg-rose-950/15 border border-rose-500/15 px-3 py-1.5 rounded-lg transition-colors flex items-center gap-1"
@@ -965,6 +968,156 @@ export default function ListaCadastrados({
                 </p>
               </div>
 
+            </div>
+          </div>
+        );
+      })()}
+
+      {/* MODAL DE SOLICITAÇÃO DE EXCLUSÃO DE CONTA */}
+      {jogadorExclusaoModal && (() => {
+        const j = jogadorExclusaoModal;
+        const originalStatus = j.membroStatusDb || j.membroStatus || 'diarista';
+        const vD = parseFloat(localStorage.getItem('racha_valor_diaria') || '30');
+        const v4 = parseFloat(localStorage.getItem('racha_valor_4s') || '85');
+        const v5 = parseFloat(localStorage.getItem('racha_valor_5s') || '105');
+        const debits = obterDebitosDoJogador(
+          j.id,
+          originalStatus,
+          j.posicao,
+          partidas,
+          pagamentos,
+          vD,
+          v4,
+          v5,
+          j.createdAt
+        );
+        const hasDebits = debits.length > 0;
+        const totalDebitos = debits.reduce((acc, d) => acc + d.valor, 0);
+
+        const formatarMesRef = (mesRef: string) => {
+          const [ano, mes] = mesRef.split('-');
+          const mesesNomes: Record<string, string> = {
+            '01': 'Janeiro', '02': 'Fevereiro', '03': 'Março', '04': 'Abril',
+            '05': 'Maio', '06': 'Junho', '07': 'Julho', '08': 'Agosto',
+            '09': 'Setembro', '10': 'Outubro', '11': 'Novembro', '12': 'Dezembro'
+          };
+          return `${mesesNomes[mes] || mes} / ${ano}`;
+        };
+
+        return (
+          <div className="fixed inset-0 bg-black/85 backdrop-blur-md z-50 flex items-center justify-center p-4">
+            <div className="bg-neutral-900 border border-white/10 w-full max-w-md rounded-2xl overflow-hidden shadow-2xl animate-in fade-in zoom-in duration-200">
+              <div className="p-4 bg-zinc-900/60 border-b border-white/10 flex items-center justify-between">
+                <div>
+                  <h3 className="font-display font-semibold text-sm text-white uppercase tracking-wider">Solicitar Exclusão de Perfil</h3>
+                  <p className="text-[10px] text-zinc-400 font-mono mt-0.5">Atleta: {j.nome} {j.sobrenome}</p>
+                </div>
+                <button
+                  id="btn-close-modal-exclusao"
+                  type="button"
+                  onClick={() => setJogadorExclusaoModal(null)}
+                  className="p-1 text-zinc-400 hover:text-white rounded-lg hover:bg-white/5 transition-colors"
+                >
+                  <X className="w-5 h-5" />
+                </button>
+              </div>
+
+              <div className="p-5 space-y-4">
+                <p className="text-xs text-zinc-300 font-sans leading-relaxed">
+                  Para proceder com o desligamento definitivo do elenco oficial do racha, o sistema exige a inexistência de quaisquer pendências financeiras ativas.
+                </p>
+
+                {j.status === 'solicitou_exclusao' ? (
+                  <div className="p-4 bg-amber-950/20 border border-amber-500/30 rounded-xl space-y-1">
+                    <h4 className="text-xs font-bold text-amber-400 flex items-center gap-1.5 uppercase font-mono">
+                      ⏳ Exclusão já Solicitada
+                    </h4>
+                    <p className="text-[11px] text-amber-200/80 font-sans leading-relaxed">
+                      Sua solicitação de exclusão já se encontra em fila de análise pelo administrador do portal. Por favor, aguarde o deferimento final de sua conta.
+                    </p>
+                  </div>
+                ) : hasDebits ? (
+                  <div className="space-y-3">
+                    <div className="p-4 bg-rose-950/35 border border-rose-500/25 rounded-xl space-y-2">
+                      <h4 className="text-xs font-black text-rose-400 flex items-center gap-1.5 uppercase tracking-wide">
+                        ⚠️ DÉBITOS PENDENTES DETECTADOS
+                      </h4>
+                      <p className="text-[11.5px] text-rose-300 font-sans leading-relaxed">
+                        Constam débitos pendentes de pagamento em seu perfil. Estas pendências de mensalidade ou diária devem ser liquidadas com o Administrador antes de prosseguir com a exclusão.
+                      </p>
+                    </div>
+
+                    <div className="bg-black/35 rounded-xl border border-white/5 overflow-hidden">
+                      <div className="p-2.5 bg-rose-955/20 border-b border-white/10 text-[10px] uppercase font-bold tracking-wider text-rose-400">
+                        Extrato de Pendências
+                      </div>
+                      <div className="divide-y divide-white/5 max-h-[160px] overflow-y-auto">
+                        {debits.map((d) => (
+                          <div key={d.id} className="p-3 flex items-center justify-between font-mono text-[11px]">
+                            <div className="text-left">
+                              <span className="text-white font-bold block">{formatarMesRef(d.mesRef)}</span>
+                              <span className="text-[9.5px] text-zinc-400 uppercase tracking-wider block">
+                                {d.tipo === 'mensalidade' ? '🛡️ Mensalidade' : '⚽ Diária de Jogo'}
+                              </span>
+                            </div>
+                            <span className="text-rose-400 font-extrabold whitespace-nowrap">
+                              R$ {d.valor.toFixed(2)}
+                            </span>
+                          </div>
+                        ))}
+                      </div>
+                      <div className="p-3 bg-black/40 border-t border-white/5 flex items-center justify-between text-xs font-bold">
+                        <span className="text-zinc-300 font-display">Total de Débito Pendente:</span>
+                        <span className="text-rose-450 font-mono text-sm font-extrabold">R$ {totalDebitos.toFixed(2)}</span>
+                      </div>
+                    </div>
+                  </div>
+                ) : (
+                  <div className="space-y-3">
+                    <div className="p-4 bg-emerald-500/10 border border-emerald-500/20 rounded-xl space-y-1.5">
+                      <h4 className="text-xs font-black text-emerald-400 flex items-center gap-1.5 uppercase tracking-wide">
+                        ✅ SITUAÇÃO REGULARIZADA!
+                      </h4>
+                      <p className="text-[11.5px] text-emerald-300 font-sans leading-relaxed">
+                        Excelente! Não há nenhum débito financeiro ou pendência registrada no seu nome.
+                      </p>
+                    </div>
+
+                    <div className="p-3 bg-white/5 border border-white/5 rounded-xl">
+                      <p className="text-[10.5px] text-zinc-300 font-sans leading-relaxed">
+                        Ao clicar em confirmar abaixo, sua solicitação de exclusão definitiva será enviada ao painel do Administrador que supervisionará o seu pedido. Após a validação administrativa, seu registro será permanentemente apagado.
+                      </p>
+                    </div>
+                  </div>
+                )}
+              </div>
+
+              <div className="p-4 bg-zinc-900/60 border-t border-white/10 flex items-center justify-end gap-2">
+                <button
+                  id="btn-modal-exclusao-cancel"
+                  type="button"
+                  onClick={() => setJogadorExclusaoModal(null)}
+                  className="bg-neutral-950 border border-white/10 text-zinc-300 hover:text-white text-xs font-bold px-4 py-2.5 rounded-xl transition-colors"
+                >
+                  {hasDebits ? 'Voltar / Entendido' : 'Cancelar'}
+                </button>
+                {j.status !== 'solicitou_exclusao' && !hasDebits && (
+                  <button
+                    id="btn-modal-exclusao-confirm"
+                    type="button"
+                    onClick={() => {
+                      if (confirm('Tem certeza que deseja solicitar a exclusão da sua conta? Esta ação enviará seu perfil ao painel administrativo para desligamento do elenco.')) {
+                        onEditarJogador(j.id, { status: 'solicitou_exclusao' });
+                        setJogadorExclusaoModal(null);
+                        alert('Solicitação de exclusão de perfil enviada com sucesso! Aguarde aprovação do administrador do portal.');
+                      }
+                    }}
+                    className="bg-rose-600 hover:bg-rose-500 text-white text-xs font-bold px-4 py-2.5 rounded-xl transition-colors shadow-lg shadow-rose-950/40"
+                  >
+                    Confirmar e Enviar Pedido
+                  </button>
+                )}
+              </div>
             </div>
           </div>
         );

@@ -222,7 +222,8 @@ export default function ControleCaixa({
         pagamentos,
         valorDiaria,
         valor4Sabados,
-        valor5Sabados
+        valor5Sabados,
+        jogador.createdAt
       );
 
       for (const deb of debits) {
@@ -298,7 +299,7 @@ export default function ControleCaixa({
 
 
   const startupMonth = useMemo(() => {
-    return localStorage.getItem('futebol_startup_month') || '2026-05';
+    return localStorage.getItem('futebol_startup_month') || '2026-06';
   }, []);
 
   // Retorna o mês atual no formato "YYYY-MM"
