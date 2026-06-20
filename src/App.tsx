@@ -49,6 +49,18 @@ import { obterTextoListaCompletaPartida, obterTextoListaRenovacao, obterStatusMe
 import logoPelada from './assets/images/logo_pelada.svg';
 import { Calendar, Users, DollarSign, ShieldAlert, LogOut, Database, Award, User, Settings, UserCheck, History, CheckSquare, Check, X, Lock, Cake, TrendingUp, UserPlus, AlertCircle } from 'lucide-react';
 
+function calcularIdade(dataNascimento: string) {
+  if (!dataNascimento) return 0;
+  const hoje = new Date();
+  const nasc = new Date(dataNascimento);
+  let idade = hoje.getFullYear() - nasc.getFullYear();
+  const m = hoje.getMonth() - nasc.getMonth();
+  if (m < 0 || (m === 0 && hoje.getDate() < nasc.getDate())) {
+    idade--;
+  }
+  return idade;
+}
+
 export default function App() {
   // Carregar estados iniciais do banco local simulado
   const [jogadores, setJogadores] = useState<Jogador[]>([]);
@@ -1132,14 +1144,14 @@ export default function App() {
 
           {/* Dados do Usuário Logado & Logout */}
           {jogadorAtual && (
-            <div className="flex items-center justify-between sm:justify-end gap-3.5 bg-emerald-950/60 p-2 rounded-lg border border-white/10">
+            <div className="flex items-center justify-between sm:justify-end gap-3.5 bg-emerald-950/60 p-2 rounded-lg border border-white/10 w-full sm:w-auto sm:min-w-[340px]">
               
               <div 
                 className="w-8 h-8 rounded-full flex items-center justify-center text-xs font-bold shrink-0 shadow-inner overflow-hidden cursor-zoom-in hover:scale-110 active:scale-95 transition-all duration-200"
                 style={{ backgroundColor: getSessaoAvatarProps(jogadorAtual.foto).color, color: getSessaoAvatarProps(jogadorAtual.foto).text === '⚪' ? '#fff' : '#000' }}
                 onClick={() => {
                   if (jogadorAtual.foto && (jogadorAtual.foto.startsWith('http') || jogadorAtual.foto.startsWith('data:'))) {
-                    setFotoZoomada({ url: jogadorAtual.foto, nome: `${jogadorAtual.nome} ${jogadorAtual.sobrenome}` });
+                     setFotoZoomada({ url: jogadorAtual.foto, nome: `${jogadorAtual.nome} ${jogadorAtual.sobrenome}` });
                   }
                 }}
                 title={jogadorAtual.foto ? "Clique para ampliar a foto" : undefined}
@@ -1154,22 +1166,35 @@ export default function App() {
               <div 
                 id="header-perfil-edit-trigger"
                 onClick={abrirModalPerfil}
-                className="flex flex-col cursor-pointer hover:bg-white/5 hover:border-white/20 px-2 py-1 rounded-lg transition-all border border-transparent select-none active:scale-97"
+                className="flex flex-col flex-1 cursor-pointer hover:bg-white/5 hover:border-white/20 px-2 py-1 rounded-lg transition-all border border-transparent select-none active:scale-97 min-w-0"
                 title="Clique aqui para editar seu perfil"
               >
-                <div>
-                  <div className="flex items-center gap-1">
-                    <span id="nome-usuario-logado" className="text-xs font-bold text-white hover:text-teal-300 transition-colors leading-none decoration-dotted hover:underline underline-offset-2">{jogadorAtual.nome} {jogadorAtual.sobrenome}</span>
-                    {jogadorAtualEfetivo?.isGold && (
-                      <span className="text-[9px] bg-gradient-to-r from-amber-400 to-yellow-600 text-black px-1 py-0.5 font-extrabold rounded shadow-sm shadow-amber-500/20 whitespace-nowrap">GOLD 🏅</span>
+                <div className="flex flex-col">
+                  <div className="flex flex-wrap items-center gap-1.5 min-w-0">
+                    <span id="nome-usuario-logado" className="text-xs font-bold text-white hover:text-teal-300 transition-colors leading-none decoration-dotted hover:underline underline-offset-2 truncate p-0.5">{jogadorAtual.nome} {jogadorAtual.sobrenome}</span>
+                    
+                    {jogadorAtual.membroStatus === 'mensalista' && (
+                      <span className="text-[8px] bg-indigo-600/95 text-white px-1.5 py-0.5 font-extrabold rounded whitespace-nowrap shadow-sm">MENSALISTA</span>
                     )}
-                    {jogadorAtual.role === 'admin' ? (
-                      <span className="text-[8px] bg-amber-500 text-black px-1 font-extrabold rounded">ADM</span>
-                    ) : (
-                      <span className="text-[8px] bg-white/10 text-emerald-300 px-1 font-bold rounded">JOG</span>
+                    {jogadorAtual.membroStatus === 'diarista' && (
+                      <span className="text-[8px] bg-cyan-600/95 text-white px-1.5 py-0.5 font-extrabold rounded whitespace-nowrap shadow-sm">DIARISTA</span>
+                    )}
+                    {jogadorAtual.membroStatus === 'isento' && (
+                      <span className="text-[8px] bg-emerald-600 text-white px-1.5 py-0.5 font-extrabold rounded whitespace-nowrap shadow-sm font-sans">ISENTO</span>
+                    )}
+                    
+                    {(jogadorAtualEfetivo?.isGold || jogadorAtual.isGold) && (
+                      <span className="text-[9px] bg-gradient-to-r from-amber-400 to-yellow-600 text-black px-1.5 py-0.5 font-extrabold rounded shadow-sm shadow-amber-500/20 whitespace-nowrap">GOLD 🏅</span>
+                    )}
+                    
+                    {jogadorAtual.role === 'admin' && (
+                      <span className="text-[8px] bg-amber-500 text-black px-1 py-0.5 font-extrabold rounded">ADM</span>
                     )}
                   </div>
-                  <p className="text-[9px] text-emerald-400/80 font-sans tracking-wide mt-0.5">{jogadorAtual.posicao} • Encontro {jogadorAtual.membroStatus}</p>
+                  
+                  <p className="text-[9px] text-emerald-400/80 font-sans tracking-wide mt-0.5">
+                    {jogadorAtual.posicao} • {jogadorAtual.dataNascimento ? `${calcularIdade(jogadorAtual.dataNascimento)} anos` : '-- anos'}
+                  </p>
                 </div>
               </div>
 

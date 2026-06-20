@@ -7,7 +7,7 @@ import React, { useState } from 'react';
 import { Partida, Jogador, Pagamento, MembroStatus, PosicaoJogador } from '../types';
 import { AVATAR_PRESETS } from '../data';
 import { Calendar as CalendarIcon, MapPin, Clock, Users, Check, X, ShieldAlert, Award, ChevronLeft, ChevronRight, Share2, AlertTriangle, Send, Copy, Edit2, Trash2, Shield } from 'lucide-react';
-import { getJanelaConfirmacao, gerarLinkCompartilhamento, obterTextoAlertaSemanal, obterDebitosDoJogador, obterTextoListaCompletaPartida } from '../utils/confirmationRules';
+import { getJanelaConfirmacao, gerarLinkCompartilhamento, obterTextoAlertaSemanal, obterDebitosDoJogador, obterTextoListaCompletaPartida, isFechamentoMensalistas } from '../utils/confirmationRules';
 import CheckoutPixModal from './CheckoutPixModal';
 
 interface ConfirmacaoPresencaProps {
@@ -1393,7 +1393,17 @@ export default function ConfirmacaoPresenca({
                 <div>
                   <label className="text-[10.5px] text-emerald-300 font-bold uppercase block tracking-wider mb-1">Status de Membro:</label>
                   <select
-                    disabled={!(jogadorAtual.role === 'admin' || jogadorAtual.id === jogadorSelecionadoModal.id) && editPosicao !== 'Goleiro'}
+                    disabled={
+                      editPosicao === 'Goleiro' || 
+                      (
+                        jogadorAtual.role !== 'admin' && 
+                        (
+                          jogadorAtual.id !== jogadorSelecionadoModal.id || 
+                          !isFechamentoMensalistas().emPeriodo || 
+                          pagamentos.some(p => p.jogadorId === jogadorSelecionadoModal.id && p.mesRef === `${new Date().getFullYear()}-${String(new Date().getMonth() + 1).padStart(2, '0')}` && !p.partidaId && p.status === 'pago')
+                        )
+                      )
+                    }
                     value={editMembro}
                     onChange={(e) => setEditMembro(e.target.value as MembroStatus)}
                     className="w-full bg-neutral-900 border border-white/10 rounded-xl p-2.5 text-xs text-white focus:outline-none focus:border-emerald-500 disabled:opacity-50"
@@ -1409,6 +1419,17 @@ export default function ConfirmacaoPresenca({
                   </select>
                 </div>
               </div>
+
+              {jogadorAtual.role !== 'admin' && 
+               editPosicao !== 'Goleiro' && 
+               (
+                 !isFechamentoMensalistas().emPeriodo || 
+                 pagamentos.some(p => p.jogadorId === jogadorSelecionadoModal.id && p.mesRef === `${new Date().getFullYear()}-${String(new Date().getMonth() + 1).padStart(2, '0')}` && !p.partidaId && p.status === 'pago')
+               ) && (
+                <p className="text-[9px] text-rose-450 font-semibold leading-tight mt-1 bg-rose-950/40 border border-rose-500/20 rounded-lg p-2 text-left">
+                  * Alteração de plano indisponível fora do período de renovação ou quando a mensalidade está paga.
+                </p>
+              )}
 
               {/* Opções Admin-Only: Status, Gold, Admin Role */}
               {jogadorAtual.role === 'admin' && (
