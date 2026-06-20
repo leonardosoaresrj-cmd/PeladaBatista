@@ -1075,17 +1075,19 @@ export default function ControleCaixa({
       </div>
 
       {/* DASHBOARDS - BIG NUMBERS DE COLETIVO FINANCEIRO */}
-      <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4">
+      <div className="grid grid-cols-2 lg:grid-cols-4 gap-3 md:gap-4">
         
         {/* Receita TOTAL */}
-        <div className="bg-emerald-900/30 border border-white/10 p-5 rounded-2xl relative overflow-hidden text-left shadow-md">
-          <p className="text-[9px] text-emerald-300 uppercase font-bold tracking-wider leading-none">
-            {visaoEscopo === 'mensal' ? 'Receitas do Mês' : visaoEscopo === 'anual' ? `Receitas do Ano (${anoSelecionado})` : 'Faturamento Histórico'}
-          </p>
-          <h4 className="text-2xl font-mono font-bold text-white mt-2">
-            R$ {receitaVisualizar.toFixed(2)}
-          </h4>
-          <div className="space-y-1 mt-3.5 text-[10px] text-emerald-300/80 border-t border-white/5 pt-2.5">
+        <div className="bg-emerald-900/30 border border-white/10 p-3.5 sm:p-5 rounded-xl sm:rounded-2xl relative overflow-hidden text-left shadow-md flex flex-col justify-between">
+          <div>
+            <p className="text-[8px] sm:text-[9px] text-emerald-300 uppercase font-bold tracking-wider leading-none">
+              {visaoEscopo === 'mensal' ? 'Receitas do Mês' : visaoEscopo === 'anual' ? `Receitas do Ano (${anoSelecionado})` : 'Faturamento Histórico'}
+            </p>
+            <h4 className="text-lg sm:text-2xl font-mono font-bold text-white mt-1.5 sm:mt-2">
+              R$ {receitaVisualizar.toFixed(2)}
+            </h4>
+          </div>
+          <div className="space-y-0.5 sm:space-y-1 mt-2.5 sm:mt-3.5 text-[9px] sm:text-[10px] text-emerald-300/80 border-t border-white/5 pt-1.5 sm:pt-2.5">
             <div className="flex justify-between">
               <span>Mensalistas:</span>
               <strong className="text-white">
@@ -1107,20 +1109,22 @@ export default function ControleCaixa({
               </div>
             )}
           </div>
-          <div className="absolute right-3 top-3 w-8 h-8 rounded-full bg-teal-500/10 border border-teal-500/20 flex items-center justify-center text-teal-400">
-            <ArrowUpRight className="w-4 h-4" />
+          <div className="absolute right-2 top-2 sm:right-3 sm:top-3 w-6 h-6 sm:w-8 sm:h-8 rounded-full bg-teal-500/10 border border-teal-500/20 flex items-center justify-center text-teal-400 shrink-0">
+            <ArrowUpRight className="w-3 w-3 sm:w-4 sm:h-4 text-teal-455" />
           </div>
         </div>
 
         {/* Despesas Gerais */}
-        <div className="bg-emerald-900/30 border border-white/10 p-5 rounded-2xl relative overflow-hidden text-left shadow-md">
-          <p className="text-[9px] text-emerald-300 uppercase font-bold tracking-wider leading-none">
-            {visaoEscopo === 'mensal' ? 'Despesas do Mês' : visaoEscopo === 'anual' ? `Despesas do Ano (${anoSelecionado})` : 'Custos Históricos'}
-          </p>
-          <h4 className="text-2xl font-mono font-bold text-rose-300 mt-2">
-            R$ {despesaVisualizar.toFixed(2)}
-          </h4>
-          <div className="space-y-1 mt-3.5 text-[10px] text-rose-300/80 border-t border-white/5 pt-2.5">
+        <div className="bg-emerald-900/30 border border-white/10 p-3.5 sm:p-5 rounded-xl sm:rounded-2xl relative overflow-hidden text-left shadow-md flex flex-col justify-between">
+          <div>
+            <p className="text-[8px] sm:text-[9px] text-emerald-300 uppercase font-bold tracking-wider leading-none">
+              {visaoEscopo === 'mensal' ? 'Despesas do Mês' : visaoEscopo === 'anual' ? `Despesas do Ano (${anoSelecionado})` : 'Custos Históricos'}
+            </p>
+            <h4 className="text-lg sm:text-2xl font-mono font-bold text-rose-300 mt-1.5 sm:mt-2">
+              R$ {despesaVisualizar.toFixed(2)}
+            </h4>
+          </div>
+          <div className="space-y-0.5 sm:space-y-1 mt-2.5 sm:mt-3.5 text-[9px] sm:text-[10px] text-rose-300/80 border-t border-white/5 pt-1.5 sm:pt-2.5">
             <div className="flex justify-between">
               <span>Aluguel ({partidasCountVisualizar} {partidasCountVisualizar === 1 ? 'jogo' : 'jogos'}):</span>
               <strong className="text-white">
@@ -1134,41 +1138,43 @@ export default function ControleCaixa({
               </strong>
             </div>
           </div>
-          <div className="absolute right-3 top-3 w-8 h-8 rounded-full bg-rose-500/10 border border-rose-500/20 flex items-center justify-center text-rose-400">
-            <ArrowDownRight className="w-4 h-4" />
+          <div className="absolute right-2 top-2 sm:right-3 sm:top-3 w-6 h-6 sm:w-8 sm:h-8 rounded-full bg-rose-500/10 border border-rose-500/20 flex items-center justify-center text-rose-400 shrink-0">
+            <ArrowDownRight className="w-3 sm:w-4 sm:h-4 text-rose-455" />
           </div>
         </div>
 
         {/* Saldo Líquido */}
-        <div className="bg-emerald-900/30 border border-white/10 p-5 rounded-2xl relative overflow-hidden text-left shadow-md">
-          <p className="text-[9px] text-emerald-300 uppercase font-bold tracking-wider leading-none">
-            {visaoEscopo === 'mensal' ? 'Saldo Líquido' : visaoEscopo === 'anual' ? `Saldo Líquido Ano (${anoSelecionado})` : 'Lucro Consolidado'}
-          </p>
+        <div className="bg-emerald-900/30 border border-white/10 p-3.5 sm:p-5 rounded-xl sm:rounded-2xl relative overflow-hidden text-left shadow-md flex flex-col justify-between">
           {(() => {
             const val = saldoLiquidoVisualizar;
             return (
               <>
-                <h4 className={`text-2xl font-mono font-bold mt-2 ${val >= 0 ? 'text-teal-400' : 'text-rose-400'}`}>
-                  R$ {val.toFixed(2)}
-                </h4>
-                <p className="text-[10px] text-emerald-300 mt-3.5 border-t border-white/5 pt-2.5 flex items-center gap-1 font-sans">
-                  Status do período: 
-                  <strong className={`${val >= 0 ? 'text-teal-300 bg-teal-500/10' : 'text-rose-400 bg-rose-500/10'} px-2 py-0.5 rounded text-[9px] uppercase tracking-wider`}>
+                <div>
+                  <p className="text-[8px] sm:text-[9px] text-emerald-300 uppercase font-bold tracking-wider leading-none">
+                    {visaoEscopo === 'mensal' ? 'Saldo Líquido' : visaoEscopo === 'anual' ? `Saldo Líquido Ano (${anoSelecionado})` : 'Lucro Consolidado'}
+                  </p>
+                  <h4 className={`text-lg sm:text-2xl font-mono font-bold mt-1.5 sm:mt-2 ${val >= 0 ? 'text-teal-400' : 'text-rose-400'}`}>
+                    R$ {val.toFixed(2)}
+                  </h4>
+                </div>
+                <p className="text-[8.5px] sm:text-[10px] text-emerald-300 mt-2.5 sm:mt-3.5 border-t border-white/5 pt-1.5 sm:pt-2.5 flex flex-wrap items-center gap-1 font-sans">
+                  Status: 
+                  <strong className={`${val >= 0 ? 'text-teal-300 bg-teal-500/10' : 'text-rose-400 bg-rose-500/10'} px-1.5 py-0.5 rounded text-[8px] sm:text-[9px] uppercase tracking-wider`}>
                     {val >= 0 ? 'Superávit' : 'Déficit'}
                   </strong>
                 </p>
               </>
             );
           })()}
-          <div className="absolute right-3 top-3 w-8 h-8 rounded-full bg-white/5 border border-white/10 flex items-center justify-center text-white/50">
-            <DollarSign className="w-4 h-4" />
+          <div className="absolute right-2 top-2 sm:right-3 sm:top-3 w-6 h-6 sm:w-8 sm:h-8 rounded-full bg-white/5 border border-white/10 flex items-center justify-center text-white/50 shrink-0">
+            <DollarSign className="w-3 sm:w-4 sm:h-4" />
           </div>
         </div>
 
         {/* Custo de Aluguel de Campo e Ajuste */}
-        <div className="bg-gradient-to-br from-emerald-950 to-emerald-900/50 border border-white/10 p-5 rounded-2xl relative overflow-hidden text-left shadow-md">
-          <p className="text-[9px] text-teal-400 uppercase font-bold tracking-wider leading-none flex items-center gap-1">
-            <Settings className="w-3 h-3 text-teal-400 animate-spin-slow" /> Aluguel Configurado
+        <div className="bg-gradient-to-br from-emerald-950 to-emerald-900/50 border border-white/10 p-3.5 sm:p-5 rounded-xl sm:rounded-2xl relative overflow-hidden text-left shadow-md flex flex-col justify-between">
+          <p className="text-[8px] sm:text-[9px] text-teal-400 uppercase font-bold tracking-wider leading-none flex items-center gap-1">
+            <Settings className="w-2.5 h-2.5 sm:w-3 sm:h-3 text-teal-400 animate-spin-slow" /> Aluguel Configurado
           </p>
           
           {isEditingAluguel ? (
@@ -1177,13 +1183,13 @@ export default function ControleCaixa({
                 type="number"
                 value={tempAluguel}
                 onChange={(e) => setTempAluguel(Number(e.target.value))}
-                className="w-full bg-emerald-955 border border-white/20 text-white font-mono font-bold text-sm rounded px-2.5 py-1 focus:outline-none"
+                className="w-full bg-emerald-955 border border-white/20 text-white font-mono font-bold text-xs sm:text-sm rounded px-2.5 py-1 focus:outline-none"
               />
               <div className="flex gap-1">
                 <button
                   type="button"
                   onClick={handleSalvarAluguel}
-                  className="bg-teal-500 text-bg text-[9px] px-2 py-1 font-sans font-black uppercase rounded block"
+                  className="bg-teal-500 text-bg text-[8px] sm:text-[9px] px-2 py-1 font-sans font-black uppercase rounded block"
                   style={{ color: '#022c22' }}
                 >
                   Salvar
@@ -1194,7 +1200,7 @@ export default function ControleCaixa({
                     setTempAluguel(aluguelCampoBase);
                     setIsEditingAluguel(false);
                   }}
-                  className="bg-white/10 text-white text-[9px] px-2 py-1 font-sans font-bold uppercase rounded block"
+                  className="bg-white/10 text-white text-[8px] sm:text-[9px] px-2 py-1 font-sans font-bold uppercase rounded block"
                 >
                   Sair
                 </button>
@@ -1202,20 +1208,20 @@ export default function ControleCaixa({
             </div>
           ) : (
             <>
-              <h4 className="text-2xl font-mono font-bold text-white mt-1.5">R$ {aluguelCampoBase.toFixed(2)}</h4>
-              <p className="text-[9px] text-emerald-300 mt-1 leading-normal font-sans">
+              <h4 className="text-lg sm:text-2xl font-mono font-bold text-white mt-1.5 sm:mt-2">R$ {aluguelCampoBase.toFixed(2)}</h4>
+              <p className="text-[8px] sm:text-[9px] text-emerald-300 mt-1 sm:mt-1.5 leading-normal font-sans">
                 {visaoEscopo === 'mensal'
-                  ? `Taxa de aluguel por jogo agendado. Incide débito automático de R$ ${aluguelCampoBase.toFixed(2)} a cada partida.`
+                  ? `Taxa por jogo agendado.`
                   : visaoEscopo === 'anual'
-                  ? `Custo total de aluguel do campo acumulado este ano: R$ ${despesaAluguelAno.toFixed(2)}.`
-                  : `Custo acumulado histórico de aluguel pago: R$ ${despesaAluguelConsolidado.toFixed(2)}.`}
+                  ? `Acumulado este ano: R$ ${despesaAluguelAno.toFixed(2)}.`
+                  : `Acumulado histórico pay: R$ ${despesaAluguelConsolidado.toFixed(2)}.`}
               </p>
               <button
                 type="button"
                 onClick={() => setIsEditingAluguel(true)}
-                className="mt-2 text-[9px] font-black uppercase tracking-wider text-teal-300 bg-white/5 border border-white/10 hover:border-teal-500/40 px-2 py-1 rounded inline-flex items-center gap-1 cursor-pointer"
+                className="mt-2 text-[8px] sm:text-[9px] font-black uppercase tracking-wider text-teal-300 bg-white/5 border border-white/10 hover:border-teal-500/40 px-2 py-1 rounded inline-flex items-center gap-1 cursor-pointer w-fit"
               >
-                <Sliders className="w-2.5 h-2.5" /> Reajustar Aluguel
+                <Sliders className="w-2.5 h-2.5" /> Reajustar
               </button>
             </>
           )}
@@ -2082,23 +2088,23 @@ export default function ControleCaixa({
       {/* SEÇÃO: CONTROLE DE INADIMPLÊNCIA / DÉBITOS PENDENTES */}
       <div 
         id="controle-inadimplencia-debitos-pendentes" 
-        className="bg-emerald-900/40 border border-rose-500/30 rounded-2xl p-6 shadow-xl backdrop-blur-sm space-y-4 text-left animate-fade-in text-white mb-6"
+        className="bg-emerald-900/40 border border-rose-500/30 rounded-2xl p-4 sm:p-6 shadow-xl backdrop-blur-sm space-y-4 text-left animate-fade-in text-white mb-6"
       >
         <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between border-b border-white/10 pb-4 gap-3">
           <div className="space-y-1">
-            <h3 className="font-display font-semibold text-base text-rose-450 flex items-center gap-2 uppercase tracking-wide">
-              <ShieldAlert className="w-5 h-5 text-rose-550 animate-pulse" />
+            <h3 className="font-display font-semibold text-sm sm:text-base text-rose-450 flex items-center gap-2 uppercase tracking-wide">
+              <ShieldAlert className="w-4.5 h-4.5 sm:w-5 sm:h-5 text-rose-555 animate-pulse" />
               Controle de Inadimplência &amp; Débitos Pendentes
             </h3>
-            <p className="text-xs text-emerald-300/80 font-sans">
+            <p className="text-[10.5px] sm:text-xs text-emerald-300/80 font-sans leading-normal">
               Listagem de atletas com pendências financeiras em aberto no campeonato (mensalidades atrasadas ou diárias de partidas confirmadas sem quitação).
             </p>
           </div>
-          <div className="flex items-center gap-2">
-            <span className="text-xs font-mono font-bold bg-rose-500/10 border border-rose-500/20 text-rose-300 px-3 py-1 rounded-full whitespace-nowrap">
+          <div className="flex flex-wrap items-center gap-1.5 sm:gap-2">
+            <span className="text-[10px] sm:text-xs font-mono font-bold bg-rose-500/10 border border-rose-500/20 text-rose-300 px-2.5 py-0.5 sm:px-3 sm:py-1 rounded-full whitespace-nowrap">
               {todosDebitosPendentes.length} Pendências Ativas
             </span>
-            <span className="text-xs font-mono font-bold bg-white/5 border border-white/10 text-white px-3 py-1 rounded-full whitespace-nowrap">
+            <span className="text-[10px] sm:text-xs font-mono font-bold bg-white/5 border border-white/10 text-white px-2.5 py-0.5 sm:px-3 sm:py-1 rounded-full whitespace-nowrap">
               Total Devido: R$ {todosDebitosPendentes.reduce((sum, d) => sum + d.valor, 0).toFixed(2)}
             </span>
           </div>

@@ -427,6 +427,7 @@ export default function App() {
   const [diaristaDebitosParaAlerta, setDiaristaDebitosParaAlerta] = useState<any[]>([]);
   const [mostrarPopUpAlertaAdminAprovacoes, setMostrarPopUpAlertaAdminAprovacoes] = useState(false);
   const [fotoZoomada, setFotoZoomada] = useState<{ url: string; nome?: string } | null>(null);
+  const [mobileProfileDropdownOpen, setMobileProfileDropdownOpen] = useState(false);
 
   // Expor função de zoom globalmente para todos os subcomponentes poderem usá-la
   useEffect(() => {
@@ -1145,82 +1146,290 @@ export default function App() {
 
           {/* Dados do Usuário Logado & Logout */}
           {jogadorAtual && (
-            <div className="flex items-center justify-between sm:justify-end gap-3.5 bg-emerald-950/60 p-2 rounded-lg border border-white/10 w-full sm:w-auto sm:min-w-[340px]">
-              
-              <div 
-                className="w-8 h-8 rounded-full flex items-center justify-center text-xs font-bold shrink-0 shadow-inner overflow-hidden cursor-zoom-in hover:scale-110 active:scale-95 transition-all duration-200"
-                style={{ backgroundColor: getSessaoAvatarProps(jogadorAtual.foto).color, color: getSessaoAvatarProps(jogadorAtual.foto).text === '⚪' ? '#fff' : '#000' }}
-                onClick={() => {
-                  if (jogadorAtual.foto && (jogadorAtual.foto.startsWith('http') || jogadorAtual.foto.startsWith('data:'))) {
-                     setFotoZoomada({ url: jogadorAtual.foto, nome: `${jogadorAtual.nome} ${jogadorAtual.sobrenome}` });
-                  }
-                }}
-                title={jogadorAtual.foto ? "Clique para ampliar a foto" : undefined}
-              >
-                {jogadorAtual.foto && (jogadorAtual.foto.startsWith('http') || jogadorAtual.foto.startsWith('data:')) ? (
-                  <img src={jogadorAtual.foto} className="w-full h-full object-cover rounded-full" alt="" referrerPolicy="no-referrer" />
-                ) : (
-                  jogadorAtual.posicao.substring(0, 1)
+            <>
+              {/* DESKTOP FLAT PROFILE CONTAINER */}
+              <div className="hidden sm:flex items-center justify-between sm:justify-end gap-3.5 bg-emerald-950/60 p-2 rounded-lg border border-white/10 w-full sm:w-auto sm:min-w-[340px]">
+                
+                <div 
+                  className="w-8 h-8 rounded-full flex items-center justify-center text-xs font-bold shrink-0 shadow-inner overflow-hidden cursor-zoom-in hover:scale-110 active:scale-95 transition-all duration-200"
+                  style={{ backgroundColor: getSessaoAvatarProps(jogadorAtual.foto).color, color: getSessaoAvatarProps(jogadorAtual.foto).text === '⚪' ? '#fff' : '#000' }}
+                  onClick={() => {
+                    if (jogadorAtual.foto && (jogadorAtual.foto.startsWith('http') || jogadorAtual.foto.startsWith('data:'))) {
+                       setFotoZoomada({ url: jogadorAtual.foto, nome: `${jogadorAtual.nome} ${jogadorAtual.sobrenome}` });
+                    }
+                  }}
+                  title={jogadorAtual.foto ? "Clique para ampliar a foto" : undefined}
+                >
+                  {jogadorAtual.foto && (jogadorAtual.foto.startsWith('http') || jogadorAtual.foto.startsWith('data:')) ? (
+                    <img src={jogadorAtual.foto} className="w-full h-full object-cover rounded-full" alt="" referrerPolicy="no-referrer" />
+                  ) : (
+                    jogadorAtual.posicao.substring(0, 1)
+                  )}
+                </div>
+
+                <div 
+                  id="header-perfil-edit-trigger"
+                  onClick={abrirModalPerfil}
+                  className="flex flex-col flex-1 cursor-pointer hover:bg-white/5 hover:border-white/20 px-2 py-1 rounded-lg transition-all border border-transparent select-none active:scale-97 min-w-0"
+                  title="Clique aqui para editar seu perfil"
+                >
+                  <div className="flex flex-col">
+                    <div className="flex flex-wrap items-center gap-1.5 min-w-0">
+                      <span id="nome-usuario-logado" className="text-xs font-bold text-white hover:text-teal-300 transition-colors leading-none decoration-dotted hover:underline underline-offset-2 truncate p-0.5">{jogadorAtual.nome} {jogadorAtual.sobrenome}</span>
+                      
+                      {jogadorAtual.membroStatus === 'mensalista' && (
+                        <span className="text-[8px] bg-indigo-600/95 text-white px-1.5 py-0.5 font-extrabold rounded whitespace-nowrap shadow-sm">MENSALISTA</span>
+                      )}
+                      {jogadorAtual.membroStatus === 'diarista' && (
+                        <span className="text-[8px] bg-cyan-600/95 text-white px-1.5 py-0.5 font-extrabold rounded whitespace-nowrap shadow-sm">DIARISTA</span>
+                      )}
+                      {jogadorAtual.membroStatus === 'isento' && (
+                        <span className="text-[8px] bg-emerald-600 text-white px-1.5 py-0.5 font-extrabold rounded whitespace-nowrap shadow-sm font-sans">ISENTO</span>
+                      )}
+                      
+                      {(jogadorAtualEfetivo?.isGold || jogadorAtual.isGold) && (
+                        <span className="text-[9px] bg-gradient-to-r from-amber-400 to-yellow-600 text-black px-1.5 py-0.5 font-extrabold rounded shadow-sm shadow-amber-500/20 whitespace-nowrap">GOLD 🏅</span>
+                      )}
+                      
+                      {jogadorAtual.role === 'admin' && (
+                        <span className="text-[8px] bg-amber-500 text-black px-1 py-0.5 font-extrabold rounded">ADM</span>
+                      )}
+                    </div>
+                    
+                    <p className="text-[9px] text-emerald-400/80 font-sans tracking-wide mt-0.5">
+                      {jogadorAtual.posicao} • {jogadorAtual.dataNascimento ? `${calcularIdade(jogadorAtual.dataNascimento)} anos` : '-- anos'}
+                    </p>
+                  </div>
+                </div>
+
+                <div className="border-l border-white/10 h-6 mx-0.5" />
+
+                <button
+                  id="btn-header-logout"
+                  type="button"
+                  onClick={handleLogoutClick}
+                  className="p-1.5 rounded-md hover:bg-white/10 text-emerald-300 hover:text-rose-400 transition-colors"
+                  title="Sair do Portal"
+                >
+                  <LogOut className="w-4 h-4" />
+                </button>
+              </div>
+
+              {/* MOBILE DROPDOWN PROFILE CONTAINER */}
+              <div className="relative flex sm:hidden w-full select-none">
+                <button
+                  id="mobile-profile-dropdown-trigger"
+                  type="button"
+                  onClick={() => setMobileProfileDropdownOpen(!mobileProfileDropdownOpen)}
+                  className="flex items-center justify-between w-full bg-emerald-950/60 p-2.5 rounded-xl border border-white/10 text-left active:scale-98 transition-all"
+                >
+                  <div className="flex items-center gap-2.5 min-w-0">
+                    <div 
+                      className="w-8 h-8 rounded-full flex items-center justify-center text-xs font-bold shrink-0 shadow-inner overflow-hidden"
+                      style={{ backgroundColor: getSessaoAvatarProps(jogadorAtual.foto).color, color: getSessaoAvatarProps(jogadorAtual.foto).text === '⚪' ? '#fff' : '#000' }}
+                    >
+                      {jogadorAtual.foto && (jogadorAtual.foto.startsWith('http') || jogadorAtual.foto.startsWith('data:')) ? (
+                        <img src={jogadorAtual.foto} className="w-full h-full object-cover rounded-full" alt="" referrerPolicy="no-referrer" />
+                      ) : (
+                        jogadorAtual.posicao.substring(0, 1)
+                      )}
+                    </div>
+                    <div className="truncate">
+                      <span className="text-xs font-extrabold text-white block truncate leading-tight">
+                        {jogadorAtual.nome} {jogadorAtual.sobrenome}
+                      </span>
+                      <span className="text-[9px] text-emerald-350 font-mono tracking-wider">
+                        {jogadorAtual.posicao} • OPTIONS / OPÇÕES
+                      </span>
+                    </div>
+                  </div>
+
+                  <div className="flex items-center gap-1.5 shrink-0 ml-2">
+                    <span className="text-[10px] text-zinc-400 font-bold uppercase tracking-wider font-mono">Menu</span>
+                    <svg
+                      className={`w-4 h-4 text-emerald-400 transition-transform duration-200 ${mobileProfileDropdownOpen ? 'rotate-180' : ''}`}
+                      fill="none"
+                      stroke="currentColor"
+                      viewBox="0 0 24 24"
+                    >
+                      <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2.5} d="M19 9l-7 7-7-7" />
+                    </svg>
+                  </div>
+                </button>
+
+                {mobileProfileDropdownOpen && (
+                  <div 
+                    id="mobile-profile-dropdown-menu"
+                    className="absolute top-full left-0 right-0 mt-2 bg-zinc-950 border border-white/10 rounded-2xl shadow-2xl p-4.5 z-45 space-y-3.5 animate-in fade-in slide-in-from-top-2 duration-200"
+                  >
+                    {/* User Profile Summary */}
+                    <div className="border-b border-white/5 pb-3">
+                      <div className="flex items-center gap-3">
+                        <div 
+                          className="w-11 h-11 rounded-full flex items-center justify-center text-sm font-bold shrink-0 shadow-inner overflow-hidden cursor-zoom-in"
+                          style={{ backgroundColor: getSessaoAvatarProps(jogadorAtual.foto).color, color: getSessaoAvatarProps(jogadorAtual.foto).text === '⚪' ? '#fff' : '#000' }}
+                          onClick={() => {
+                            if (jogadorAtual.foto && (jogadorAtual.foto.startsWith('http') || jogadorAtual.foto.startsWith('data:'))) {
+                              setFotoZoomada({ url: jogadorAtual.foto, nome: `${jogadorAtual.nome} ${jogadorAtual.sobrenome}` });
+                            }
+                          }}
+                        >
+                          {jogadorAtual.foto && (jogadorAtual.foto.startsWith('http') || jogadorAtual.foto.startsWith('data:')) ? (
+                            <img src={jogadorAtual.foto} className="w-full h-full object-cover rounded-full" alt="" referrerPolicy="no-referrer" />
+                          ) : (
+                            jogadorAtual.posicao.substring(0, 1)
+                          )}
+                        </div>
+                        <div>
+                          <h4 className="text-sm font-black text-white">{jogadorAtual.nome} {jogadorAtual.sobrenome}</h4>
+                          <p className="text-[10.5px] text-zinc-400 font-medium">
+                            {jogadorAtual.posicao} • {jogadorAtual.dataNascimento ? `${calcularIdade(jogadorAtual.dataNascimento)} anos` : '-- anos'}
+                          </p>
+                        </div>
+                      </div>
+
+                      <div className="flex flex-wrap gap-1.5 mt-3">
+                        {jogadorAtual.membroStatus === 'mensalista' && (
+                          <span className="text-[8px] bg-indigo-600/95 text-white px-2 py-0.5 font-black uppercase rounded shadow-sm">MENSALISTA</span>
+                        )}
+                        {jogadorAtual.membroStatus === 'diarista' && (
+                          <span className="text-[8px] bg-cyan-600/95 text-white px-2 py-0.5 font-black uppercase rounded shadow-sm">DIARISTA</span>
+                        )}
+                        {jogadorAtual.membroStatus === 'isento' && (
+                          <span className="text-[8px] bg-emerald-600 text-white px-2 py-0.5 font-black uppercase rounded shadow-sm">ISENTO</span>
+                        )}
+                        {(jogadorAtualEfetivo?.isGold || jogadorAtual.isGold) && (
+                          <span className="text-[8px] bg-gradient-to-r from-amber-400 to-yellow-600 text-black px-2 py-0.5 font-black rounded shadow-sm">GOLD 🏅</span>
+                        )}
+                        {jogadorAtual.role === 'admin' && (
+                          <span className="text-[8px] bg-amber-500 text-black px-1.5 py-0.5 font-black rounded">ADM</span>
+                        )}
+                      </div>
+                    </div>
+
+                    {/* Quick Profile & Tab Actions */}
+                    <div className="space-y-1.5">
+                      <button
+                        id="mobile-profile-btn-editar"
+                        type="button"
+                        onClick={() => {
+                          abrirModalPerfil();
+                          setMobileProfileDropdownOpen(false);
+                        }}
+                        className="w-full flex items-center justify-between text-xs font-bold text-zinc-200 hover:text-white bg-white/5 hover:bg-white/10 px-3.5 py-2.5 rounded-xl border border-white/5 transition-colors cursor-pointer"
+                      >
+                        <span className="flex items-center gap-2">
+                          <User className="w-4 h-4 text-emerald-400" />
+                          Meus Dados / Perfil
+                        </span>
+                        <span className="text-[9px] text-emerald-400 font-mono font-bold uppercase bg-emerald-950/60 px-1.5 py-0.5 rounded border border-emerald-500/10">Editar</span>
+                      </button>
+
+                      {/* Other tabs inside mobile dropdown */}
+                      <button
+                        id="mobile-profile-btn-historico"
+                        type="button"
+                        onClick={() => {
+                          setActiveTab('historico');
+                          setMobileProfileDropdownOpen(false);
+                        }}
+                        className={`w-full flex items-center gap-2 text-xs font-bold px-3.5 py-2.5 rounded-xl border transition-colors cursor-pointer ${
+                          activeTab === 'historico'
+                            ? 'text-teal-400 bg-teal-500/10 border-teal-500/20'
+                            : 'text-zinc-300 hover:text-white bg-white/5 hover:bg-white/10 border-white/5'
+                        }`}
+                      >
+                        <History className="w-4 h-4 text-emerald-400" />
+                        Histórico de Jogos
+                      </button>
+
+                      {jogadorAtual.role === 'admin' && (
+                        <>
+                          <div className="text-[9px] text-amber-500 font-mono tracking-widest uppercase font-bold pt-1.5 pb-0.5">Admin Painéis</div>
+
+                          <button
+                            id="mobile-profile-btn-caixa"
+                            type="button"
+                            onClick={() => {
+                              setActiveTab('caixa');
+                              setMobileProfileDropdownOpen(false);
+                            }}
+                            className={`w-full flex items-center gap-2 text-xs font-bold px-3.5 py-2.5 rounded-xl border transition-all cursor-pointer ${
+                              activeTab === 'caixa'
+                                ? 'text-teal-400 bg-teal-500/10 border-teal-500/20 shadow-md'
+                                : 'text-zinc-300 hover:text-white bg-white/5 hover:bg-white/10 border-white/5'
+                            }`}
+                          >
+                            <TrendingUp className="w-4 h-4 text-emerald-400" />
+                            Finanças Gerais (Caixa)
+                          </button>
+
+                          <button
+                            id="mobile-profile-btn-admin"
+                            type="button"
+                            onClick={() => {
+                              setActiveTab('admin');
+                              setMobileProfileDropdownOpen(false);
+                            }}
+                            className={`w-full flex items-center gap-2 text-xs font-bold px-3.5 py-2.5 rounded-xl border transition-all cursor-pointer ${
+                              activeTab === 'admin'
+                                ? 'text-teal-400 bg-teal-500/10 border-teal-500/20 shadow-md'
+                                : 'text-zinc-300 hover:text-white bg-white/5 hover:bg-white/10 border-white/5'
+                            }`}
+                          >
+                            <Award className="w-4 h-4 text-emerald-400" />
+                            Painel de Aprovações
+                          </button>
+
+                          <button
+                            id="mobile-profile-btn-configuracao"
+                            type="button"
+                            onClick={() => {
+                              setActiveTab('configuracao');
+                              setMobileProfileDropdownOpen(false);
+                            }}
+                            className={`w-full flex items-center gap-2 text-xs font-bold px-3.5 py-2.5 rounded-xl border transition-all cursor-pointer ${
+                              activeTab === 'configuracao'
+                                ? 'text-teal-400 bg-teal-500/10 border-teal-500/20 shadow-md'
+                                : 'text-zinc-300 hover:text-white bg-white/5 hover:bg-white/10 border-white/5'
+                            }`}
+                          >
+                            <Settings className="w-4 h-4 text-emerald-400" />
+                            Configurações Gerais
+                          </button>
+                        </>
+                      )}
+                    </div>
+
+                    {/* Logout Button */}
+                    <div className="border-t border-white/5 pt-3">
+                      <button
+                        id="mobile-profile-btn-logout"
+                        type="button"
+                        onClick={() => {
+                          setMobileProfileDropdownOpen(false);
+                          handleLogoutClick();
+                        }}
+                        className="w-full flex items-center justify-center gap-2 text-xs font-black text-rose-450 hover:text-white hover:bg-rose-950/20 border border-rose-500/25 py-2.5 rounded-xl transition-all cursor-pointer hover:shadow-lg active:scale-97"
+                      >
+                        <LogOut className="w-4 h-4 text-rose-500" />
+                        Terminar Sessão / Sair
+                      </button>
+                    </div>
+                  </div>
                 )}
               </div>
-
-              <div 
-                id="header-perfil-edit-trigger"
-                onClick={abrirModalPerfil}
-                className="flex flex-col flex-1 cursor-pointer hover:bg-white/5 hover:border-white/20 px-2 py-1 rounded-lg transition-all border border-transparent select-none active:scale-97 min-w-0"
-                title="Clique aqui para editar seu perfil"
-              >
-                <div className="flex flex-col">
-                  <div className="flex flex-wrap items-center gap-1.5 min-w-0">
-                    <span id="nome-usuario-logado" className="text-xs font-bold text-white hover:text-teal-300 transition-colors leading-none decoration-dotted hover:underline underline-offset-2 truncate p-0.5">{jogadorAtual.nome} {jogadorAtual.sobrenome}</span>
-                    
-                    {jogadorAtual.membroStatus === 'mensalista' && (
-                      <span className="text-[8px] bg-indigo-600/95 text-white px-1.5 py-0.5 font-extrabold rounded whitespace-nowrap shadow-sm">MENSALISTA</span>
-                    )}
-                    {jogadorAtual.membroStatus === 'diarista' && (
-                      <span className="text-[8px] bg-cyan-600/95 text-white px-1.5 py-0.5 font-extrabold rounded whitespace-nowrap shadow-sm">DIARISTA</span>
-                    )}
-                    {jogadorAtual.membroStatus === 'isento' && (
-                      <span className="text-[8px] bg-emerald-600 text-white px-1.5 py-0.5 font-extrabold rounded whitespace-nowrap shadow-sm font-sans">ISENTO</span>
-                    )}
-                    
-                    {(jogadorAtualEfetivo?.isGold || jogadorAtual.isGold) && (
-                      <span className="text-[9px] bg-gradient-to-r from-amber-400 to-yellow-600 text-black px-1.5 py-0.5 font-extrabold rounded shadow-sm shadow-amber-500/20 whitespace-nowrap">GOLD 🏅</span>
-                    )}
-                    
-                    {jogadorAtual.role === 'admin' && (
-                      <span className="text-[8px] bg-amber-500 text-black px-1 py-0.5 font-extrabold rounded">ADM</span>
-                    )}
-                  </div>
-                  
-                  <p className="text-[9px] text-emerald-400/80 font-sans tracking-wide mt-0.5">
-                    {jogadorAtual.posicao} • {jogadorAtual.dataNascimento ? `${calcularIdade(jogadorAtual.dataNascimento)} anos` : '-- anos'}
-                  </p>
-                </div>
-              </div>
-
-              <div className="border-l border-white/10 h-6 mx-0.5" />
-
-              <button
-                id="btn-header-logout"
-                type="button"
-                onClick={handleLogoutClick}
-                className="p-1.5 rounded-md hover:bg-white/10 text-emerald-300 hover:text-rose-400 transition-colors"
-                title="Sair do Portal"
-              >
-                <LogOut className="w-4 h-4" />
-              </button>
-            </div>
+            </>
           )}
         </div>
       </header>
 
       {/* ÁREA DE CONTEÚDO PRINCIPAL COM LAYOUT FLEX ADAPTÁVEL PARA CELULAR (flex-col) E DESKTOP (flex-row) */}
-      <div className={`flex-grow w-full max-w-7xl mx-auto flex flex-col md:flex-row items-start p-3 sm:p-4 md:p-6 gap-4 sm:gap-5 md:gap-6 relative z-10`}>
+      <div className={`flex-grow w-full max-w-7xl mx-auto flex flex-col md:flex-row items-start p-3 sm:p-4 md:p-6 pb-28 md:pb-6 gap-4 sm:gap-5 md:gap-6 relative z-10`}>
         
-        {/* MENU NAVEGAÇÃO HORIZONTAL NO CELULAR / VERTICAL NO DESKTOP (Somente se autenticado) */}
+        {/* MENU NAVEGAÇÃO DE DESKTOP (Somente se autenticado) */}
         {jogadorAtual && (
-          <aside className="w-full md:w-64 shrink-0 p-2 md:p-4 rounded-2xl bg-emerald-900/25 border border-white/10 md:sticky md:top-24 gap-1.5 md:gap-2 flex flex-row flex-wrap md:flex-col shadow-xl backdrop-blur-md select-none justify-center md:justify-start">
+          <aside className="hidden md:flex md:flex-col w-64 shrink-0 p-4 rounded-2xl bg-emerald-900/25 border border-white/10 md:sticky md:top-24 gap-2 shadow-xl backdrop-blur-md select-none justify-start">
             
             <div className="hidden md:block px-3.5 pb-2 border-b border-white/5 text-[10px] font-bold text-emerald-400 uppercase tracking-widest font-mono shrink-0 w-full">
               Menu de Acesso
@@ -2233,6 +2442,101 @@ export default function App() {
               Clique fora ou no botão para fechar
             </div>
           </div>
+        </div>
+      )}
+
+      {/* MOBILE FLOATING BOTTOM NAVIGATION MENU */}
+      {jogadorAtual && (
+        <div className="md:hidden fixed bottom-4 left-4 right-4 z-40 bg-zinc-950/95 border border-white/10 backdrop-blur-md rounded-2xl shadow-2xl py-2 px-3 flex items-center justify-around select-none">
+          {/* Icone 1 - Calendario (somente icone) */}
+          <button
+            id="mobile-nav-calendario"
+            type="button"
+            onClick={() => {
+              setActiveTab('calendario');
+              setMobileProfileDropdownOpen(false);
+            }}
+            className={`p-2.5 rounded-xl transition-all duration-200 cursor-pointer ${
+              activeTab === 'calendario' 
+                ? 'text-teal-400 bg-white/5 scale-110 shadow-inner' 
+                : 'text-zinc-400 hover:text-white'
+            }`}
+            title="Calendário"
+          >
+            <Calendar className="w-5.5 h-5.5" />
+          </button>
+
+          {/* Icone 2 - Mensalistas (Somente icone) */}
+          <button
+            id="mobile-nav-mensalistas"
+            type="button"
+            onClick={() => {
+              setActiveTab('mensalistas');
+              setMobileProfileDropdownOpen(false);
+            }}
+            className={`p-2.5 rounded-xl transition-all duration-200 cursor-pointer ${
+              activeTab === 'mensalistas' 
+                ? 'text-teal-400 bg-white/5 scale-110 shadow-inner' 
+                : 'text-zinc-400 hover:text-white'
+            }`}
+            title="Mensalistas"
+          >
+            <UserCheck className="w-5.5 h-5.5" />
+          </button>
+
+          {/* Icone 3 - Confirmação (somente icone, com destaque sendo um pouco maior) */}
+          <button
+            id="mobile-nav-confirmacao"
+            type="button"
+            onClick={() => {
+              setActiveTab('confirmacao');
+              setMobileProfileDropdownOpen(false);
+            }}
+            className={`p-3 rounded-full transition-all duration-200 cursor-pointer ${
+              activeTab === 'confirmacao' 
+                ? 'bg-teal-500 text-black scale-115 shadow-lg shadow-teal-500/20 ring-4 ring-zinc-950' 
+                : 'bg-emerald-600 text-white hover:bg-emerald-500 scale-105 shadow-md ring-4 ring-zinc-950'
+            }`}
+            title="Confirmação"
+          >
+            <CheckSquare className="w-6.5 h-6.5" />
+          </button>
+
+          {/* Icone 4 - Participantes (Somente icone) */}
+          <button
+            id="mobile-nav-elenco"
+            type="button"
+            onClick={() => {
+              setActiveTab('elenco');
+              setMobileProfileDropdownOpen(false);
+            }}
+            className={`p-2.5 rounded-xl transition-all duration-200 cursor-pointer ${
+              activeTab === 'elenco' 
+                ? 'text-teal-400 bg-white/5 scale-110 shadow-inner' 
+                : 'text-zinc-400 hover:text-white'
+            }`}
+            title="Participantes"
+          >
+            <Users className="w-5.5 h-5.5" />
+          </button>
+
+          {/* Icone 5 - Pagamentos (Somente icone) */}
+          <button
+            id="mobile-nav-financeiro"
+            type="button"
+            onClick={() => {
+              setActiveTab('financeiro');
+              setMobileProfileDropdownOpen(false);
+            }}
+            className={`p-2.5 rounded-xl transition-all duration-200 cursor-pointer ${
+              activeTab === 'financeiro' 
+                ? 'text-teal-400 bg-white/5 scale-110 shadow-inner' 
+                : 'text-zinc-400 hover:text-white'
+            }`}
+            title="Pagamentos"
+          >
+            <DollarSign className="w-5.5 h-5.5" />
+          </button>
         </div>
       )}
 
