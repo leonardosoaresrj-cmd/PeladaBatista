@@ -26,9 +26,26 @@ import {
   ShieldAlert,
   X,
   Users,
-  Pencil
+  Pencil,
+  Download
 } from 'lucide-react';
 import { obterDebitosDoJogador } from '../utils/confirmationRules';
+import { jsPDF } from 'jspdf';
+import {
+  ResponsiveContainer,
+  AreaChart,
+  Area,
+  BarChart,
+  Bar,
+  XAxis,
+  YAxis,
+  CartesianGrid,
+  Tooltip,
+  Legend,
+  PieChart,
+  Pie,
+  Cell
+} from 'recharts';
 
 interface ControleCaixaProps {
   partidas: Partida[];
@@ -960,6 +977,305 @@ export default function ControleCaixa({
     ? saldoLiquidoAno 
     : saldoLiquidoConsolidado;
 
+  // --- DADOS PARA OS GRÁFICOS DINÂMICOS ---
+  const dadosGrafico = useMemo(() => {
+    if (visaoEscopo === 'mensal') {
+      // Filtrar partidas ordenadas do mês selecionado
+      const games = [...partidasDoMesSorted];
+      let somaAcumulado = 0;
+      
+      const res = games.map((game) => {
+        const mesPartida = game.data.substring(0, 7);
+        const atletasDoJogo = game.confirmados.map(id => jogadores.find(j => j.id === id)).filter(Boolean) as Jogador[];
+        
+        const diaristas = atletasDoJogo.filter(j => j.membroStatus === 'diarista');
+        const mensalistas = atletasDoJogo.filter(j => j.membroStatus === 'mensalista');
+        
+        const recDiaristas = diaristas.reduce((sum, d) => {
+          const pag = pagamentos.find(p => p.jogadorId === d.id && p.mesRef === mesPartida && p.status === 'pago');
+          return sum + (pag ? pag.valor : 0);
+        }, 0);
+        
+        const recMensalistas = mensalistas.reduce((sum, m) => {
+          const pag = pagamentos.find(p => p.jogadorId === m.id && p.mesRef === mesPartida && p.status === 'pago');
+          if (pag) {
+            return sum + (pag.valor / (numSabados || 4));
+          }
+          return sum;
+        }, 0);
+        
+        const receita = recDiaristas + recMensalistas;
+        const despesa = getAluguelDoMes(mesPartida);
+        const saldo = receita - despesa;
+        somaAcumulado += saldo;
+        
+        const diaMez = game.data.split('-').slice(1).reverse().join('/');
+        
+        return {
+          name: `Jogo ${diaMez}`,
+          receita: Number(receita.toFixed(2)),
+          despesa: Number(despesa.toFixed(2)),
+          saldo: Number(saldo.toFixed(2)),
+          acumulado: Number(somaAcumulado.toFixed(2))
+        };
+      });
+
+      // Se não houver jogos no mês, trazer um ponto focado no saldo gerado de lançamentos avulsos
+      if (res.length === 0) {
+        return [{
+          name: 'Sem Jogo',
+          receita: receitaTotalGeral,
+          despesa: despesaTotalGeral,
+          saldo: saldoLiquidoMês,
+          acumulado: saldoLiquidoMês
+        }];
+      }
+      return res;
+    } else if (visaoEscopo === 'anual') {
+      let somaAcumulado = 0;
+      const res = consolidadoMensalDoAno.map(m => {
+        somaAcumulado += m.saldo;
+        return {
+          name: m.nome.substring(0, 3),
+          receita: Number(m.receitaTotal.toFixed(2)),
+          despesa: Number(m.despesaTotal.toFixed(2)),
+          saldo: Number(m.saldo.toFixed(2)),
+          acumulado: Number(somaAcumulado.toFixed(2))
+        };
+      });
+      return res.length > 0 ? res : [{ name: 'Sem info', receita: 0, despesa: 0, saldo: 0, acumulado: 0 }];
+    } else {
+      let somaAcumulado = 0;
+      const historicoCrescente = [...consolidadoMensalHistorico].reverse();
+      const res = historicoCrescente.map(m => {
+        somaAcumulado += m.saldo;
+        const [ano, mes] = m.mesRef.split('-');
+        const nomeMesAbrev = m.nome.split(' de ')[0].substring(0, 3);
+        return {
+          name: `${nomeMesAbrev}/${ano.substring(2)}`,
+          receita: Number(m.receitaTotal.toFixed(2)),
+          despesa: Number(m.despesaTotal.toFixed(2)),
+          saldo: Number(m.saldo.toFixed(2)),
+          acumulado: Number(somaAcumulado.toFixed(2))
+        };
+      });
+      return res.length > 0 ? res : [{ name: 'Sem info', receita: 0, despesa: 0, saldo: 0, acumulado: 0 }];
+    }
+  }, [visaoEscopo, partidasDoMesSorted, jogadores, pagamentos, numSabados, consolidadoMensalDoAno, consolidadoMensalHistorico, receitaTotalGeral, despesaTotalGeral, saldoLiquidoMês]);
+
+  // --- ARRECADAÇÃO DE CATEGORIAS ---
+  const streamBreakdown = useMemo(() => {
+    const recMensalIndex = visaoEscopo === 'mensal' ? receitaMensalistas : visaoEscopo === 'anual' ? receitaMensalistasAno : receitaMensalistasConsolidado;
+    const recDiarIndex = visaoEscopo === 'mensal' ? receitaDiaristas : visaoEscopo === 'anual' ? receitaDiaristasAno : receitaDiaristasConsolidado;
+    const recAvulsaIndex = visaoEscopo === 'mensal' ? receitaAvulsaTotal : visaoEscopo === 'anual' ? receitaAvulsaAno : receitaAvulsaConsolidado;
+
+    const despAluguelIndex = visaoEscopo === 'mensal' ? despesaAluguelAutomatico : visaoEscopo === 'anual' ? despesaAluguelAno : despesaAluguelConsolidado;
+    const despAvulsaIndex = visaoEscopo === 'mensal' ? despesaAvulsaTotal : visaoEscopo === 'anual' ? despesaAvulsaAno : despesaAvulsaConsolidado;
+
+    return {
+      receitas: [
+        { name: 'Mensalistas', value: recMensalIndex, color: '#14b8a6' },
+        { name: 'Diaristas', value: recDiarIndex, color: '#34d399' },
+        { name: 'Avulsas/Extras', value: recAvulsaIndex, color: '#a7f3d0' }
+      ].filter(x => x.value > 0),
+      despesas: [
+        { name: 'Aluguel do Campo', value: despAluguelIndex, color: '#f87171' },
+        { name: 'Extras/Goleiros/Outros', value: despAvulsaIndex, color: '#fca5a5' }
+      ].filter(x => x.value > 0)
+    };
+  }, [visaoEscopo, receitaMensalistas, receitaMensalistasAno, receitaMensalistasConsolidado, receitaDiaristas, receitaDiaristasAno, receitaDiaristasConsolidado, receitaAvulsaTotal, receitaAvulsaAno, receitaAvulsaConsolidado, despesaAluguelAutomatico, despesaAluguelAno, despesaAluguelConsolidado, despesaAvulsaTotal, despesaAvulsaAno, despesaAvulsaConsolidado]);
+
+  // --- GERADOR DE RELATÓRIO PDF ---
+  const handleExportarPDF = () => {
+    const doc = new jsPDF({
+      orientation: 'portrait',
+      unit: 'mm',
+      format: 'a4'
+    });
+
+    // Paleta de cores executiva
+    const primaryColor = [2, 44, 34]; // Deep Emerald
+    const secondaryColor = [20, 184, 166]; // Teal
+    const darkTextColor = [30, 41, 59]; // Slate
+    const lightBgColor = [248, 250, 252]; // Slate 50
+    const accentColor = [220, 38, 38]; // Red
+
+    // Cabeçalho institucional
+    doc.setFillColor(primaryColor[0], primaryColor[1], primaryColor[2]);
+    doc.rect(0, 0, 210, 42, 'F');
+
+    doc.setTextColor(255, 255, 255);
+    doc.setFont('Helvetica', 'bold');
+    doc.setFontSize(20);
+    doc.text('SISTEMA DE GESTÃO DA PELADA', 15, 16);
+    
+    doc.setFont('Helvetica', 'normal');
+    doc.setFontSize(10);
+    doc.setTextColor(180, 220, 200);
+    doc.text('DASHBOARD & DEMONSTRATIVO FINANCEIRO EXECUTIVO DA PELADA BATISTA SÁBADO', 15, 24);
+
+    // Detalhes da geração
+    doc.setFontSize(8);
+    doc.setTextColor(140, 180, 160);
+    doc.text('Emissão: 21/06/2026 10:01:50 | Gerado em conformidade com as regras financeiras da liga oficial', 15, 33);
+
+    // Identificação do Filtro / Escopo
+    let escopoTexto = '';
+    if (visaoEscopo === 'mensal') {
+      const [ano, mes] = mesSelecionado.split('-');
+      const nomes = ['Janeiro', 'Fevereiro', 'Março', 'Abril', 'Maio', 'Junho', 'Julho', 'Agosto', 'Setembro', 'Outubro', 'Novembro', 'Dezembro'];
+      escopoTexto = `Ciclo Mensal: ${nomes[parseInt(mes) - 1] || mes} de ${ano}`;
+    } else if (visaoEscopo === 'anual') {
+      escopoTexto = `Consolidado Anual de ${anoSelecionado}`;
+    } else {
+      escopoTexto = 'Visão de Consolidado Histórico Geral';
+    }
+
+    doc.setTextColor(primaryColor[0], primaryColor[1], primaryColor[2]);
+    doc.setFont('Helvetica', 'bold');
+    doc.setFontSize(13);
+    doc.text('1. Resumo do Balanço Geral', 15, 54);
+    
+    doc.setFont('Helvetica', 'normal');
+    doc.setFontSize(10);
+    doc.setTextColor(darkTextColor[0], darkTextColor[1], darkTextColor[2]);
+    doc.text('Filtro de Relatório Ativo: ', 15, 61);
+    doc.setFont('Helvetica', 'bold');
+    doc.text(escopoTexto, 52, 61);
+
+    // Cards numéricos de resumo
+    // Card 1: Receita
+    doc.setFillColor(lightBgColor[0], lightBgColor[1], lightBgColor[2]);
+    doc.roundedRect(15, 67, 56, 24, 2, 2, 'F');
+    doc.setFont('Helvetica', 'normal');
+    doc.setFontSize(8);
+    doc.setTextColor(100, 116, 139);
+    doc.text('FATURAMENTO BRUTO', 19, 74);
+    doc.setFont('Helvetica', 'bold');
+    doc.setFontSize(11);
+    doc.setTextColor(2, 44, 34);
+    doc.text(`R$ ${receitaVisualizar.toFixed(2)}`, 19, 82);
+
+    // Card 2: Despesa
+    doc.setFillColor(lightBgColor[0], lightBgColor[1], lightBgColor[2]);
+    doc.roundedRect(77, 67, 56, 24, 2, 2, 'F');
+    doc.setFont('Helvetica', 'normal');
+    doc.setFontSize(8);
+    doc.setTextColor(100, 116, 139);
+    doc.text('CUSTO CSTR/DESPESAS', 81, 74);
+    doc.setFont('Helvetica', 'bold');
+    doc.setFontSize(11);
+    doc.setTextColor(accentColor[0], accentColor[1], accentColor[2]);
+    doc.text(`R$ ${despesaVisualizar.toFixed(2)}`, 81, 82);
+
+    // Card 3: Saldo
+    const isSuperavit = saldoLiquidoVisualizar >= 0;
+    doc.setFillColor(lightBgColor[0], lightBgColor[1], lightBgColor[2]);
+    doc.roundedRect(139, 67, 56, 24, 2, 2, 'F');
+    doc.setFont('Helvetica', 'normal');
+    doc.setFontSize(8);
+    doc.setTextColor(100, 116, 139);
+    doc.text('CAIXA LÍQUIDO', 143, 74);
+    doc.setFont('Helvetica', 'bold');
+    doc.setFontSize(11);
+    doc.setTextColor(isSuperavit ? 16 : 220, isSuperavit ? 120 : 38, isSuperavit ? 80 : 38);
+    doc.text(`R$ ${saldoLiquidoVisualizar.toFixed(2)} (${isSuperavit ? 'LUCRO' : 'DÉFICIT'})`, 143, 82);
+
+    // Seção de Fontes/Destino
+    doc.setTextColor(primaryColor[0], primaryColor[1], primaryColor[2]);
+    doc.setFont('Helvetica', 'bold');
+    doc.setFontSize(13);
+    doc.text('2. Detalhamento de Fluxos de Arrecadação e Custos', 15, 102);
+
+    // Desenhar Tabela de Categorias
+    doc.setFontSize(8.5);
+    doc.setFillColor(31, 41, 55);
+    doc.rect(15, 107, 180, 8, 'F');
+    doc.setTextColor(255, 255, 255);
+    doc.setFont('Helvetica', 'bold');
+    doc.text('CATEGORIA FINANCEIRA', 18, 112);
+    doc.text('ORIGEM/DESTINO DETALHADO', 85, 112);
+    doc.text('MONANTE (R$)', 155, 112);
+
+    const dataRows = [
+      { cat: 'Arrecadação de Mensalistas', dest: 'Membros com status fixo mensal ativo', val: receitaMensalistasVisualizar },
+      { cat: 'Arrecadação de Diaristas', dest: 'Frequência avulsa por partida', val: receitaDiaristasVisualizar },
+      { cat: 'Arrecadação de Avulsas/Extras', dest: 'Lançamentos esporádicos e doações', val: receitaAvulsaVisualizar },
+      { cat: 'Custo de Aluguel de Campo', dest: 'Locação contratual do gramado', val: despesaAluguelVisualizar },
+      { cat: 'Outras Despesas e Suplementações', dest: 'Materiais extras, bolas, goleiros e isenções', val: despesaAvulsaVisualizar }
+    ];
+
+    let rowY = 115;
+    doc.setFont('Helvetica', 'normal');
+    doc.setTextColor(darkTextColor[0], darkTextColor[1], darkTextColor[2]);
+    dataRows.forEach((row, i) => {
+      doc.setFillColor(i % 2 === 0 ? 255 : 244, i % 2 === 0 ? 255 : 246, i % 2 === 0 ? 255 : 248);
+      doc.rect(15, rowY, 180, 7, 'F');
+      
+      doc.setTextColor(darkTextColor[0], darkTextColor[1], darkTextColor[2]);
+      doc.setFont('Helvetica', 'bold');
+      doc.text(row.cat, 18, rowY + 4.5);
+      
+      doc.setFont('Helvetica', 'normal');
+      doc.text(row.dest, 85, rowY + 4.5);
+      
+      doc.setFont('Helvetica', 'bold');
+      doc.text(`R$ ${row.val.toFixed(2)}`, 155, rowY + 4.5);
+      rowY += 7;
+    });
+
+    // Seção de Evolução Temporal / Linha de Tempo
+    doc.setTextColor(primaryColor[0], primaryColor[1], primaryColor[2]);
+    doc.setFont('Helvetica', 'bold');
+    doc.setFontSize(13);
+    doc.text('3. Demonstrativo de Evolução Sequencial (Curva S)', 15, 160);
+
+    // Desenhar Tabela Cronológica
+    doc.setFontSize(8.5);
+    doc.setFillColor(31, 41, 55);
+    doc.rect(15, 165, 180, 8, 'F');
+    doc.setTextColor(255, 255, 255);
+    doc.setFont('Helvetica', 'bold');
+    doc.text('PERÍODO/REF', 18, 170);
+    doc.text('RECEITAS (R$)', 65, 170);
+    doc.text('DESPESAS (R$)', 115, 170);
+    doc.text('BALANÇO ACUMULADO (R$)', 150, 170);
+
+    let listY = 173;
+    doc.setFont('Helvetica', 'normal');
+    doc.setTextColor(darkTextColor[0], darkTextColor[1], darkTextColor[2]);
+
+    dadosGrafico.forEach((pt, i) => {
+      if (listY > 260) return; // Prevent overflow on single page limits
+      doc.setFillColor(i % 2 === 0 ? 255 : 244, i % 2 === 0 ? 255 : 246, i % 2 === 0 ? 255 : 248);
+      doc.rect(15, listY, 180, 7.5, 'F');
+
+      doc.setTextColor(darkTextColor[0], darkTextColor[1], darkTextColor[2]);
+      doc.setFont('Helvetica', 'bold');
+      doc.text(pt.name, 18, listY + 5);
+
+      doc.setFont('Helvetica', 'normal');
+      doc.text(`R$ ${pt.receita.toFixed(2)}`, 65, listY + 5);
+      doc.text(`R$ ${pt.despesa.toFixed(2)}`, 115, listY + 5);
+
+      doc.setFont('Helvetica', 'bold');
+      const balanceVal = pt.acumulado;
+      doc.setTextColor(balanceVal >= 0 ? 16 : 220, balanceVal >= 0 ? 120 : 38, balanceVal >= 0 ? 80 : 38);
+      doc.text(`R$ ${balanceVal.toFixed(2)}`, 150, listY + 5);
+
+      listY += 7.5;
+    });
+
+    // Rodapé
+    doc.setFont('Helvetica', 'normal');
+    doc.setFontSize(8);
+    doc.setTextColor(115, 115, 115);
+    doc.text('Relatório emitido pela governança da Pelada Batista Sábado. Todos os saldos e lançamentos representam dados legítimos.', 15, 282);
+    doc.text('Página 1 de 1', 185, 282);
+
+    doc.save(`Relatorio_Financeiro_Executivo_${visaoEscopo === 'mensal' ? mesSelecionado : visaoEscopo === 'anual' ? anoSelecionado : 'Geral'}.pdf`);
+  };
+
   return (
     <div className="w-full max-w-7xl mx-auto space-y-6">
       {/* CABEÇALHO */}
@@ -1227,6 +1543,303 @@ export default function ControleCaixa({
           )}
         </div>
 
+      </div>
+
+      {/* PAINEL DE DASHBOARDS E GRÁFICOS ANALÍTICOS (FINANÇAS DIGITAIS) */}
+      <div className="bg-emerald-900/10 border border-white/10 rounded-2xl p-4 sm:p-6 shadow-xl backdrop-blur-sm space-y-6 text-left">
+        <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-4 border-b border-white/5 pb-4">
+          <div className="space-y-1">
+            <h3 className="font-display font-semibold text-base text-teal-300 flex items-center gap-2 uppercase tracking-wide">
+              <TrendingUp className="w-5 h-5 text-teal-400 animate-pulse" />
+              Painel Analítico Financeiro
+            </h3>
+            <p className="text-xs text-emerald-300/85 font-sans">
+              Análise visual de fluxos de caixa, curva S de crescimento acumulado e detalhamento de streams de receita.
+            </p>
+          </div>
+
+          <button
+            type="button"
+            onClick={handleExportarPDF}
+            className="flex items-center justify-center gap-2 px-4.5 py-2.5 text-xs font-black uppercase tracking-wider bg-gradient-to-r from-teal-500 to-emerald-400 text-emerald-950 font-sans rounded-xl hover:from-teal-400 hover:to-emerald-300 hover:shadow-teal-500/20 active:scale-95 shadow-lg transition-all cursor-pointer self-start sm:self-center"
+          >
+            <Download className="w-4 h-4 text-emerald-950" />
+            Exportar PDF Executivo
+          </button>
+        </div>
+
+        {/* Informações Auxiliares de Escopo */}
+        <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
+          
+          {/* Coluna da Esquerda (Graficos Linha e Barras - lg:col-span-2) */}
+          <div className="lg:col-span-2 space-y-6">
+            
+            {/* Gráfico 1: Curva S de Saldo Acumulado (Area com Gradiente) */}
+            <div className="bg-black/30 border border-white/5 rounded-xl p-4 space-y-3">
+              <div className="flex items-center justify-between border-b border-white/5 pb-2">
+                <h4 className="text-xs font-bold font-sans uppercase tracking-wider text-teal-300 flex items-center gap-1.5">
+                  <span className="w-2 h-2 rounded-full bg-amber-450 animate-ping"></span>
+                  Curva S: Saldo Líquido Acumulado (Receita - Despesa)
+                </h4>
+                <span className="text-[10px] text-zinc-400 font-mono">
+                  {visaoEscopo === 'mensal' ? 'Partida a Partida' : 'Mês a Mês'}
+                </span>
+              </div>
+              
+              <div className="w-full h-[240px]">
+                <ResponsiveContainer width="100%" height="100%">
+                  <AreaChart data={dadosGrafico} margin={{ top: 10, right: 10, left: -25, bottom: 0 }}>
+                    <defs>
+                      <linearGradient id="colorAcumulado" x1="0" y1="0" x2="0" y2="1">
+                        <stop offset="5%" stopColor="#d97706" stopOpacity={0.35} />
+                        <stop offset="95%" stopColor="#d97706" stopOpacity={0.0} />
+                      </linearGradient>
+                    </defs>
+                    <CartesianGrid strokeDasharray="3 3" stroke="rgba(255,255,255,0.06)" />
+                    <XAxis 
+                      dataKey="name" 
+                      stroke="#94a3b8" 
+                      fontSize={10} 
+                      tickLine={false} 
+                      axisLine={false}
+                    />
+                    <YAxis 
+                      stroke="#94a3b8" 
+                      fontSize={10} 
+                      tickLine={false} 
+                      axisLine={false}
+                      tickFormatter={(v) => `R$ ${v}`}
+                    />
+                    <Tooltip 
+                      content={({ active, payload, label }) => {
+                        if (active && payload && payload.length) {
+                          const val = payload[0].value as number;
+                          return (
+                            <div className="bg-slate-950/95 border border-white/10 px-3 py-2 rounded-xl text-left space-y-1 shadow-2xl">
+                              <p className="text-[10px] font-bold text-teal-400 uppercase tracking-wide">{label}</p>
+                              <p className="text-xs font-mono font-bold text-white">
+                                Saldo Acumulado: <span className={val >= 0 ? "text-teal-300" : "text-rose-400"}>R$ {val.toFixed(2)}</span>
+                              </p>
+                            </div>
+                          );
+                        }
+                        return null;
+                      }}
+                    />
+                    <Area 
+                      type="monotone" 
+                      dataKey="acumulado" 
+                      stroke="#f59e0b" 
+                      strokeWidth={3} 
+                      fillOpacity={1} 
+                      fill="url(#colorAcumulado)" 
+                      dot={{ r: 4, stroke: '#f59e0b', strokeWidth: 1.5, fill: '#1e293b' }}
+                      activeDot={{ r: 6, stroke: '#ffffff', strokeWidth: 2, fill: '#f59e0b' }}
+                    />
+                  </AreaChart>
+                </ResponsiveContainer>
+              </div>
+            </div>
+
+            {/* Gráfico 2: Receitas vs Despesas (Barras Emparelhadas) */}
+            <div className="bg-black/30 border border-white/5 rounded-xl p-4 space-y-3">
+              <div className="flex items-center justify-between border-b border-white/5 pb-2">
+                <h4 className="text-xs font-bold font-sans uppercase tracking-wider text-teal-300 flex items-center gap-1.5">
+                  <TrendingUp className="w-4 h-4 text-teal-450" />
+                  Receitas vs Despesas Comparadas
+                </h4>
+                <span className="text-[10px] text-zinc-400 font-mono">
+                  {visaoEscopo === 'mensal' ? 'Por Partida' : 'Por Competência'}
+                </span>
+              </div>
+              
+              <div className="w-full h-[240px]">
+                <ResponsiveContainer width="100%" height="100%">
+                  <BarChart data={dadosGrafico} margin={{ top: 10, right: 10, left: -25, bottom: 0 }}>
+                    <CartesianGrid strokeDasharray="3 3" stroke="rgba(255,255,255,0.06)" />
+                    <XAxis 
+                      dataKey="name" 
+                      stroke="#94a3b8" 
+                      fontSize={10} 
+                      tickLine={false} 
+                      axisLine={false}
+                    />
+                    <YAxis 
+                      stroke="#94a3b8" 
+                      fontSize={10} 
+                      tickLine={false} 
+                      axisLine={false}
+                      tickFormatter={(v) => `R$ ${v}`}
+                    />
+                    <Tooltip 
+                      content={({ active, payload, label }) => {
+                        if (active && payload && payload.length) {
+                          const r = payload[0]?.value as number;
+                          const d = payload[1]?.value as number;
+                          const s = r - d;
+                          return (
+                            <div className="bg-slate-950/95 border border-white/10 px-3 py-2 rounded-xl text-left space-y-1 shadow-2xl">
+                              <p className="text-[10px] font-bold text-teal-400 uppercase tracking-wide">{label}</p>
+                              <div className="text-xs space-y-0.5">
+                                <p className="text-teal-300 font-mono">Receita: R$ {r.toFixed(2)}</p>
+                                <p className="text-rose-400 font-mono">Despesa: R$ {d.toFixed(2)}</p>
+                                <p className={`font-mono font-bold border-t border-white/5 pt-1 mt-1 ${s >= 0 ? 'text-emerald-300' : 'text-rose-400'}`}>
+                                  Saldo: R$ {s.toFixed(2)}
+                                </p>
+                              </div>
+                            </div>
+                          );
+                        }
+                        return null;
+                      }}
+                    />
+                    <Bar name="Receita" dataKey="receita" fill="#14b8a6" radius={[4, 4, 0, 0]} barSize={16} />
+                    <Bar name="Despesa" dataKey="despesa" fill="#ef4444" radius={[4, 4, 0, 0]} barSize={16} />
+                  </BarChart>
+                </ResponsiveContainer>
+              </div>
+            </div>
+
+          </div>
+
+          {/* Coluna da Direita (Doughnut das Receitas e Despesas de Categoria - lg:col-span-1) */}
+          <div className="space-y-6">
+            
+            {/* Gráfico 3: Origem de Receitas (Pie Chart) */}
+            <div className="bg-black/30 border border-white/5 rounded-xl p-4 space-y-4 flex flex-col justify-between h-fit">
+              <div className="border-b border-white/5 pb-2 text-left">
+                <h4 className="text-xs font-bold font-sans uppercase tracking-wider text-teal-300 flex items-center gap-1.5">
+                  <Percent className="w-4 h-4 text-teal-450" />
+                  Fontes de Receita
+                </h4>
+              </div>
+
+              {streamBreakdown.receitas.length === 0 ? (
+                <div className="h-[210px] flex items-center justify-center text-xs text-zinc-500 font-sans">
+                  Nenhuma receita registrada neste período.
+                </div>
+              ) : (
+                <div className="flex flex-col items-center justify-center py-2 space-y-4">
+                  <div className="w-[160px] h-[160px] relative shrink-0">
+                    <ResponsiveContainer width="100%" height="100%">
+                      <PieChart>
+                        <Pie
+                          data={streamBreakdown.receitas}
+                          cx="50%"
+                          cy="50%"
+                          innerRadius={50}
+                          outerRadius={75}
+                          paddingAngle={3}
+                          dataKey="value"
+                        >
+                          {streamBreakdown.receitas.map((entry, index) => (
+                            <Cell key={`cell-${index}`} fill={entry.color} />
+                          ))}
+                        </Pie>
+                        <Tooltip
+                          formatter={(v: number) => [`R$ ${v.toFixed(2)}`, 'Montante']}
+                          contentStyle={{ backgroundColor: '#020617', borderColor: '#1e293b', borderRadius: '12px' }}
+                        />
+                      </PieChart>
+                    </ResponsiveContainer>
+                    <div className="absolute inset-0 flex flex-col items-center justify-center select-none pt-1">
+                      <span className="text-[10px] text-zinc-400 uppercase tracking-widest font-sans font-bold">Total</span>
+                      <span className="text-xs font-bold font-mono text-teal-200">
+                        R$ {receitaVisualizar.toFixed(0)}
+                      </span>
+                    </div>
+                  </div>
+
+                  {/* legenda */}
+                  <div className="w-full space-y-1.5 text-xs font-sans text-left px-2">
+                    {streamBreakdown.receitas.map((entry, idx) => {
+                      const perc = receitaVisualizar > 0 ? (entry.value / receitaVisualizar) * 100 : 0;
+                      return (
+                        <div key={idx} className="flex items-center justify-between text-[11px]">
+                          <div className="flex items-center gap-2">
+                            <span className="w-2.5 h-2.5 rounded-full shrink-0" style={{ backgroundColor: entry.color }} />
+                            <span className="text-zinc-350">{entry.name}</span>
+                          </div>
+                          <span className="font-mono text-white font-bold ml-2 shrink-0">
+                            R$ {entry.value.toFixed(0)} ({perc.toFixed(0)}%)
+                          </span>
+                        </div>
+                      );
+                    })}
+                  </div>
+                </div>
+              )}
+            </div>
+
+            {/* Gráfico 4: Distribuição de Despesas (Doughnut) */}
+            <div className="bg-black/30 border border-white/5 rounded-xl p-4 space-y-4 flex flex-col justify-between h-fit">
+              <div className="border-b border-white/5 pb-2 text-left">
+                <h4 className="text-xs font-bold font-sans uppercase tracking-wider text-rose-300 flex items-center gap-1.5">
+                  <TrendingDown className="w-4 h-4 text-rose-450" />
+                  Alocação de Despesas
+                </h4>
+              </div>
+
+              {streamBreakdown.despesas.length === 0 ? (
+                <div className="h-[210px] flex items-center justify-center text-xs text-zinc-500 font-sans">
+                  Sem despesas neste período.
+                </div>
+              ) : (
+                <div className="flex flex-col items-center justify-center py-2 space-y-4">
+                  <div className="w-[160px] h-[160px] relative shrink-0">
+                    <ResponsiveContainer width="100%" height="100%">
+                      <PieChart>
+                        <Pie
+                          data={streamBreakdown.despesas}
+                          cx="50%"
+                          cy="50%"
+                          innerRadius={50}
+                          outerRadius={75}
+                          paddingAngle={3}
+                          dataKey="value"
+                        >
+                          {streamBreakdown.despesas.map((entry, index) => (
+                            <Cell key={`cell-${index}`} fill={entry.color} />
+                          ))}
+                        </Pie>
+                        <Tooltip
+                          formatter={(v: number) => [`R$ ${v.toFixed(2)}`, 'Montante']}
+                          contentStyle={{ backgroundColor: '#020617', borderColor: '#1e293b', borderRadius: '12px' }}
+                        />
+                      </PieChart>
+                    </ResponsiveContainer>
+                    <div className="absolute inset-0 flex flex-col items-center justify-center select-none pt-1">
+                      <span className="text-[10px] text-zinc-400 uppercase tracking-widest font-sans font-bold">Total</span>
+                      <span className="text-xs font-bold font-mono text-rose-350">
+                        R$ {despesaVisualizar.toFixed(0)}
+                      </span>
+                    </div>
+                  </div>
+
+                  {/* legenda */}
+                  <div className="w-full space-y-1.5 text-xs font-sans text-left px-2">
+                    {streamBreakdown.despesas.map((entry, idx) => {
+                      const perc = despesaVisualizar > 0 ? (entry.value / despesaVisualizar) * 100 : 0;
+                      return (
+                        <div key={idx} className="flex items-center justify-between text-[11px]">
+                          <div className="flex items-center gap-2">
+                            <span className="w-2.5 h-2.5 rounded-full shrink-0" style={{ backgroundColor: entry.color }} />
+                            <span className="text-zinc-350 truncate max-w-[120px]" title={entry.name}>{entry.name}</span>
+                          </div>
+                          <span className="font-mono text-white font-bold ml-2 shrink-0">
+                            R$ {entry.value.toFixed(0)} ({perc.toFixed(0)}%)
+                          </span>
+                        </div>
+                      );
+                    })}
+                  </div>
+                </div>
+              )}
+            </div>
+
+          </div>
+
+        </div>
       </div>
 
       {/* DEMONSTRATIVO MENSAL CONSOLIDADO (EXIBIDO EM VISÃO ANUAL OU CONSOLIDADO TOTAL) */}
