@@ -372,7 +372,7 @@ export default function ConfiguracaoSystem({
             </h3>
             
             <p className="text-[10px] text-emerald-300/80 leading-relaxed font-sans">
-              Testes práticos para checar a automação das 4 mensagens principais.
+              Testes práticos para checar a automação das 4 mensagens principais oficiais do sistema.
             </p>
 
             {/* MESSAGE 1 */}
@@ -396,7 +396,7 @@ https://peladabatista.onrender.com`}
                 type="button"
                 onClick={() => {
                   onSendTestAlert(`⚽ *PELADA BATISTA SÁBADO* ⚽\n🏆 *NOVO JOGO AGENDADO!* 🏆\n\n📋 *[Partida Teste]*\n🗓️ Data: *Sábado, 25/06/2026 às 08:00*\n📍 Local: *Campo do Batista*\n\n⏰ *Janela de confirmação:*\n🗓️ Terça-feira às 00:00 até Sexta-feira às 23:59\n\n📲 Confirme sua presença no portal:\nhttps://peladabatista.onrender.com`);
-                  setSuccessMsg('Mensagem 1 disparada!');
+                  setSuccessMsg('Mensagem 1 (Jogo Agendado) disparada!');
                   setTimeout(() => setSuccessMsg(''), 4000);
                 }}
                 className="w-full bg-emerald-800 hover:bg-emerald-700 text-white font-bold text-[9px] py-1.5 flex items-center justify-center gap-1.5 rounded transition-colors"
@@ -407,63 +407,34 @@ https://peladabatista.onrender.com`}
 
             {/* MESSAGE 2 */}
             <div className="bg-emerald-950/70 p-3 rounded-lg border border-white/5 space-y-2">
-              <strong className="text-white text-[10px] block font-sans">2. Confirmação de Presença</strong>
+              <strong className="text-white text-[10px] block font-sans">2. Novo Jogo Cancelado</strong>
               <div className="font-mono text-[8px] text-emerald-300 whitespace-pre">
-{`⚽ *CONFIRMAÇÃO DE PELADA - FC* ⚽
+{`⚽ *PELADA BATISTA SÁBADO* ⚽
+❌ *JOGO CANCELADO!* ❌
 
-Fala galera! O atleta *[Nome do Atleta]* confirmou presença para a partida:
-
-🏆 *[Partida Teste]*
-📅 Data: *Sábado, 25/06/2026 às 08:00*
+📋 *[Partida Teste]*
+🗓️ Data: *Sábado, 25/06/2026 às 08:00*
 📍 Local: *Campo do Batista*
 
-_Bora pro jogo tirar aquela onda!_ 💪🏃‍♂️💨`}
+📲 Acesse nosso portal:
+https://peladabatista.onrender.com`}
               </div>
               <button
                 type="button"
                 onClick={() => {
-                  onSendTestAlert(`⚽ *CONFIRMAÇÃO DE PELADA - FC* ⚽\n\nFala galera! O atleta *[Nome do Atleta]* confirmou presença para a partida:\n\n🏆 *[Partida Teste]*\n📅 Data: *Sábado, 25/06/2026 às 08:00*\n📍 Local: *Campo do Batista*\n\n_Bora pro jogo tirar aquela onda!_ 💪🏃‍♂️💨`);
-                  setSuccessMsg('Mensagem 2 disparada!');
+                  onSendTestAlert(`⚽ *PELADA BATISTA SÁBADO* ⚽\n❌ *JOGO CANCELADO!* ❌\n\n📋 *[Partida Teste]*\n🗓️ Data: *Sábado, 25/06/2026 às 08:00*\n📍 Local: *Campo do Batista*\n\n📲 Acesse nosso portal:\nhttps://peladabatista.onrender.com`);
+                  setSuccessMsg('Mensagem 2 (Jogo Cancelado) disparada!');
                   setTimeout(() => setSuccessMsg(''), 4000);
                 }}
                 className="w-full bg-emerald-800 hover:bg-emerald-700 text-white font-bold text-[9px] py-1.5 flex items-center justify-center gap-1.5 rounded transition-colors"
               >
-                <Send className="w-3 h-3 text-teal-300" /> Teste 2: Confirmação Presença
+                <Send className="w-3 h-3 text-teal-300" /> Teste 2: Jogo Cancelado
               </button>
             </div>
 
             {/* MESSAGE 3 */}
             <div className="bg-emerald-950/70 p-3 rounded-lg border border-white/5 space-y-2">
-              <strong className="text-white text-[10px] block font-sans">3. Quitação de Mensalidade</strong>
-              <div className="font-mono text-[8px] text-emerald-300 whitespace-pre">
-{`💰 *QUITAÇÃO DE MENSALIDADE - PELADA BATISTA SÁBADO* 💰
-
-Atleta: *[Nome do Atleta]* (Ataque) 🏅
-Referência: *06/2026*
-Valor Quitado: *R$ 60.00*
-Status: *PAGO & CONFIRMADO* ✅
-
-📊 *Informativo Financeiro:*
-- Total de mensalistas quitados neste período: *15* (Limite regulamentado de 25 mensalistas)
-
-Muito obrigado pelo compromisso em manter o nosso futebol rodando redondo de campo pago e bola cheia! 🤝⚽🏃‍♂️💨`}
-              </div>
-              <button
-                type="button"
-                onClick={() => {
-                  onSendTestAlert(`💰 *QUITAÇÃO DE MENSALIDADE - PELADA BATISTA SÁBADO* 💰\n\nAtleta: *[Nome do Atleta]* (Ataque) 🏅\nReferência: *06/2026*\nValor Quitado: *R$ 60.00*\nStatus: *PAGO & CONFIRMADO* ✅\n\n📊 *Informativo Financeiro:*\n- Total de mensalistas quitados neste período: *15* (Limite regulamentado de 25 mensalistas)\n\nMuito obrigado pelo compromisso em manter o nosso futebol rodando redondo de campo pago e bola cheia! 🤝⚽🏃‍♂️💨`);
-                  setSuccessMsg('Mensagem 3 disparada!');
-                  setTimeout(() => setSuccessMsg(''), 4000);
-                }}
-                className="w-full bg-emerald-800 hover:bg-emerald-700 text-white font-bold text-[9px] py-1.5 flex items-center justify-center gap-1.5 rounded transition-colors"
-              >
-                <Send className="w-3 h-3 text-teal-300" /> Teste 3: Quitação Pagamento
-              </button>
-            </div>
-
-            {/* MESSAGE 4 */}
-            <div className="bg-emerald-950/70 p-3 rounded-lg border border-white/5 space-y-2">
-              <strong className="text-white text-[10px] block font-sans">4. Convocação & Presença Atualizada</strong>
+              <strong className="text-white text-[10px] block font-sans">3. Convocação & Presença Atualizada</strong>
               <div className="font-mono text-[8px] text-emerald-300 whitespace-pre">
 {`⚽ *PELADA BATISTA SÁBADO* ⚽
 🏆 *CONVOCAÇÃO & PRESENÇA ATUALIZADA* 🏆
@@ -473,13 +444,14 @@ Muito obrigado pelo compromisso em manter o nosso futebol rodando redondo de cam
 📍 Local: *Campo do Batista*
 
 *A - MENSALISTAS:*
-1. *[Nome Mensalista]* - Meio 🏅
+1. *Roberto Nunes* (Meio) 🏅
+2. *Paulo Souza* (Defesa)
 
 *B - DIARISTAS:*
-_Nenhum diarista confirmado ainda_
+1. *Renan Costa* (Ataque)
 
 *C - GOLEIROS:*
-1. *[Nome Goleiro]*
+1. *Daniel Marcos* (Goleiro)
 
 *D - JOGADORES AUSENTES:*
 _Nenhuma ausência registrada_
@@ -494,13 +466,49 @@ https://peladabatista.onrender.com`}
               <button
                 type="button"
                 onClick={() => {
-                  onSendTestAlert(`⚽ *PELADA BATISTA SÁBADO* ⚽\n🏆 *CONVOCAÇÃO & PRESENÇA ATUALIZADA* 🏆\n\n📅 Jogo: *[Partida Teste]*\n🗓️ Data: *Sábado, 25 de junho* às *08:00*\n📍 Local: *Campo do Batista*\n\n*A - MENSALISTAS:*\n1. *[Nome Mensalista]* - Meio 🏅\n\n*B - DIARISTAS:*\n_Nenhum diarista confirmado ainda_\n\n*C - GOLEIROS:*\n1. *[Nome Goleiro]*\n\n*D - JOGADORES AUSENTES:*\n_Nenhuma ausência registrada_\n\n*E - LISTA DE ESPERA:*\n_Nenhum jogador em lista de espera_\n\n----------------------------------------\n📲 Acesse o portal oficial para confirmar ou alterar sua presença:\nhttps://peladabatista.onrender.com`);
-                  setSuccessMsg('Mensagem 4 disparada!');
+                  onSendTestAlert(`⚽ *PELADA BATISTA SÁBADO* ⚽\n🏆 *CONVOCAÇÃO & PRESENÇA ATUALIZADA* 🏆\n\n📅 Jogo: *[Partida Teste]*\n🗓️ Data: *Sábado, 25 de junho* às *08:00*\n📍 Local: *Campo do Batista*\n\n*A - MENSALISTAS:*\n1. *Roberto Nunes* (Meio) 🏅\n2. *Paulo Souza* (Defesa)\n\n*B - DIARISTAS:*\n1. *Renan Costa* (Ataque)\n\n*C - GOLEIROS:*\n1. *Daniel Marcos* (Goleiro)\n\n*D - JOGADORES AUSENTES:*\n_Nenhuma ausência registrada_\n\n*E - LISTA DE ESPERA:*\n_Nenhum jogador em lista de espera_\n\n----------------------------------------\n📲 Acesse o portal oficial para confirmar ou alterar sua presença:\nhttps://peladabatista.onrender.com`);
+                  setSuccessMsg('Mensagem 3 (Convocação Atualizada) disparada!');
                   setTimeout(() => setSuccessMsg(''), 4000);
                 }}
                 className="w-full bg-emerald-800 hover:bg-emerald-700 text-white font-bold text-[9px] py-1.5 flex items-center justify-center gap-1.5 rounded transition-colors"
               >
-                <Send className="w-3 h-3 text-teal-300" /> Teste 4: Convocação Consolidada
+                <Send className="w-3 h-3 text-teal-300" /> Teste 3: Convocação & Presença
+              </button>
+            </div>
+
+            {/* MESSAGE 4 */}
+            <div className="bg-emerald-950/70 p-3 rounded-lg border border-white/5 space-y-2">
+              <strong className="text-white text-[10px] block font-sans">4. Período de Renovação de Mensalistas</strong>
+              <div className="font-mono text-[8px] text-emerald-300 whitespace-pre">
+{`⚽ *PELADA BATISTA SÁBADO* ⚽
+🔄 *RENOVAÇÃO DE MENSALIDADE - 06/2026* 🔄
+
+⏰ *Período de Renovação:* De *22/06/2026* até *26/06/2026*
+💰 *Valor da Mensalidade:* *R$ 85.00* (4 sábados)
+
+Abaixo a situação atual dos mensalistas:
+
+A - ATUAIS MENSALISTAS:
+1. 🏅*Jogador Teste* (Meio) -
+2. *Teste PIX* (Defesa) - 💰
+
+B - NOVOS MENSALISTAS:
+1. *Rodolfo Dias* (Defesa) - 💰
+
+----------------------------------------
+📲 Acesse o portal oficial para mais informações:
+https://peladabatista.onrender.com`}
+              </div>
+              <button
+                type="button"
+                onClick={() => {
+                  onSendTestAlert(`⚽ *PELADA BATISTA SÁBADO* ⚽\n🔄 *RENOVAÇÃO DE MENSALIDADE - 06/2026* 🔄\n\n⏰ *Período de Renovação:* De *22/06/2026* até *26/06/2026*\n💰 *Valor da Mensalidade:* *R$ 85.00* (4 sábados)\n\nAbaixo a situação atual dos mensalistas:\n\nA - ATUAIS MENSALISTAS:\n1. 🏅*Jogador Teste* (Meio) -\n2. *Teste PIX* (Defesa) - 💰\n\nB - NOVOS MENSALISTAS:\n1. *Rodolfo Dias* (Defesa) - 💰\n\n----------------------------------------\n📲 Acesse o portal oficial para mais informações:\nhttps://peladabatista.onrender.com`);
+                  setSuccessMsg('Mensagem 4 (Renovação Mensalistas) disparada!');
+                  setTimeout(() => setSuccessMsg(''), 4000);
+                }}
+                className="w-full bg-emerald-800 hover:bg-emerald-700 text-white font-bold text-[9px] py-1.5 flex items-center justify-center gap-1.5 rounded transition-colors"
+              >
+                <Send className="w-3 h-3 text-teal-300" /> Teste 4: Renovação Mensalistas
               </button>
             </div>
 
@@ -693,7 +701,7 @@ https://peladabatista.onrender.com`}
                     type="text"
                     value={diretoPixChave}
                     onChange={(e) => setDiretoPixChave(e.target.value)}
-                    placeholder="Ex: pix@arena.com ou 123.456.789-00 ou celular"
+                    placeholder="Ex: pix@peladabatista.com.br ou 123.456.789-00 ou celular"
                     className="w-full bg-emerald-955 border border-white/10 text-white font-mono text-xs rounded-lg p-2 focus:outline-none focus:border-teal-500 transition-all placeholder:text-emerald-800/60"
                   />
                 </div>

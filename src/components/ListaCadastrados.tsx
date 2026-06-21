@@ -1024,7 +1024,7 @@ export default function ListaCadastrados({
 
               <div className="p-5 space-y-4">
                 <p className="text-xs text-zinc-300 font-sans leading-relaxed">
-                  Para proceder com o desligamento definitivo do elenco oficial do racha, o sistema exige a inexistência de quaisquer pendências financeiras ativas.
+                  Para proceder com o desligamento definitivo do elenco oficial da Pelada Batista, o sistema exige a inexistência de quaisquer pendências financeiras ativas.
                 </p>
 
                 {j.status === 'solicitou_exclusao' ? (

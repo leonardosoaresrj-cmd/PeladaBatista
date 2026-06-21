@@ -124,7 +124,7 @@ export default function CheckoutPixModal({
     
     // Se não há uma chave configurada pelo administrador, gera a string simulada padrão com CRC16 válido
     if (!directPixInfo.chave || directPixInfo.chave.trim() === '') {
-      const baseString = `00020101021226830014br.gov.bcb.pix2561pix.mercadopago.com.br/qr/v2/a94bd113-d02f-4886-9ac7-9cfc01828cb55204000053039865405${valString.length}${valString}5802BR5913Arena Society6009SAO PAULO62070503***6304`;
+      const baseString = `00020101021226830014br.gov.bcb.pix2561pix.mercadopago.com.br/qr/v2/a94bd113-d02f-4886-9ac7-9cfc01828cb55204000053039865405${valString.length}${valString}5802BR5914Pelada Batista6009SAO PAULO62070503***6304`;
       const crc = calculateCRC16(baseString);
       return baseString + crc;
     }

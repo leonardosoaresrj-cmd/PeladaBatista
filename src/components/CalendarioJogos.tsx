@@ -982,7 +982,7 @@ export default function CalendarioJogos({
                 </div>
 
                 <div className="space-y-1">
-                  <label className="block text-[10px] font-bold text-emerald-400 uppercase tracking-widest font-sans">Local da Arena / Quadra</label>
+                  <label className="block text-[10px] font-bold text-emerald-400 uppercase tracking-widest font-sans">Local da Pelada Batista / Quadra</label>
                   <input
                     type="text"
                     required

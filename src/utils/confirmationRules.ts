@@ -125,29 +125,81 @@ export function gerarLinkCompartilhamento(texto: string): string {
 /**
  * Mensagem de Renovação de Mensalidade
  */
-export function obterTextoListaRenovacao(mesRef: string, jogadores: Jogador[], pagamentos: Pagamento[]): string {
+export function obterTextoListaRenovacao(
+  mesRef: string,
+  jogadores: Jogador[],
+  pagamentos: Pagamento[],
+  valor4Sabados: number = 85,
+  valor5Sabados: number = 105
+): string {
   const mesFormatado = mesRef.split('-').reverse().join('/');
+  const [anoStr, mesStr] = mesRef.split('-');
+  const ano = parseInt(anoStr, 10);
+  const mes = parseInt(mesStr, 10);
+
+  // Calcular sábados do mês
+  const tempDate = new Date(Date.UTC(ano, mes - 1, 1, 12, 0, 0));
+  let countSabados = 0;
+  while (tempDate.getUTCMonth() === mes - 1) {
+    if (tempDate.getUTCDay() === 6) {
+      countSabados++;
+    }
+    tempDate.setUTCDate(tempDate.getUTCDate() + 1);
+  }
+
+  const valorMensalidade = countSabados === 5 ? valor5Sabados : valor4Sabados;
+
+  // Datas de abertura e fechamento do período
+  const janela = obterJanelaRenovacaoParaMesRef(ano, mes - 1);
+  const dtInicio = janela.inicio.toLocaleDateString('pt-BR');
+  const dtFim = janela.fim.toLocaleDateString('pt-BR');
   
-  // Pegar todos os mensalistas ativos
-  const mensalistas = jogadores.filter(j => j.membroStatus === 'mensalista');
+  // ATUAIS MENSALISTAS: jogadores cadastrados como 'mensalista'
+  const atuaisMensalistas = jogadores.filter(j => j.membroStatus === 'mensalista');
   
-  const formatarLinha = (j: Jogador, index: number) => {
-    const pagou = pagamentos.some(p => p.jogadorId === j.id && p.mesRef === mesRef && p.status === 'pago');
-    const statusSign = pagou ? ' 💰' : '';
-    return `${index + 1}. *${j.nome} ${j.sobrenome}*${statusSign}`;
+  // NOVOS MENSALISTAS: jogadores cadastrados como 'diarista' (ou não mensalistas)
+  // que têm pagamento de mensalidade Pago para este mês.
+  const pagantesDesteMesIds = pagamentos
+    .filter(p => p.mesRef === mesRef && !p.partidaId && p.status === 'pago')
+    .map(p => p.jogadorId);
+
+  const novosMensalistas = jogadores.filter(
+    j => j.membroStatus !== 'mensalista' && j.posicao !== 'Goleiro' && pagantesDesteMesIds.includes(j.id)
+  );
+
+  const formatarLinhaAtual = (j: Jogador, index: number) => {
+    const pagou = pagamentos.some(p => p.jogadorId === j.id && p.mesRef === mesRef && !p.partidaId && p.status === 'pago');
+    const goldPrefix = j.isGold ? '🏅' : '';
+    const statusSign = pagou ? ' - 💰' : ' -';
+    return `${index + 1}. ${goldPrefix}*${j.nome} ${j.sobrenome}* (${j.posicao})${statusSign}`;
   };
 
-  const listaTxt = mensalistas.length > 0 
-    ? mensalistas.map((j, i) => formatarLinha(j, i)).join('\n')
+  const formatarLinhaNovo = (j: Jogador, index: number) => {
+    const goldPrefix = j.isGold ? '🏅' : '';
+    return `${index + 1}. ${goldPrefix}*${j.nome} ${j.sobrenome}* (${j.posicao}) - 💰`;
+  };
+
+  const strAtuais = atuaisMensalistas.length > 0
+    ? atuaisMensalistas.map((j, i) => formatarLinhaAtual(j, i)).join('\n')
     : '_Nenhum mensalista cadastrado_';
+
+  const strNovos = novosMensalistas.length > 0
+    ? novosMensalistas.map((j, i) => formatarLinhaNovo(j, i)).join('\n')
+    : '_Nenhum novo mensalista ainda_';
 
   return `⚽ *PELADA BATISTA SÁBADO* ⚽
 🔄 *RENOVAÇÃO DE MENSALIDADE - ${mesFormatado}* 🔄
 
-A janela de renovação de mensalidade está aberta!
+⏰ *Período de Renovação:* De *${dtInicio}* até *${dtFim}*
+💰 *Valor da Mensalidade:* *R$ ${valorMensalidade.toFixed(2)}* (${countSabados} sábados)
+
 Abaixo a situação atual dos mensalistas:
 
-${listaTxt}
+A - ATUAIS MENSALISTAS:
+${strAtuais}
+
+B - NOVOS MENSALISTAS:
+${strNovos}
 
 ----------------------------------------
 📲 Acesse o portal oficial para mais informações:
@@ -382,7 +434,7 @@ export function obterTextoListaCompletaPartida(
 
   const formatarLinha = (j: Jogador, index: number) => {
     const goldSuffix = j.isGold ? ' 🏅' : '';
-    return `${index + 1}. *${j.nome} ${j.sobrenome}* - ${j.posicao}${goldSuffix}`;
+    return `${index + 1}. *${j.nome} ${j.sobrenome}* (${j.posicao})${goldSuffix}`;
   };
 
   const formatarLinhaGoleiro = (j: Jogador, index: number) => {
@@ -469,6 +521,36 @@ https://peladabatista.onrender.com`;
  */
 export function obterStatusMembroEfetivo(jogador: Jogador, pagamentos: Pagamento[]): 'mensalista' | 'diarista' | 'isento' {
   if (jogador.posicao === 'Goleiro') return 'isento';
-  return (jogador.membroStatus || 'diarista') as 'mensalista' | 'diarista' | 'isento';
+  
+  const statusOriginal = (jogador.membroStatus || 'diarista') as 'mensalista' | 'diarista' | 'isento';
+  if (statusOriginal === 'mensalista') return 'mensalista';
+
+  // Promoção de novos mensalistas para o próximo mês de forma dinâmica
+  // Se o diarista pagou a mensalidade de algum mês, e o período de renovação já fechou,
+  // ou já estamos em mês cronológico posterior, ele se torna mensalista oficial!
+  const mensalidadesPagas = pagamentos.filter(p => p.jogadorId === r_j_id(jogador.id) && !p.partidaId && p.status === 'pago');
+  if (mensalidadesPagas.length > 0) {
+    const agora = new Date();
+    for (const pag of mensalidadesPagas) {
+      const [anoStr, mesStr] = pag.mesRef.split('-');
+      const ano = parseInt(anoStr, 10);
+      const mes = parseInt(mesStr, 10);
+      const janela = obterJanelaRenovacaoParaMesRef(ano, mes);
+      
+      const mesRefDate = new Date(ano, mes - 1, 1);
+      const agoraMesDate = new Date(agora.getFullYear(), agora.getMonth(), 1);
+
+      if (agora > janela.fim || agoraMesDate > mesRefDate) {
+        return 'mensalista';
+      }
+    }
+  }
+
+  return statusOriginal;
+}
+
+// Função auxiliar simples de id
+function r_j_id(idStr: any): string {
+  return String(idStr);
 }
 

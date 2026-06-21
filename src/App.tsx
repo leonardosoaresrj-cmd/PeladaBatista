@@ -16,6 +16,8 @@ import {
   saveLancamentos,
   getSavedAluguelCampo,
   saveAluguelCampo,
+  getSavedWhatsappLogs,
+  saveWhatsappLogs,
   AVATAR_PRESETS
 } from './data';
 import {
@@ -45,7 +47,7 @@ import MensalistasMes from './components/MensalistasMes';
 import HistoricoJogos from './components/HistoricoJogos';
 import { mesclarPartidasAutomáticas } from './utils/partidaHelper';
 import { isJogadorFuncionalmenteGold } from './utils/goldRules';
-import { obterTextoListaCompletaPartida, obterTextoListaRenovacao, obterStatusMembroEfetivo, obterDebitosDoJogador, obterTextoPartidaCancelada, obterJanelaRenovacaoParaMesRef, isFechamentoMensalistas } from './utils/confirmationRules';
+import { obterTextoListaCompletaPartida, obterTextoListaRenovacao, obterStatusMembroEfetivo, obterDebitosDoJogador, obterTextoPartidaCancelada, obterJanelaRenovacaoParaMesRef, isFechamentoMensalistas, getJanelaConfirmacao } from './utils/confirmationRules';
 import logoPelada from './assets/images/logo_pelada.svg';
 import { Calendar, Users, DollarSign, ShieldAlert, LogOut, Database, Award, User, Settings, UserCheck, History, CheckSquare, Check, X, Lock, Cake, TrendingUp, UserPlus, AlertCircle, Trash2 } from 'lucide-react';
 
@@ -114,7 +116,9 @@ export default function App() {
     return localStorage.getItem('racha_whatsapp_webhook_token') || '';
   });
 
-  const [whatsappLogs, setWhatsappLogs] = useState<any[]>([]);
+  const [whatsappLogs, setWhatsappLogs] = useState<any[]>(() => {
+    return getSavedWhatsappLogs();
+  });
 
   const handleUpdateWhatsappConfig = (link: string, ativa: boolean, webhookUrl: string = '', token: string = '') => {
     setWhatsappGrupoLink(link);
@@ -314,22 +318,32 @@ export default function App() {
   };
 
   const handleRegistrarLogAutomacao = async (atletaNome: string, partidaTitulo: string, msg: string) => {
-    // Insere o evento de teste inicial
+    // Insere o evento de teste inicial com ID local temporário
     const logId = `log-${Date.now()}-${Math.random().toString(36).substr(2, 4)}`;
     const novoLog: BotLog = {
       id: logId,
       tabela: atletaNome,
-      evento: 'TESTE_PAINEL',
+      evento: (partidaTitulo || 'DISPARO').substring(0, 100).toUpperCase(),
       mensagem: msg,
       enviado_em: new Date().toISOString()
     };
     
-    // Atualização otimista apenas da UI temporária, o real load vem do supabase
-    setWhatsappLogs(currentLogs => [novoLog, ...currentLogs].slice(0, 50));
+    // Atualização instantânea e persistente do estado local
+    setWhatsappLogs(currentLogs => {
+      const updated = [novoLog, ...currentLogs].slice(0, 50);
+      saveWhatsappLogs(updated);
+      return updated;
+    });
     
     const supabase = getSupabase();
     if (supabase) {
-       await supabase.from('bot_logs').insert(novoLog);
+       // Omitimos o ID customizado "log-..." para que o Postgres possa usar o default uuid_generate_v4()
+       const { id, ...supabaseLogPayload } = novoLog;
+       try {
+         await supabase.from('bot_logs').insert(supabaseLogPayload);
+       } catch (e) {
+         console.error('Erro ao salvar log no Supabase:', e);
+       }
     }
 
     if (whatsappAutomacaoAtiva && whatsappWebhookUrl) {
@@ -353,31 +367,78 @@ export default function App() {
           if (!response.ok) {
             const respTxt = await response.text().catch(() => '');
             const falhaMsg = `[FALHA DISPARO] Status ${response.status} - ${respTxt.substring(0, 80)}`;
+            
+            const logFalha: BotLog = {
+              id: `log-${Date.now()}-${Math.random().toString(36).substr(2, 4)}`,
+              tabela: atletaNome,
+              evento: 'FALHA_DISPARO',
+              mensagem: `${msg} | ⚠️ ${falhaMsg}`,
+              enviado_em: new Date().toISOString()
+            };
+
+            setWhatsappLogs(currentLogs => {
+              const updated = [logFalha, ...currentLogs].slice(0, 50);
+              saveWhatsappLogs(updated);
+              return updated;
+            });
+
             if (supabase) {
-               await supabase.from('bot_logs').insert({
-                 tabela: atletaNome,
-                 evento: 'FALHA_DISPARO',
-                 mensagem: `${msg} | ⚠️ ${falhaMsg}`,
-                 enviado_em: new Date().toISOString()
-               });
+               const { id, ...supabaseLogPayload } = logFalha;
+               try {
+                 await supabase.from('bot_logs').insert(supabaseLogPayload);
+               } catch (e) {
+                 console.error(e);
+               }
+            }
+          } else {
+            // Log de sucesso opcional para que o usuário sinta segurança de que deu certo de fato
+            const logSucesso: BotLog = {
+              id: `log-${Date.now()}-${Math.random().toString(36).substr(2, 4)}`,
+              tabela: atletaNome,
+              evento: 'SUCESSO_DISPARO',
+              mensagem: `Mensagem enviada com sucesso ao grupo: "${msg.substring(0, 60)}..."`,
+              enviado_em: new Date().toISOString()
+            };
+
+            setWhatsappLogs(currentLogs => {
+              const updated = [logSucesso, ...currentLogs].slice(0, 50);
+              saveWhatsappLogs(updated);
+              return updated;
+            });
+
+            if (supabase) {
+               const { id, ...supabaseLogPayload } = logSucesso;
+               try {
+                 await supabase.from('bot_logs').insert(supabaseLogPayload);
+               } catch (e) {
+                 console.error(e);
+               }
             }
           }
         } catch (error: any) {
           const falhaMsg = `[FALHA CONEXÃO] ${error.message || error}`;
+          const logFalha: BotLog = {
+            id: `log-${Date.now()}-${Math.random().toString(36).substr(2, 4)}`,
+            tabela: atletaNome,
+            evento: 'FALHA_CONEXAO',
+            mensagem: `${msg} | ⚠️ ${falhaMsg}`,
+            enviado_em: new Date().toISOString()
+          };
+
+          setWhatsappLogs(currentLogs => {
+            const updated = [logFalha, ...currentLogs].slice(0, 50);
+            saveWhatsappLogs(updated);
+            return updated;
+          });
+
           if (supabase) {
-             await supabase.from('bot_logs').insert({
-               tabela: atletaNome,
-               evento: 'FALHA_CONEXAO',
-               mensagem: `${msg} | ⚠️ ${falhaMsg}`,
-               enviado_em: new Date().toISOString()
-             });
+             const { id, ...supabaseLogPayload } = logFalha;
+             try {
+               await supabase.from('bot_logs').insert(supabaseLogPayload);
+             } catch (e) {
+               console.error(e);
+             }
           }
-        }
-        
-        // Recarregar os logs reais da base para manter consistência
-        if (supabase) {
-           const bLogs = await carregarBotLogsDoSupabase();
-           if (bLogs) setWhatsappLogs(bLogs as any[]);
         }
       }, 50);
     }
@@ -385,6 +446,7 @@ export default function App() {
 
   const handleClearWhatsappLogs = async () => {
     setWhatsappLogs([]);
+    saveWhatsappLogs([]);
     await limparBotLogsDoSupabase();
   };
 
@@ -573,17 +635,22 @@ export default function App() {
         const bLogs = await carregarBotLogsDoSupabase();
         if (bLogs) {
           setWhatsappLogs(bLogs as any[]);
+          saveWhatsappLogs(bLogs as any[]);
+        } else {
+          setWhatsappLogs(getSavedWhatsappLogs());
         }
       } catch (err) {
         console.warn('Erro ao ler dados do Supabase. Usando local:', err);
         setJogadores(getSavedJogadores());
         setPartidas(getSavedPartidas());
         setPagamentos(getSavedPagamentos());
+        setWhatsappLogs(getSavedWhatsappLogs());
       }
     } else {
       setJogadores(getSavedJogadores());
       setPartidas(getSavedPartidas());
       setPagamentos(getSavedPagamentos());
+      setWhatsappLogs(getSavedWhatsappLogs());
     }
   };
 
@@ -630,7 +697,7 @@ export default function App() {
 
         const key = `renew_alert_sent_${mesRef}`;
         if (!localStorage.getItem(key)) {
-          const msgCompleta = obterTextoListaRenovacao(mesRef, jogadores, pagamentos);
+          const msgCompleta = obterTextoListaRenovacao(mesRef, jogadores, pagamentos, valor4Sabados, valor5Sabados);
           handleRegistrarLogAutomacao(
             'Sistema', 
             `Abertura Renovação ${mesRef}`, 
@@ -640,7 +707,38 @@ export default function App() {
         }
       }
     }
-  }, [jogadores, pagamentos, whatsappAutomacaoAtiva]);
+  }, [jogadores, pagamentos, whatsappAutomacaoAtiva, valor4Sabados, valor5Sabados]);
+
+  // Alerta de Abertura de Janela de Confirmação Semanal Automática
+  useEffect(() => {
+    if (!whatsappAutomacaoAtiva || partidas.length === 0 || jogadores.length === 0) return;
+
+    const hoje = new Date();
+    const partidasAtivas = partidas.filter(p => !p.cancelada && !partidasDeletadas.includes(p.id));
+    
+    // Lista a próxima partida (mais recente futura ou hoje)
+    const proximaPartida = partidasAtivas
+      .map(p => ({ ...p, dateObj: new Date(`${p.data}T12:00:00`) }))
+      .filter(p => p.dateObj >= new Date(hoje.getFullYear(), hoje.getMonth(), hoje.getDate()))
+      .sort((a, b) => a.dateObj.getTime() - b.dateObj.getTime())[0];
+
+    if (proximaPartida) {
+      const janela = getJanelaConfirmacao(proximaPartida.data);
+      if (janela.status === 'aberto') {
+        const key = `confirm_alert_sent_${proximaPartida.id}`;
+        if (!localStorage.getItem(key)) {
+          // Dispara a mensagem padrão de convocação inicial para a próxima partida
+          const msgConvocacao = obterTextoListaCompletaPartida(proximaPartida, jogadores, window.location.origin);
+          handleRegistrarLogAutomacao(
+            'Sistema',
+            `Abertura de Convocação - Jogo ${proximaPartida.data.split('-').reverse().join('/')}`,
+            msgConvocacao
+          );
+          localStorage.setItem(key, 'true');
+        }
+      }
+    }
+  }, [partidas, jogadores, partidasDeletadas, whatsappAutomacaoAtiva]);
 
   const handleLoginSuccess = (jogador: Jogador) => {
     setJogadorAtual(jogador);
@@ -873,6 +971,16 @@ export default function App() {
     savePartidas(atualizadas);
 
     await salvarPartidaNoSupabase(partidaCompleta);
+
+    if (whatsappAutomacaoAtiva) {
+      const dataJogoDate = new Date(`${partidaCompleta.data}T12:00:00`);
+      let dataAmigavel = dataJogoDate.toLocaleDateString('pt-BR', { weekday: 'long', day: '2-digit', month: '2-digit', year: 'numeric' });
+      dataAmigavel = dataAmigavel.charAt(0).toUpperCase() + dataAmigavel.slice(1);
+      const horario = partidaCompleta.horario.split(' ')[0];
+
+      const msgAgendamento = `⚽ *PELADA BATISTA SÁBADO* ⚽\n🏆 *NOVO JOGO AGENDADO!* 🏆\n\n📋 *${partidaCompleta.titulo}*\n🗓️ Data: *${dataAmigavel} às ${horario}*\n📍 Local: *${partidaCompleta.local}*\n\n⏰ *Janela de confirmação:*\n🗓️ Terça-feira às 00:00 até Sexta-feira às 23:59\n\n📲 Confirme sua presença no portal:\nhttps://peladabatista.onrender.com`;
+      handleRegistrarLogAutomacao('Administrador', 'Novo Jogo Agendado', msgAgendamento);
+    }
   };
 
   // Deletar Partida no Calendário / Histórico (Ação administrativa)
@@ -1057,7 +1165,17 @@ export default function App() {
     if (pagModificado!) {
       await salvarPagamentoNoSupabase(pagModificado);
 
-      // Removed automatic WhatsApp WhatsApp group logging as per user request
+      // Se for quitação de mensalidade (sem partidaId associada) e o bot estiver ativo, disparar mensagem com a lista atualizada
+      if (whatsappAutomacaoAtiva && !partidaId && status === 'pago') {
+        const msgCompleta = obterTextoListaRenovacao(mesRef, jogadores, atualizados, valor4Sabados, valor5Sabados);
+        const atleta = jogadores.find(j => j.id === jogadorId);
+        const atletaNome = atleta ? `${atleta.nome} ${atleta.sobrenome}` : 'Contribuinte';
+        handleRegistrarLogAutomacao(
+          atletaNome,
+          `Renovação de Mensalidade ${mesRef.split('-').reverse().join('/')}`,
+          msgCompleta
+        );
+      }
     }
   };
 

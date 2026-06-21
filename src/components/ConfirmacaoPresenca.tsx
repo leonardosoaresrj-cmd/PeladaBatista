@@ -206,7 +206,15 @@ export default function ConfirmacaoPresenca({
 
       const msgAtualizada = obterTextoListaCompletaPartida(partidaAtualizada, jogadores, window.location.origin);
 
-      // Removed WhatsApp toast for individual confirmation as per user request
+      if (whatsappAutomacaoAtiva && onRegistrarLogAutomacao) {
+        const atleta = jogadores.find(j => j.id === id);
+        const atletaNome = atleta ? `${atleta.nome} ${atleta.sobrenome}` : 'Jogador';
+        onRegistrarLogAutomacao(
+          atletaNome,
+          `${confirmado ? 'Confirmou Presença' : 'Recusou Presença'} (Partida: ${partidaSelecionada.titulo})`,
+          msgAtualizada
+        );
+      }
     }
   };
 

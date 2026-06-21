@@ -313,3 +313,21 @@ export function saveAluguelCampo(valor: number) {
   localStorage.setItem('futebol_aluguel_campo', String(valor));
 }
 
+// Carregar logs do whatsapp salvos no localStorage
+export function getSavedWhatsappLogs(): any[] {
+  const json = localStorage.getItem('futebol_whatsapp_logs');
+  if (json) {
+    try {
+      return JSON.parse(json);
+    } catch (e) {
+      return [];
+    }
+  }
+  return [];
+}
+
+export function saveWhatsappLogs(logs: any[]) {
+  localStorage.setItem('futebol_whatsapp_logs', JSON.stringify(logs));
+}
+
+
