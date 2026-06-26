@@ -1772,10 +1772,10 @@ export default function ConfirmacaoPresenca({
           jogadorAtual={jogadorAtual}
           valorTotal={debitosParaPagarDiarista.reduce((sum, d) => sum + d.valor, 0)}
           debitos={debitosParaPagarDiarista}
-          onConfirmarPagamentoTotal={async (debitList) => {
+          onConfirmarPagamentoTotal={async (debitList, status = 'pago') => {
             if (onRegistrarPagamento) {
               for (const dt of debitList) {
-                await onRegistrarPagamento(jogadorAtual.id, dt.mesRef, 'pago', new Date().toISOString().split('T')[0], dt.valor, dt.partidaId);
+                await onRegistrarPagamento(jogadorAtual.id, dt.mesRef, status, new Date().toISOString().split('T')[0], dt.valor, dt.partidaId);
               }
             }
             if (dadosConfirmacaoPendente) {

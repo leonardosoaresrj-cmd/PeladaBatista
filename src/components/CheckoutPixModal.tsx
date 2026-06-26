@@ -18,7 +18,8 @@ import {
   ShieldCheck,
   Send,
   Zap,
-  Info
+  Info,
+  Clock
 } from 'lucide-react';
 import { Jogador } from '../types';
 
@@ -34,7 +35,10 @@ interface CheckoutPixModalProps {
     mesRef: string;
     partidaId?: string;
   }>;
-  onConfirmarPagamentoTotal: (debitList: Array<{ mesRef: string; valor: number; partidaId?: string }>) => void;
+  onConfirmarPagamentoTotal: (
+    debitList: Array<{ mesRef: string; valor: number; partidaId?: string }>,
+    status?: 'pago' | 'pendente_confirmacao'
+  ) => void;
 }
 
 export default function CheckoutPixModal({
@@ -47,6 +51,7 @@ export default function CheckoutPixModal({
 }: CheckoutPixModalProps) {
   const [copied, setCopied] = useState(false);
   const [step, setStep] = useState<'gerando' | 'qrcode' | 'sucesso'>('qrcode');
+  const [tipoSucesso, setTipoSucesso] = useState<'imediato' | 'pendente'>('imediato');
   const [tempoRestante, setTempoRestante] = useState(600); // 10 minutos
   const [simulandoVerificacao, setSimulandoVerificacao] = useState(false);
   const [opcaoSimuladorAtiva, setOpcaoSimuladorAtiva] = useState(false);
@@ -217,6 +222,7 @@ export default function CheckoutPixModal({
     // Simular o delay de validação e confirmação da API do Mercado Pago
     setTimeout(() => {
       setSimulandoVerificacao(false);
+      setTipoSucesso('imediato');
       setStep('sucesso');
       
       // Chamar callback para consolidar no banco Supabase
@@ -227,8 +233,23 @@ export default function CheckoutPixModal({
       }));
 
       // Consolida os pagamentos como "pago" (quitado) automaticamente!
-      onConfirmarPagamentoTotal(pagamentosAgendados);
+      onConfirmarPagamentoTotal(pagamentosAgendados, 'pago');
     }, 2200);
+  };
+
+  // Declaração de pagamento manual pelo usuário (Já Paguei - Confirmar Quitação)
+  const handleDeclararJaPago = () => {
+    setTipoSucesso('pendente');
+    setStep('sucesso');
+
+    // Chamar callback para consolidar no banco com status 'pendente_confirmacao'
+    const pagamentosAgendados = debitos.map((deb) => ({
+      mesRef: deb.mesRef,
+      valor: deb.valor,
+      partidaId: deb.partidaId
+    }));
+
+    onConfirmarPagamentoTotal(pagamentosAgendados, 'pendente_confirmacao');
   };
 
   if (!isOpen) return null;
@@ -351,6 +372,21 @@ export default function CheckoutPixModal({
                 </div>
               </div>
 
+              {/* Botão de Declaração de Pagamento Manual (Já Paguei - Confirmar Quitação) */}
+              <div className="pt-1.5">
+                <button
+                  type="button"
+                  onClick={handleDeclararJaPago}
+                  className="w-full bg-amber-500 hover:bg-amber-400 text-black font-extrabold text-xs py-3.5 rounded-xl transition-all shadow-md active:scale-97 flex items-center justify-center gap-2 cursor-pointer uppercase tracking-wider border-b-2 border-amber-700 font-sans"
+                >
+                  <Check className="w-4 h-4 text-black stroke-[3px]" />
+                  JÁ PAGUEI — CONFIRMAR QUITAÇÃO
+                </button>
+                <p className="text-[9.5px] text-amber-300 text-center mt-1.5 font-sans leading-tight">
+                  Clique acima caso já tenha realizado a transferência. Seu status ficará como <b>"Aguardando Validação"</b> e o administrador será notificado para aprovação.
+                </p>
+              </div>
+
               {/* Verificação se a Chave PIX direta está configurada para evitar erros em bancos reais */}
               {!directPixInfo.chave ? (
                 <div className="bg-rose-950/45 border border-rose-500/30 rounded-2xl p-4 flex gap-3 text-xs">
@@ -441,27 +477,56 @@ export default function CheckoutPixModal({
           ) : (
             /* Tela de Sucesso */
             <div className="p-10 text-center flex flex-col items-center justify-center space-y-5 py-12 animate-fade-in overflow-y-auto flex-1">
-              <div className="w-16 h-16 rounded-full bg-teal-500/20 flex items-center justify-center text-teal-400 border-2 border-teal-500/40 animate-bounce shrink-0">
-                <CheckCircle2 className="w-10 h-10 text-teal-400" />
-              </div>
+              {tipoSucesso === 'imediato' ? (
+                <>
+                  <div className="w-16 h-16 rounded-full bg-teal-500/20 flex items-center justify-center text-teal-400 border-2 border-teal-500/40 animate-bounce shrink-0">
+                    <CheckCircle2 className="w-10 h-10 text-teal-400" />
+                  </div>
 
-              <div className="space-y-2">
-                <h3 className="font-display font-black text-lg text-teal-300 uppercase tracking-widest">
-                  PAGAMENTO RECONHECIDO!
-                </h3>
-                <p className="text-xs text-teal-100 max-w-[340px] leading-relaxed font-sans">
-                  Excelente! A transação no valor de <b>R$ {valorTotal.toFixed(2)}</b> foi processada com sucesso pelo Mercado Pago. Seu status foi atualizado para <b className="text-teal-300 bg-teal-950/60 border border-teal-500/30 px-2 py-0.5 rounded text-[10px]">QUITADO (PAGO)</b>.
-                </p>
-              </div>
+                  <div className="space-y-2">
+                    <h3 className="font-display font-black text-lg text-teal-300 uppercase tracking-widest">
+                      PAGAMENTO RECONHECIDO!
+                    </h3>
+                    <p className="text-xs text-teal-100 max-w-[340px] leading-relaxed font-sans">
+                      Excelente! A transação no valor de <b>R$ {valorTotal.toFixed(2)}</b> foi processada com sucesso pelo Mercado Pago. Seu status foi atualizado para <b className="text-teal-300 bg-teal-950/60 border border-teal-500/30 px-2 py-0.5 rounded text-[10px]">QUITADO (PAGO)</b>.
+                    </p>
+                  </div>
 
-              <div className="bg-teal-950/30 rounded-xl p-3 border border-teal-500/20 w-full text-[10.5px] text-emerald-300 font-mono space-y-1 text-center shrink-0">
-                <p>Nº Autenticação: <span className="font-bold text-white">MP-{Math.floor(Math.random() * 900000000) + 100000000}</span></p>
-                <p>Status: <span className="text-teal-400 font-bold">APPROVED - CREDITO IMEDIATO</span></p>
-              </div>
+                  <div className="bg-teal-950/30 rounded-xl p-3 border border-teal-500/20 w-full text-[10.5px] text-emerald-300 font-mono space-y-1 text-center shrink-0">
+                    <p>Nº Autenticação: <span className="font-bold text-white">MP-{Math.floor(Math.random() * 900000000) + 100000000}</span></p>
+                    <p>Status: <span className="text-teal-400 font-bold">APPROVED - CREDITO IMEDIATO</span></p>
+                  </div>
+                </>
+              ) : (
+                <>
+                  <div className="w-16 h-16 rounded-full bg-amber-500/20 flex items-center justify-center text-amber-400 border-2 border-amber-500/40 animate-bounce shrink-0">
+                    <Clock className="w-10 h-10 text-amber-400" />
+                  </div>
+
+                  <div className="space-y-2">
+                    <h3 className="font-display font-black text-lg text-amber-300 uppercase tracking-widest">
+                      QUITAÇÃO REGISTRADA!
+                    </h3>
+                    <p className="text-xs text-teal-100 max-w-[340px] leading-relaxed font-sans">
+                      Sua declaração de pagamento no valor de <b>R$ {valorTotal.toFixed(2)}</b> foi enviada com sucesso! O seu status agora é <b className="text-amber-300 bg-amber-950/60 border border-amber-500/30 px-2.5 py-0.5 rounded text-[10px]">QUITADO - PENDENTE CONFIRMAÇÃO</b>.
+                    </p>
+                    <p className="text-[10px] text-amber-200/80 max-w-[320px] mx-auto font-sans">
+                      O Administrador foi notificado e validará o seu pagamento na seção de aprovações em breve.
+                    </p>
+                  </div>
+
+                  <div className="bg-amber-955/20 rounded-xl p-3 border border-amber-500/20 w-full text-[10.5px] text-amber-300 font-mono space-y-1 text-center shrink-0">
+                    <p>Referência: <span className="font-bold text-white">PIX-MANUAL-{Date.now().toString().slice(-6)}</span></p>
+                    <p>Status: <span className="text-amber-400 font-bold">PENDING_CONFIRMATION - AGUARDANDO ADMIN</span></p>
+                  </div>
+                </>
+              )}
 
               <button
                 onClick={onClose}
-                className="w-full max-w-xs bg-teal-500 hover:bg-teal-400 text-black font-black text-xs py-3 rounded-xl transition-all shadow-md uppercase cursor-pointer tracking-wider"
+                className={`w-full max-w-xs text-black font-black text-xs py-3 rounded-xl transition-all shadow-md uppercase cursor-pointer tracking-wider ${
+                  tipoSucesso === 'imediato' ? 'bg-teal-500 hover:bg-teal-400' : 'bg-amber-500 hover:bg-amber-400'
+                }`}
               >
                 Concluir e Fechar Tela
               </button>

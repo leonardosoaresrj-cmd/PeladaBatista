@@ -100,14 +100,15 @@ export default function ControlePagamentos({
   };
 
   const handleConfirmarPagamentoTotal = async (
-    debitList: Array<{ mesRef: string; valor: number; partidaId?: string }>
+    debitList: Array<{ mesRef: string; valor: number; partidaId?: string }>,
+    status: 'pago' | 'pendente_confirmacao' = 'pago'
   ) => {
     const hojeStr = new Date().toISOString().split('T')[0];
     if (onRegistrarVariosPagamentos) {
       const items = debitList.map(deb => ({
         mesRef: deb.mesRef,
-        status: 'pago' as const,
-        dataPagamento: hojeStr,
+        status: status,
+        dataPagamento: status === 'pago' ? hojeStr : null,
         valor: deb.valor,
         partidaId: deb.partidaId
       }));
@@ -117,8 +118,8 @@ export default function ControlePagamentos({
         await onRegistrarPagamento(
           jogadorAtual.id,
           deb.mesRef,
-          'pago', // Altera status para quitado imediatamente!
-          hojeStr,
+          status,
+          status === 'pago' ? hojeStr : null,
           deb.valor,
           deb.partidaId
         );

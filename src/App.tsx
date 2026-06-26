@@ -488,6 +488,7 @@ export default function App() {
   const [mostrarPopUpAlertaDiarista, setMostrarPopUpAlertaDiarista] = useState(false);
   const [diaristaDebitosParaAlerta, setDiaristaDebitosParaAlerta] = useState<any[]>([]);
   const [mostrarPopUpAlertaAdminAprovacoes, setMostrarPopUpAlertaAdminAprovacoes] = useState(false);
+  const [mostrarPopUpAlertaAdminPagamentos, setMostrarPopUpAlertaAdminPagamentos] = useState(false);
   const [fotoZoomada, setFotoZoomada] = useState<{ url: string; nome?: string } | null>(null);
   const [mobileProfileDropdownOpen, setMobileProfileDropdownOpen] = useState(false);
 
@@ -516,6 +517,22 @@ export default function App() {
       setMostrarPopUpAlertaAdminAprovacoes(false);
     }
   }, [jogadorAtual, jogadores]);
+
+  // Alerta de pagamentos pendentes para o administrador após login
+  useEffect(() => {
+    if (jogadorAtual && jogadorAtual.role === 'admin') {
+      const sessaoAlertaAdminPagamentosChave = `alerta_admin_pagamentos_mostrada_${jogadorAtual.id}`;
+      const jaMostradoAdminPagamentos = sessionStorage.getItem(sessaoAlertaAdminPagamentosChave);
+      
+      const pendentesPagamentos = pagamentos.filter(p => p.status === 'pendente_confirmacao');
+      if (pendentesPagamentos.length > 0 && !jaMostradoAdminPagamentos) {
+        setMostrarPopUpAlertaAdminPagamentos(true);
+        sessionStorage.setItem(sessaoAlertaAdminPagamentosChave, 'true');
+      }
+    } else {
+      setMostrarPopUpAlertaAdminPagamentos(false);
+    }
+  }, [jogadorAtual, pagamentos]);
 
   // Helpers de status de membros dinâmicos/efetivos baseados em adimplência
   const jogadorAtualEfetivo = useMemo(() => {
@@ -2185,6 +2202,109 @@ export default function App() {
                 type="button"
                 onClick={() => setMostrarPopUpAlertaAdminAprovacoes(false)}
                 className="py-2.5 px-4 rounded-xl border border-white/10 hover:bg-white/5 text-emerald-300 hover:text-white transition-all text-xs cursor-pointer"
+              >
+                Fechar
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {/* POPUP DE ALERTA DE PAGAMENTOS PENDENTES PARA O ADMIN APÓS LOGIN */}
+      {mostrarPopUpAlertaAdminPagamentos && jogadorAtual && jogadorAtual.role === 'admin' && (
+        <div 
+          id="popup-alerta-admin-pagamentos"
+          className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/80 backdrop-blur-md animate-fade-in"
+        >
+          <div className="bg-emerald-950 border border-amber-500/30 rounded-2xl max-w-lg w-full p-6 text-left shadow-2xl relative animate-scale-up max-h-[90vh] flex flex-col">
+            <div className="flex items-center justify-between border-b border-white/10 pb-3.5 mb-4 shrink-0">
+              <div className="flex items-center gap-3">
+                <div className="w-10 h-10 bg-amber-500/10 border border-amber-500/30 text-amber-400 rounded-xl flex items-center justify-center shrink-0">
+                  <DollarSign className="w-5 h-5 animate-pulse" />
+                </div>
+                <div>
+                  <h3 className="font-display font-black text-sm uppercase tracking-wide text-amber-300">Aprovações de Pagamento Pendentes</h3>
+                  <p className="text-[10px] text-emerald-400/80 font-mono">Confirmações financeiras de atletas aguardando liberação de caixa</p>
+                </div>
+              </div>
+              <button
+                type="button"
+                onClick={() => setMostrarPopUpAlertaAdminPagamentos(false)}
+                className="text-emerald-400 hover:text-white p-1 rounded-lg hover:bg-white/5 transition-colors cursor-pointer"
+                title="Fechar"
+              >
+                <X className="w-5 h-5" />
+              </button>
+            </div>
+            
+            <p className="text-xs text-emerald-200 leading-relaxed font-sans mb-4 shrink-0">
+              Olá, Administrador <b>{jogadorAtual.nome}</b>. Identificamos <b>{pagamentos.filter(p => p.status === 'pendente_confirmacao').length}</b> declarações de pagamento pendentes de aprovação na seção de Controle de Caixa:
+            </p>
+            
+            <div className="flex-grow overflow-y-auto space-y-3 pr-1 mb-5 select-none scrollbar-thin font-sans">
+              {pagamentos.filter(p => p.status === 'pendente_confirmacao').map((p) => {
+                const jogador = jogadores.find(j => j.id === p.jogadorId);
+                const partidaObj = p.partidaId ? partidas.find(pt => pt.id === p.partidaId) : null;
+                if (!jogador) return null;
+                
+                return (
+                  <div 
+                    key={p.id} 
+                    className="p-3.5 rounded-xl border border-white/5 bg-amber-955/10 hover:bg-amber-955/20 flex flex-col sm:flex-row sm:items-center justify-between gap-3 transition-all"
+                  >
+                    <div className="flex items-center gap-3 min-w-0">
+                      <div 
+                        className="w-9 h-9 rounded-full flex items-center justify-center text-xs font-bold shrink-0 shadow-inner overflow-hidden text-black font-sans"
+                        style={{ 
+                          backgroundColor: getSessaoAvatarProps ? getSessaoAvatarProps(jogador.foto || '').color : '#10b981',
+                          color: getSessaoAvatarProps && getSessaoAvatarProps(jogador.foto || '').text === '⚪' ? '#fff' : '#000'
+                        }}
+                      >
+                        {jogador.foto && (jogador.foto.startsWith('http') || jogador.foto.startsWith('data:')) ? (
+                          <img src={jogador.foto} className="w-full h-full object-cover rounded-full" alt="" referrerPolicy="no-referrer" />
+                        ) : (
+                          jogador.nome.substring(0, 1).toUpperCase()
+                        )}
+                      </div>
+                      <div className="min-w-0 text-left">
+                        <p className="text-xs font-bold text-white truncate leading-tight">{jogador.nome} {jogador.sobrenome}</p>
+                        <p className="text-[9.5px] text-amber-300 font-mono mt-1">
+                          {partidaObj 
+                            ? `Diária Jogo: ${partidaObj.titulo}` 
+                            : `Mensalidade: ${p.mesRef.split('-').reverse().join('/')}`}
+                        </p>
+                      </div>
+                    </div>
+                    
+                    <div className="text-right shrink-0">
+                      <span className="block font-mono font-black text-white text-xs">
+                        R$ {p.valor.toFixed(2)}
+                      </span>
+                      <span className="block text-[8.5px] font-bold text-amber-400 font-mono uppercase tracking-wider">
+                        Aguardando Liberação
+                      </span>
+                    </div>
+                  </div>
+                );
+              })}
+            </div>
+
+            <div className="shrink-0 border-t border-white/10 pt-4 flex gap-3">
+              <button
+                type="button"
+                onClick={() => {
+                  setMostrarPopUpAlertaAdminPagamentos(false);
+                  setActiveTab('caixa');
+                }}
+                className="flex-1 bg-amber-500 hover:bg-amber-400 text-black font-extrabold py-2.5 rounded-xl transition-all shadow-md active:scale-97 text-xs flex items-center justify-center gap-1.5 cursor-pointer font-sans"
+              >
+                <TrendingUp className="w-4 h-4 text-black" />
+                Ir para Controle de Caixa / Finanças
+              </button>
+              <button
+                type="button"
+                onClick={() => setMostrarPopUpAlertaAdminPagamentos(false)}
+                className="py-2.5 px-4 rounded-xl border border-white/10 hover:bg-white/5 text-emerald-300 hover:text-white transition-all text-xs cursor-pointer font-sans"
               >
                 Fechar
               </button>
