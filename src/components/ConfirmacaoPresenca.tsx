@@ -257,7 +257,20 @@ export default function ConfirmacaoPresenca({
         targetPlayer.createdAt
       );
 
-      if (jogadorAtual.role !== 'admin' && originalStatus === 'diarista' && id === jogadorAtual.id && partidaSelecionada) {
+      const jaPagoDiaria = partidaSelecionada && pagamentos.some(
+        p => p.jogadorId === id && 
+             p.partidaId === partidaSelecionada.id && 
+             p.status === 'pago'
+      );
+
+      const matchMesRef = partidaSelecionada ? partidaSelecionada.data.substring(0, 7) : '';
+      const jaPagoMensalidade = pagamentos.some(
+        p => p.jogadorId === id && 
+             p.mesRef === matchMesRef && 
+             p.status === 'pago'
+      );
+
+      if (jogadorAtual.role !== 'admin' && originalStatus === 'diarista' && id === jogadorAtual.id && partidaSelecionada && !jaPagoDiaria) {
         const novaDiaria = {
           id: `diaria-[temp]-${partidaSelecionada.id}`,
           tipo: 'diaria',
@@ -275,7 +288,7 @@ export default function ConfirmacaoPresenca({
         return;
       }
 
-      if (jogadorAtual.role !== 'admin' && originalStatus === 'mensalista' && debits.length > 0 && id === jogadorAtual.id) {
+      if (jogadorAtual.role !== 'admin' && originalStatus === 'mensalista' && debits.length > 0 && id === jogadorAtual.id && !jaPagoMensalidade) {
         setDebitosPendentes(debits);
         setDadosConfirmacaoPendente({ id, confirmado });
         setShowInadimplenteModal(true);

@@ -691,7 +691,20 @@ export default function CalendarioJogos({
                           jogadorAtual.createdAt
                         );
 
-                        if (jogadorAtual.role !== 'admin' && originalStatus === 'diarista' && !isConfirmado) {
+                        const jaPagoDiaria = activePartidaPopup && pagamentos.some(
+                          p => p.jogadorId === jogadorAtual.id && 
+                               p.partidaId === activePartidaPopup.id && 
+                               p.status === 'pago'
+                        );
+
+                        const matchMesRef = activePartidaPopup ? activePartidaPopup.data.substring(0, 7) : '';
+                        const jaPagoMensalidade = pagamentos.some(
+                          p => p.jogadorId === jogadorAtual.id && 
+                               p.mesRef === matchMesRef && 
+                               p.status === 'pago'
+                        );
+
+                        if (jogadorAtual.role !== 'admin' && originalStatus === 'diarista' && !isConfirmado && !jaPagoDiaria) {
                           const novaDiaria = {
                             id: `diaria-[temp]-${activePartidaPopup.id}`,
                             tipo: 'diaria',
@@ -709,7 +722,7 @@ export default function CalendarioJogos({
                           return;
                         }
 
-                        if (jogadorAtual.role !== 'admin' && originalStatus === 'mensalista' && debits.length > 0 && !isConfirmado) {
+                        if (jogadorAtual.role !== 'admin' && originalStatus === 'mensalista' && debits.length > 0 && !isConfirmado && !jaPagoMensalidade) {
                           setDebitosPendentes(debits);
                           setDadosConfirmacaoPendente({ partidaId: activePartidaPopup.id, jogadorId: jogadorAtual.id, confirmado: true });
                           setShowInadimplenteModal(true);
