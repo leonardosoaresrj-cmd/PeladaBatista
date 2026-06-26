@@ -55,6 +55,7 @@ export default function CheckoutPixModal({
   const [tempoRestante, setTempoRestante] = useState(600); // 10 minutos
   const [simulandoVerificacao, setSimulandoVerificacao] = useState(false);
   const [opcaoSimuladorAtiva, setOpcaoSimuladorAtiva] = useState(false);
+  const [alertaDuplicadoAberto, setAlertaDuplicadoAberto] = useState(false);
   const timerRef = useRef<NodeJS.Timeout | null>(null);
 
   // Mercado Pago configuration simulation
@@ -239,6 +240,29 @@ export default function CheckoutPixModal({
 
   // Declaração de pagamento manual pelo usuário (Já Paguei - Confirmar Quitação)
   const handleDeclararJaPago = () => {
+    // Verificar se algum débito já foi notificado anteriormente
+    const getDebitKey = (deb: any) => {
+      return deb.id || `${deb.mesRef}_${deb.partidaId || 'mensalidade'}`;
+    };
+    
+    const chavesEnviadas = JSON.parse(sessionStorage.getItem('debitos_enviados_admin_' + jogadorAtual.id) || '[]');
+    const algumEnviado = debitos.some(deb => chavesEnviadas.includes(getDebitKey(deb)));
+
+    if (algumEnviado) {
+      setAlertaDuplicadoAberto(true);
+      return;
+    }
+
+    // Registrar novas chaves enviadas
+    const novasChaves = [...chavesEnviadas];
+    debitos.forEach(deb => {
+      const key = getDebitKey(deb);
+      if (!novasChaves.includes(key)) {
+        novasChaves.push(key);
+      }
+    });
+    sessionStorage.setItem('debitos_enviados_admin_' + jogadorAtual.id, JSON.stringify(novasChaves));
+
     setTipoSucesso('pendente');
     setStep('sucesso');
 
@@ -373,17 +397,17 @@ export default function CheckoutPixModal({
               </div>
 
               {/* Botão de Declaração de Pagamento Manual (Já Paguei - Confirmar Quitação) */}
-              <div className="pt-1.5">
+              <div className="my-6 px-1 py-1 bg-amber-500/5 rounded-2xl border border-amber-500/10">
                 <button
                   type="button"
                   onClick={handleDeclararJaPago}
-                  className="w-full bg-amber-500 hover:bg-amber-400 text-black font-extrabold text-xs py-3.5 rounded-xl transition-all shadow-md active:scale-97 flex items-center justify-center gap-2 cursor-pointer uppercase tracking-wider border-b-2 border-amber-700 font-sans"
+                  className="w-full bg-amber-500/10 hover:bg-amber-500/20 text-amber-300 border border-amber-500/30 backdrop-blur-md font-extrabold text-xs py-4 rounded-xl transition-all shadow-[0_0_15px_rgba(245,158,11,0.15)] active:scale-97 flex items-center justify-center gap-2 cursor-pointer uppercase tracking-wider font-sans"
                 >
-                  <Check className="w-4 h-4 text-black stroke-[3px]" />
+                  <Check className="w-4 h-4 text-amber-400 stroke-[3px]" />
                   JÁ PAGUEI — CONFIRMAR QUITAÇÃO
                 </button>
-                <p className="text-[9.5px] text-amber-300 text-center mt-1.5 font-sans leading-tight">
-                  Clique acima caso já tenha realizado a transferência. Seu status ficará como <b>"Aguardando Validação"</b> e o administrador será notificado para aprovação.
+                <p className="text-[9.5px] text-amber-300/80 text-center mt-2.5 px-3 font-sans leading-relaxed">
+                  Clique acima caso já tenha realizado a transferência. Seu status ficará como <b className="text-amber-400">"Aguardando Validação"</b> e o administrador será notificado para aprovação.
                 </p>
               </div>
 
@@ -522,13 +546,51 @@ export default function CheckoutPixModal({
                 </>
               )}
 
+              <div className="w-full max-w-xs flex flex-col gap-3 shrink-0">
+                {tipoSucesso === 'pendente' && (
+                  <a
+                    href={`https://api.whatsapp.com/send?text=${encodeURIComponent(
+                      `Olá! Sou o atleta ${jogadorAtual.nome} ${jogadorAtual.sobrenome} e acabei de informar o pagamento manual de meus débitos no app Pelada Batista Sábado no valor de R$ ${valorTotal.toFixed(2)}. Segue o comprovante em anexo:`
+                    )}`}
+                    target="_blank"
+                    rel="noreferrer"
+                    className="w-full bg-emerald-600 hover:bg-emerald-500 text-white font-extrabold text-xs py-3.5 rounded-xl transition-all shadow-md uppercase flex items-center justify-center gap-2 cursor-pointer font-sans"
+                  >
+                    <Send className="w-4 h-4 text-white animate-pulse" />
+                    Enviar Comprovante via WhatsApp
+                  </a>
+                )}
+
+                <button
+                  onClick={onClose}
+                  className={`w-full text-black font-black text-xs py-3.5 rounded-xl transition-all shadow-md uppercase cursor-pointer tracking-wider ${
+                    tipoSucesso === 'imediato' ? 'bg-teal-500 hover:bg-teal-400' : 'bg-amber-500 hover:bg-amber-400'
+                  }`}
+                >
+                  Concluir e Fechar Tela
+                </button>
+              </div>
+            </div>
+          )}
+
+          {/* Overlay de Alerta Duplicado */}
+          {alertaDuplicadoAberto && (
+            <div className="absolute inset-0 bg-black/95 backdrop-blur-md z-50 flex flex-col items-center justify-center p-6 text-center animate-fade-in">
+              <div className="w-14 h-14 rounded-full bg-amber-500/20 flex items-center justify-center text-amber-400 border border-amber-500/35 mb-4 animate-pulse">
+                <AlertCircle className="w-8 h-8" />
+              </div>
+              <h4 className="font-display font-bold text-sm uppercase tracking-wider text-amber-300 mb-2 font-sans">
+                Aviso já enviado!
+              </h4>
+              <p className="text-xs text-emerald-100 max-w-[280px] leading-relaxed mb-6 font-sans">
+                Você já notificou o administrador sobre o pagamento deste débito. Por favor, aguarde a aprovação na seção de <b>Aprovações</b> do sistema.
+              </p>
               <button
-                onClick={onClose}
-                className={`w-full max-w-xs text-black font-black text-xs py-3 rounded-xl transition-all shadow-md uppercase cursor-pointer tracking-wider ${
-                  tipoSucesso === 'imediato' ? 'bg-teal-500 hover:bg-teal-400' : 'bg-amber-500 hover:bg-amber-400'
-                }`}
+                type="button"
+                onClick={() => setAlertaDuplicadoAberto(false)}
+                className="bg-amber-500/20 hover:bg-amber-500/30 text-amber-300 border border-amber-500/30 text-xs font-bold py-2.5 px-6 rounded-xl transition-all cursor-pointer font-sans"
               >
-                Concluir e Fechar Tela
+                Entendi, vou aguardar
               </button>
             </div>
           )}
