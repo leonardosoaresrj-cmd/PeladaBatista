@@ -1179,6 +1179,24 @@ export default function App() {
     setPagamentos(atualizados);
     savePagamentos(atualizados);
 
+    // Se o pagamento for aprovado (status === 'pago'), confirmar automaticamente a presença do jogador no jogo correspondente
+    if (status === 'pago' && partidaId) {
+      await handleActualizarPresenca(partidaId, jogadorId, true);
+    }
+
+    // Se o pagamento for estornado (status === 'pendente' ou 'cancelado'), remover o jogador do jogo correspondente
+    if (status === 'pendente' || status === 'cancelado') {
+      if (partidaId) {
+        await handleActualizarPresenca(partidaId, jogadorId, null);
+      } else {
+        // Se for mensalidade, remove o jogador de qualquer jogo confirmado deste mês de referência
+        const partidasDoMes = partidas.filter(p => p.data && p.data.substring(0, 7) === mesRef && p.confirmados.includes(jogadorId));
+        for (const p of partidasDoMes) {
+          await handleActualizarPresenca(p.id, jogadorId, null);
+        }
+      }
+    }
+
     if (pagModificado!) {
       await salvarPagamentoNoSupabase(pagModificado);
 
@@ -1240,6 +1258,23 @@ export default function App() {
 
     setPagamentos(atualizados);
     savePagamentos(atualizados);
+
+    // Sincronizar presenças de acordo com os estados dos pagamentos alterados
+    for (const item of items) {
+      if (item.status === 'pago' && item.partidaId) {
+        await handleActualizarPresenca(item.partidaId, jogadorId, true);
+      }
+      if (item.status === 'pendente' || item.status === 'cancelado') {
+        if (item.partidaId) {
+          await handleActualizarPresenca(item.partidaId, jogadorId, null);
+        } else {
+          const partidasDoMes = partidas.filter(p => p.data && p.data.substring(0, 7) === item.mesRef && p.confirmados.includes(jogadorId));
+          for (const p of partidasDoMes) {
+            await handleActualizarPresenca(p.id, jogadorId, null);
+          }
+        }
+      }
+    }
 
     for (const pag of modificados) {
       await salvarPagamentoNoSupabase(pag);

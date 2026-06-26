@@ -523,7 +523,49 @@ export function obterStatusMembroEfetivo(jogador: Jogador, pagamentos: Pagamento
   if (jogador.posicao === 'Goleiro') return 'isento';
   
   const statusOriginal = (jogador.membroStatus || 'diarista') as 'mensalista' | 'diarista' | 'isento';
-  if (statusOriginal === 'mensalista') return 'mensalista';
+  
+  if (statusOriginal === 'mensalista') {
+    const agora = new Date();
+    
+    const obterMesLimit = (): string => {
+      const d = new Date();
+      const y = d.getFullYear();
+      const m = String(d.getMonth() + 1).padStart(2, '0');
+      return `${y}-${m}`;
+    };
+    
+    const mesLimit = obterMesLimit();
+    const mesesAVerificar: string[] = [];
+    const cadastro = jogador.createdAt || new Date().toISOString();
+    const mesCadastro = cadastro.substring(0, 7);
+    
+    const [cadY, cadM] = mesCadastro.split('-').map(Number);
+    const [limY, limM] = mesLimit.split('-').map(Number);
+    
+    let curY = cadY;
+    let curM = cadM;
+    while (curY < limY || (curY === limY && curM <= limM)) {
+      mesesAVerificar.push(`${curY}-${String(curM).padStart(2, '0')}`);
+      curM++;
+      if (curM > 12) {
+        curM = 1;
+        curY++;
+      }
+    }
+    
+    for (const mes of mesesAVerificar) {
+      const pag = pagamentos.find(p => p.jogadorId === r_j_id(jogador.id) && p.mesRef === mes && !p.partidaId);
+      if (!pag || (pag.status !== 'pago' && pag.status !== 'cancelado')) {
+        const [ano, mesNum] = mes.split('-').map(Number);
+        const janela = obterJanelaRenovacaoParaMesRef(ano, mesNum);
+        if (agora > janela.fim) {
+          return 'diarista'; // Perde o status de mensalista!
+        }
+      }
+    }
+    
+    return 'mensalista';
+  }
 
   // Promoção de novos mensalistas para o próximo mês de forma dinâmica
   // Se o diarista pagou a mensalidade de algum mês, e o período de renovação já fechou,

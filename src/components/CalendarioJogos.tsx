@@ -54,6 +54,7 @@ export default function CalendarioJogos({
 
   // Estados para Modal de Inadimplência
   const [showInadimplenteModal, setShowInadimplenteModal] = useState(false);
+  const [showAguardandoAdminModal, setShowAguardandoAdminModal] = useState(false);
   const [debitosPendentes, setDebitosPendentes] = useState<any[]>([]);
 
   // Estado do calendário de visualização: Inicia no mês atual de forma dinâmica
@@ -704,6 +705,25 @@ export default function CalendarioJogos({
                                p.status === 'pago'
                         );
 
+                        const jaInformouDiaria = activePartidaPopup && pagamentos.some(
+                          p => p.jogadorId === jogadorAtual.id && 
+                               p.partidaId === activePartidaPopup.id && 
+                               p.status === 'pendente_confirmacao'
+                        );
+
+                        const jaInformouMensalidade = pagamentos.some(
+                          p => p.jogadorId === jogadorAtual.id && 
+                               p.mesRef === matchMesRef && 
+                               p.status === 'pendente_confirmacao'
+                        );
+
+                        const algumDebitoInformado = debits.some(d => d.status === 'pendente_confirmacao');
+
+                        if (jogadorAtual.role !== 'admin' && (jaInformouDiaria || jaInformouMensalidade || algumDebitoInformado)) {
+                          setShowAguardandoAdminModal(true);
+                          return;
+                        }
+
                         if (jogadorAtual.role !== 'admin' && originalStatus === 'diarista' && !isConfirmado && !jaPagoDiaria) {
                           const novaDiaria = {
                             id: `diaria-[temp]-${activePartidaPopup.id}`,
@@ -1107,6 +1127,41 @@ export default function CalendarioJogos({
             setDebitosParaPagarDiarista([]);
           }}
         />
+      )}
+
+      {showAguardandoAdminModal && (
+        <div id="modal-aguardando-admin" className="fixed inset-0 bg-black/95 backdrop-blur-md flex items-center justify-center p-4 z-50 animate-fade-in">
+          <div className="bg-emerald-950 border border-amber-500/30 rounded-2xl w-full max-w-sm p-6 shadow-2xl space-y-5 text-center relative overflow-hidden">
+            <div className="absolute top-0 left-0 right-0 h-1 bg-gradient-to-r from-amber-500/30 via-amber-500 to-amber-500/30 animate-pulse" />
+            
+            <div className="mx-auto w-14 h-14 rounded-full bg-amber-500/10 border border-amber-500/35 flex items-center justify-center text-amber-400 animate-pulse">
+              <Clock className="w-8 h-8" />
+            </div>
+
+            <div className="space-y-1.5">
+              <h3 className="font-display font-black text-sm text-amber-300 uppercase tracking-wider">
+                Aviso já enviado!
+              </h3>
+              <p className="text-[10px] text-amber-400 font-mono">
+                Aguardando Validação do Administrador
+              </p>
+            </div>
+
+            <p className="text-xs text-emerald-100 leading-relaxed font-sans px-2">
+              Você já notificou o administrador sobre o pagamento de seus débitos pendentes por PIX manual. Sua presença no jogo será <b>confirmada de forma automática</b> assim que o administrador validar seu comprovante na seção de aprovações.
+            </p>
+
+            <div className="pt-2">
+              <button
+                type="button"
+                onClick={() => setShowAguardandoAdminModal(false)}
+                className="w-full py-3 bg-amber-500 hover:bg-amber-450 text-emerald-950 font-black text-xs rounded-xl transition-all shadow-md uppercase font-sans tracking-wider active:scale-97 cursor-pointer"
+              >
+                Entendi, vou aguardar
+              </button>
+            </div>
+          </div>
+        </div>
       )}
 
       {showInadimplenteModal && (

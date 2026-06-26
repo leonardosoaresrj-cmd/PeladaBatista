@@ -73,6 +73,9 @@ export default function CheckoutPixModal({
   // Carregar configurações de Mercado Pago salvas e Chave PIX direta
   useEffect(() => {
     if (isOpen) {
+      setAlertaDuplicadoAberto(false);
+      setStep('qrcode');
+      setTipoSucesso('imediato');
       const token = localStorage.getItem('mercado_pago_access_token');
       if (token && token.trim().length > 10) {
         setMpConfiguracao({
