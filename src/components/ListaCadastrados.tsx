@@ -32,8 +32,8 @@ export default function ListaCadastrados({
   onActualizarPresenca,
   whatsappAutomacaoAtiva = true,
 }: ListaCadastradosProps) {
-  // Filtrar apenas jogadores "Ativo" para a área pública de cadastrados
-  const jogadoresAtivos = jogadores.filter(j => j.status === 'ativo');
+  // Filtrar apenas jogadores "Ativo" (e "Suspenso" se for admin) para a área pública de cadastrados
+  const jogadoresAtivos = jogadores.filter(j => j.status === 'ativo' || (jogadorAtual.role === 'admin' && j.status === 'suspenso'));
 
   // Separar e contar ativos para goleiros, mensalistas e diaristas
   const goleirosAtivos = jogadoresAtivos.filter(j => j.posicao === 'Goleiro');
@@ -453,6 +453,11 @@ export default function ListaCadastrados({
                   }`}>
                     {j.membroStatus}
                   </span>
+                  {j.status === 'suspenso' && (
+                    <span className="text-[9px] px-1.5 py-0.5 rounded font-black uppercase font-mono border bg-rose-950/80 border-rose-500/40 text-rose-400 flex items-center gap-0.5 shadow-sm">
+                      🚫 SUSPENSO
+                    </span>
+                  )}
                 </div>
               </div>
             )}
@@ -582,6 +587,40 @@ export default function ListaCadastrados({
                   <Edit2 className="w-3 h-3 text-emerald-450" />
                   Editar
                 </button>
+
+                {jogadorAtual.role === 'admin' && j.id !== jogadorAtual.id && j.status === 'suspenso' && (
+                  <button
+                    id={`btn-reativar-atleta-${j.id}`}
+                    type="button"
+                    onClick={() => {
+                      if (confirm(`Deseja reativar a conta de ${j.nome} ${j.sobrenome}?`)) {
+                        onEditarJogador(j.id, { status: 'ativo' });
+                      }
+                    }}
+                    className="text-[11px] font-bold text-emerald-300 hover:bg-emerald-950/30 hover:text-white bg-emerald-950/15 border border-emerald-500/15 px-3 py-1.5 rounded-lg transition-colors flex items-center gap-1"
+                    title="Reativar a conta deste jogador"
+                  >
+                    <Check className="w-3 h-3" />
+                    Reativar
+                  </button>
+                )}
+
+                {jogadorAtual.role === 'admin' && j.id !== jogadorAtual.id && j.status !== 'suspenso' && (
+                  <button
+                    id={`btn-suspender-atleta-${j.id}`}
+                    type="button"
+                    onClick={() => {
+                      if (confirm(`Tem certeza que deseja suspender temporariamente a conta de ${j.nome} ${j.sobrenome}?`)) {
+                        onEditarJogador(j.id, { status: 'suspenso' });
+                      }
+                    }}
+                    className="text-[11px] font-bold text-rose-350 hover:bg-rose-950/30 hover:text-white bg-rose-950/15 border border-rose-500/15 px-3 py-1.5 rounded-lg transition-colors flex items-center gap-1"
+                    title="Suspender a conta deste jogador"
+                  >
+                    <ShieldAlert className="w-3 h-3" />
+                    Suspender
+                  </button>
+                )}
                 
                 {/* Permitir exclusão se o usuário for administrador (e não for ele mesmo) ou se for o próprio usuário acessando seu perfil */}
                 {((jogadorAtual.role === 'admin' && j.id !== jogadorAtual.id) || j.id === jogadorAtual.id) && (

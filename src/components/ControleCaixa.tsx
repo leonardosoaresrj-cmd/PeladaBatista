@@ -68,7 +68,7 @@ interface ControleCaixaProps {
 export default function ControleCaixa({
   partidas,
   jogadores,
-  pagamentos,
+  pagamentos: pagamentosRaw,
   lancamentos,
   onAddLancamento,
   onRemoveLancamento,
@@ -82,6 +82,42 @@ export default function ControleCaixa({
   jogadorAtual,
   onLimparDadosDoMes
 }: ControleCaixaProps) {
+  // Deduplicar pagamentos para evitar que registros duplicados afetem a contabilidade
+  const pagamentos = useMemo(() => {
+    const grupos: { [key: string]: Pagamento[] } = {};
+    for (const p of pagamentosRaw) {
+      const key = p.partidaId 
+        ? `diaria-${p.jogadorId}-${p.partidaId}`
+        : `mensal-${p.jogadorId}-${p.mesRef}`;
+      if (!grupos[key]) {
+        grupos[key] = [];
+      }
+      grupos[key].push(p);
+    }
+
+    const uniqueList: Pagamento[] = [];
+    for (const key in grupos) {
+      const lista = grupos[key];
+      if (lista.length === 1) {
+        uniqueList.push(lista[0]);
+      } else {
+        const sorted = [...lista].sort((a, b) => {
+          const statusOrder: { [key: string]: number } = { 'pago': 0, 'pendente_confirmacao': 1, 'pendente': 2, 'cancelado': 3 };
+          const orderA = statusOrder[a.status] !== undefined ? statusOrder[a.status] : 9;
+          const orderB = statusOrder[b.status] !== undefined ? statusOrder[b.status] : 9;
+          if (orderA !== orderB) return orderA - orderB;
+          
+          const dateA = a.dataPagamento || '';
+          const dateB = b.dataPagamento || '';
+          if (dateA !== dateB) return dateB.localeCompare(dateA);
+          
+          return b.id.localeCompare(a.id);
+        });
+        uniqueList.push(sorted[0]);
+      }
+    }
+    return uniqueList;
+  }, [pagamentosRaw]);
   // Helper to find the correct rent of a given month
   const getAluguelDoMes = (mes: string): number => {
     const mapStr = localStorage.getItem('futebol_aluguel_mensal_map');

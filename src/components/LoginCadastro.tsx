@@ -150,7 +150,7 @@ export default function LoginCadastro({ jogadores, onLoginSuccess, onRegistrar }
     }
 
     if (found.status === 'suspenso') {
-      setLoginError('Sua conta foi suspensa temporariamente. Contate o administrador.');
+      onLoginSuccess(found);
       return;
     }
 

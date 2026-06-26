@@ -504,18 +504,36 @@ export default function ConfirmacaoPresenca({
                     </div>
                   </div>
 
-                  <span 
-                    title={j.membroStatus === 'isento' ? 'Goleiro Isento' : j.membroStatus === 'mensalista' ? 'Membro Mensalista' : 'Jogador Diarista'}
-                    className={`text-[8.5px] px-2 py-0.5 font-extrabold rounded-md uppercase font-mono tracking-wider shrink-0 shadow-sm ${
-                      j.membroStatus === 'isento'
-                        ? 'bg-emerald-950/85 border border-emerald-500/40 text-emerald-300'
-                        : j.membroStatus === 'mensalista' 
-                        ? 'bg-teal-950/60 border border-teal-500/35 text-teal-400' 
-                        : 'bg-amber-950/60 border border-amber-500/35 text-amber-400'
-                    }`}
-                  >
-                    {j.membroStatus === 'isento' ? 'ISENTO' : j.membroStatus === 'mensalista' ? 'MENSAL' : 'DIÁRIA'}
-                  </span>
+                  <div className="flex items-center gap-1.5 shrink-0">
+                    <span 
+                      title={j.membroStatus === 'isento' ? 'Goleiro Isento' : j.membroStatus === 'mensalista' ? 'Membro Mensalista' : 'Jogador Diarista'}
+                      className={`text-[8.5px] px-2 py-0.5 font-extrabold rounded-md uppercase font-mono tracking-wider shadow-sm ${
+                        j.membroStatus === 'isento'
+                          ? 'bg-emerald-950/85 border border-emerald-500/40 text-emerald-300'
+                          : j.membroStatus === 'mensalista' 
+                          ? 'bg-teal-950/60 border border-teal-500/35 text-teal-400' 
+                          : 'bg-amber-950/60 border border-amber-500/35 text-amber-400'
+                      }`}
+                    >
+                      {j.membroStatus === 'isento' ? 'ISENTO' : j.membroStatus === 'mensalista' ? 'MENSAL' : 'DIÁRIA'}
+                    </span>
+                    {jogadorAtual.role === 'admin' && (
+                      <button
+                        id={`btn-remover-presenca-posicao-${j.id}`}
+                        type="button"
+                        onClick={(e) => {
+                          e.stopPropagation();
+                          if (confirm(`Remover confirmação de presença de ${j.nome} ${j.sobrenome} nesta partida?`)) {
+                            onActualizarPresenca(partidaSelecionadaId || '', j.id, null);
+                          }
+                        }}
+                        className="p-1 text-rose-450 hover:text-white hover:bg-rose-500/20 rounded transition-all cursor-pointer"
+                        title="Remover Confirmação"
+                      >
+                        <Trash2 className="w-3.5 h-3.5" />
+                      </button>
+                    )}
+                  </div>
                 </div>
               );
             })}
@@ -904,15 +922,33 @@ export default function ConfirmacaoPresenca({
                                 </div>
                               </div>
                             </div>
-                            <span className={`text-[8.5px] px-2 py-0.5 font-extrabold rounded-md uppercase font-mono tracking-wider shrink-0 shadow-sm ${
-                              j.membroStatus === 'isento'
-                                ? 'bg-emerald-950/85 border border-emerald-500/40 text-emerald-300'
-                                : j.membroStatus === 'mensalista'
-                                ? 'bg-teal-950/60 border border-teal-500/35 text-teal-400'
-                                : 'bg-amber-950/60 border border-amber-500/35 text-amber-400'
-                            }`}>
-                              {j.membroStatus === 'isento' ? 'ISENTO' : j.membroStatus === 'mensalista' ? 'MENSAL' : 'DIÁRIA'}
-                            </span>
+                            <div className="flex items-center gap-1.5 shrink-0">
+                              <span className={`text-[8.5px] px-2 py-0.5 font-extrabold rounded-md uppercase font-mono tracking-wider shadow-sm ${
+                                j.membroStatus === 'isento'
+                                  ? 'bg-emerald-950/85 border border-emerald-500/40 text-emerald-300'
+                                  : j.membroStatus === 'mensalista'
+                                  ? 'bg-teal-950/60 border border-teal-500/35 text-teal-400'
+                                  : 'bg-amber-950/60 border border-amber-500/35 text-amber-400'
+                              }`}>
+                                {j.membroStatus === 'isento' ? 'ISENTO' : j.membroStatus === 'mensalista' ? 'MENSAL' : 'DIÁRIA'}
+                              </span>
+                              {jogadorAtual.role === 'admin' && (
+                                <button
+                                  id={`btn-remover-presenca-goleiro-${j.id}`}
+                                  type="button"
+                                  onClick={(e) => {
+                                    e.stopPropagation();
+                                    if (confirm(`Remover confirmação de presença de ${j.nome} ${j.sobrenome} nesta partida?`)) {
+                                      onActualizarPresenca(partidaSelecionadaId || '', j.id, null);
+                                    }
+                                  }}
+                                  className="p-1 text-rose-450 hover:text-white hover:bg-rose-500/20 rounded transition-all cursor-pointer"
+                                  title="Remover Confirmação"
+                                >
+                                  <Trash2 className="w-3.5 h-3.5" />
+                                </button>
+                              )}
+                            </div>
                           </div>
                         );
                       })}
@@ -983,9 +1019,27 @@ export default function ConfirmacaoPresenca({
                                 </div>
                               </div>
                             </div>
-                            <span className="text-[8.5px] px-2 py-0.5 font-extrabold rounded-md uppercase font-mono tracking-wider shrink-0 shadow-sm bg-teal-950/60 border border-teal-500/35 text-teal-400">
-                              MENSAL
-                            </span>
+                            <div className="flex items-center gap-1.5 shrink-0">
+                              <span className="text-[8.5px] px-2 py-0.5 font-extrabold rounded-md uppercase font-mono tracking-wider shadow-sm bg-teal-950/60 border border-teal-500/35 text-teal-400">
+                                MENSAL
+                              </span>
+                              {jogadorAtual.role === 'admin' && (
+                                <button
+                                  id={`btn-remover-presenca-mensal-${j.id}`}
+                                  type="button"
+                                  onClick={(e) => {
+                                    e.stopPropagation();
+                                    if (confirm(`Remover confirmação de presença de ${j.nome} ${j.sobrenome} nesta partida?`)) {
+                                      onActualizarPresenca(partidaSelecionadaId || '', j.id, null);
+                                    }
+                                  }}
+                                  className="p-1 text-rose-450 hover:text-white hover:bg-rose-500/20 rounded transition-all cursor-pointer"
+                                  title="Remover Confirmação"
+                                >
+                                  <Trash2 className="w-3.5 h-3.5" />
+                                </button>
+                              )}
+                            </div>
                           </div>
                         );
                       })}
@@ -1056,9 +1110,27 @@ export default function ConfirmacaoPresenca({
                                 </div>
                               </div>
                             </div>
-                            <span className="text-[8.5px] px-2 py-0.5 font-extrabold rounded-md uppercase font-mono tracking-wider shrink-0 shadow-sm bg-amber-950/60 border border-amber-500/35 text-amber-400">
-                              DIÁRIA
-                            </span>
+                            <div className="flex items-center gap-1.5 shrink-0">
+                              <span className="text-[8.5px] px-2 py-0.5 font-extrabold rounded-md uppercase font-mono tracking-wider shadow-sm bg-amber-950/60 border border-amber-500/35 text-amber-400">
+                                DIÁRIA
+                              </span>
+                              {jogadorAtual.role === 'admin' && (
+                                <button
+                                  id={`btn-remover-presenca-diaria-${j.id}`}
+                                  type="button"
+                                  onClick={(e) => {
+                                    e.stopPropagation();
+                                    if (confirm(`Remover confirmação de presença de ${j.nome} ${j.sobrenome} nesta partida?`)) {
+                                      onActualizarPresenca(partidaSelecionadaId || '', j.id, null);
+                                    }
+                                  }}
+                                  className="p-1 text-rose-450 hover:text-white hover:bg-rose-500/20 rounded transition-all cursor-pointer"
+                                  title="Remover Confirmação"
+                                >
+                                  <Trash2 className="w-3.5 h-3.5" />
+                                </button>
+                              )}
+                            </div>
                           </div>
                         );
                       })}
@@ -1120,18 +1192,36 @@ export default function ConfirmacaoPresenca({
                           </div>
                         </div>
 
-                        <span
-                          title={j.membroStatus === 'isento' ? 'Goleiro Isento' : j.membroStatus === 'mensalista' ? 'Membro Mensalista' : 'Jogador Diarista'}
-                          className={`text-[9px] px-2 py-0.5 font-extrabold rounded-md uppercase font-mono tracking-wider shrink-0 shadow-sm ${
-                            j.membroStatus === 'isento'
-                              ? 'bg-emerald-950/85 border border-emerald-500/40 text-emerald-300'
-                              : j.membroStatus === 'mensalista'
-                              ? 'bg-teal-950/60 border border-teal-500/35 text-teal-400'
-                              : 'bg-amber-950/60 border border-amber-500/35 text-amber-400'
-                          }`}
-                        >
-                          {j.membroStatus === 'isento' ? 'ISENTO' : j.membroStatus === 'mensalista' ? 'MENSAL' : 'DIÁRIA'}
-                        </span>
+                        <div className="flex items-center gap-1.5 shrink-0">
+                          <span
+                            title={j.membroStatus === 'isento' ? 'Goleiro Isento' : j.membroStatus === 'mensalista' ? 'Membro Mensalista' : 'Jogador Diarista'}
+                            className={`text-[9px] px-2 py-0.5 font-extrabold rounded-md uppercase font-mono tracking-wider shadow-sm ${
+                              j.membroStatus === 'isento'
+                                ? 'bg-emerald-950/85 border border-emerald-500/40 text-emerald-300'
+                                : j.membroStatus === 'mensalista'
+                                ? 'bg-teal-950/60 border border-teal-500/35 text-teal-400'
+                                : 'bg-amber-950/60 border border-amber-500/35 text-amber-400'
+                            }`}
+                          >
+                            {j.membroStatus === 'isento' ? 'ISENTO' : j.membroStatus === 'mensalista' ? 'MENSAL' : 'DIÁRIA'}
+                          </span>
+                          {jogadorAtual.role === 'admin' && (
+                            <button
+                              id={`btn-remover-presenca-espera-${j.id}`}
+                              type="button"
+                              onClick={(e) => {
+                                e.stopPropagation();
+                                if (confirm(`Remover ${j.nome} ${j.sobrenome} da lista de espera?`)) {
+                                  onActualizarPresenca(partidaSelecionadaId || '', j.id, null);
+                                }
+                              }}
+                              className="p-1 text-rose-450 hover:text-white hover:bg-rose-500/20 rounded transition-all cursor-pointer"
+                              title="Remover da Lista de Espera"
+                            >
+                              <Trash2 className="w-3.5 h-3.5" />
+                            </button>
+                          )}
+                        </div>
                       </div>
                     );
                   })}

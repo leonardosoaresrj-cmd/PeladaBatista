@@ -681,7 +681,7 @@ export default function App() {
       const parsed = JSON.parse(savedSession) as Jogador;
       // Validar se o jogador ainda existe no banco
       const baseJogadores = getSavedJogadores();
-      const match = baseJogadores.find(j => j.id === parsed.id && j.status === 'ativo');
+      const match = baseJogadores.find(j => j.id === parsed.id && (j.status === 'ativo' || j.status === 'suspenso'));
       if (match) {
         setJogadorAtual(match);
         // Migramos para sessionStorage para deslogar ao sair do app (fechar aba/desligar pc)
@@ -1955,6 +1955,36 @@ export default function App() {
               className="w-full bg-teal-500 hover:bg-teal-400 text-emerald-950 font-black py-2.5 rounded-xl transition-all shadow-md active:scale-97 text-xs uppercase"
             >
               Fazer Login Novamente
+            </button>
+          </div>
+        </div>
+      )}
+
+      {/* POPUP DE CONTA SUSPENSA TEMPORARIAMENTE */}
+      {jogadorAtual && jogadorAtual.status === 'suspenso' && (
+        <div 
+          id="popup-conta-suspensa"
+          className="fixed inset-0 z-[100] flex items-center justify-center p-4 bg-black/95 backdrop-blur-md animate-fade-in text-white font-sans"
+        >
+          <div className="bg-emerald-950 border border-rose-500/30 rounded-2xl max-w-sm w-full p-6 text-center shadow-2xl relative animate-scale-up">
+            <div className="w-16 h-16 bg-rose-500/10 border-2 border-rose-500 text-rose-400 rounded-full flex items-center justify-center mx-auto mb-4">
+              <ShieldAlert className="w-8 h-8 animate-pulse" />
+            </div>
+            <h3 className="font-display font-black text-sm uppercase tracking-widest text-rose-400 mb-2">🚨 Conta Suspensa</h3>
+            <p className="text-xs text-emerald-250/95 leading-relaxed mb-6 font-sans">
+              Olá, <b className="text-white">{jogadorAtual.nome} {jogadorAtual.sobrenome}</b>. Sua conta foi suspensa temporariamente do elenco pelo administrador do portal.
+              <br/><br/>
+              Por favor, contate o administrador para regularizar sua situação.
+            </p>
+            <button
+              id="btn-conta-suspensa-ok"
+              type="button"
+              onClick={() => {
+                performLogout();
+              }}
+              className="w-full bg-rose-600 hover:bg-rose-500 text-white font-black py-2.5 rounded-xl transition-all shadow-md active:scale-97 text-xs uppercase"
+            >
+              OK, voltar para o login
             </button>
           </div>
         </div>
