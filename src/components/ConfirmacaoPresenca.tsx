@@ -524,13 +524,13 @@ export default function ConfirmacaoPresenca({
                         onClick={(e) => {
                           e.stopPropagation();
                           if (confirm(`Remover confirmação de presença de ${j.nome} ${j.sobrenome} nesta partida?`)) {
-                            onActualizarPresenca(partidaSelecionadaId || '', j.id, null);
+                            onActualizarPresenca(idPartidaCorrente || '', j.id, null);
                           }
                         }}
-                        className="p-1 text-rose-450 hover:text-white hover:bg-rose-500/20 rounded transition-all cursor-pointer"
+                        className="text-[10px] font-bold text-rose-400 hover:text-rose-300 hover:bg-rose-950/40 border border-rose-500/20 px-2 py-0.5 rounded transition-colors cursor-pointer uppercase font-mono tracking-wider shrink-0"
                         title="Remover Confirmação"
                       >
-                        <Trash2 className="w-3.5 h-3.5" />
+                        Remover
                       </button>
                     )}
                   </div>
@@ -939,13 +939,13 @@ export default function ConfirmacaoPresenca({
                                   onClick={(e) => {
                                     e.stopPropagation();
                                     if (confirm(`Remover confirmação de presença de ${j.nome} ${j.sobrenome} nesta partida?`)) {
-                                      onActualizarPresenca(partidaSelecionadaId || '', j.id, null);
+                                      onActualizarPresenca(idPartidaCorrente || '', j.id, null);
                                     }
                                   }}
-                                  className="p-1 text-rose-450 hover:text-white hover:bg-rose-500/20 rounded transition-all cursor-pointer"
+                                  className="text-[10px] font-bold text-rose-400 hover:text-rose-300 hover:bg-rose-950/40 border border-rose-500/20 px-2 py-0.5 rounded transition-colors cursor-pointer uppercase font-mono tracking-wider shrink-0"
                                   title="Remover Confirmação"
                                 >
-                                  <Trash2 className="w-3.5 h-3.5" />
+                                  Remover
                                 </button>
                               )}
                             </div>
@@ -1030,13 +1030,13 @@ export default function ConfirmacaoPresenca({
                                   onClick={(e) => {
                                     e.stopPropagation();
                                     if (confirm(`Remover confirmação de presença de ${j.nome} ${j.sobrenome} nesta partida?`)) {
-                                      onActualizarPresenca(partidaSelecionadaId || '', j.id, null);
+                                      onActualizarPresenca(idPartidaCorrente || '', j.id, null);
                                     }
                                   }}
-                                  className="p-1 text-rose-450 hover:text-white hover:bg-rose-500/20 rounded transition-all cursor-pointer"
+                                  className="text-[10px] font-bold text-rose-400 hover:text-rose-300 hover:bg-rose-950/40 border border-rose-500/20 px-2 py-0.5 rounded transition-colors cursor-pointer uppercase font-mono tracking-wider shrink-0"
                                   title="Remover Confirmação"
                                 >
-                                  <Trash2 className="w-3.5 h-3.5" />
+                                  Remover
                                 </button>
                               )}
                             </div>
@@ -1121,13 +1121,13 @@ export default function ConfirmacaoPresenca({
                                   onClick={(e) => {
                                     e.stopPropagation();
                                     if (confirm(`Remover confirmação de presença de ${j.nome} ${j.sobrenome} nesta partida?`)) {
-                                      onActualizarPresenca(partidaSelecionadaId || '', j.id, null);
+                                      onActualizarPresenca(idPartidaCorrente || '', j.id, null);
                                     }
                                   }}
-                                  className="p-1 text-rose-450 hover:text-white hover:bg-rose-500/20 rounded transition-all cursor-pointer"
+                                  className="text-[10px] font-bold text-rose-400 hover:text-rose-300 hover:bg-rose-950/40 border border-rose-500/20 px-2 py-0.5 rounded transition-colors cursor-pointer uppercase font-mono tracking-wider shrink-0"
                                   title="Remover Confirmação"
                                 >
-                                  <Trash2 className="w-3.5 h-3.5" />
+                                  Remover
                                 </button>
                               )}
                             </div>
@@ -1212,13 +1212,13 @@ export default function ConfirmacaoPresenca({
                               onClick={(e) => {
                                 e.stopPropagation();
                                 if (confirm(`Remover ${j.nome} ${j.sobrenome} da lista de espera?`)) {
-                                  onActualizarPresenca(partidaSelecionadaId || '', j.id, null);
+                                  onActualizarPresenca(idPartidaCorrente || '', j.id, null);
                                 }
                               }}
-                              className="p-1 text-rose-450 hover:text-white hover:bg-rose-500/20 rounded transition-all cursor-pointer"
+                              className="text-[10px] font-bold text-rose-400 hover:text-rose-300 hover:bg-rose-950/40 border border-rose-500/20 px-2 py-0.5 rounded transition-colors cursor-pointer uppercase font-mono tracking-wider shrink-0"
                               title="Remover da Lista de Espera"
                             >
-                              <Trash2 className="w-3.5 h-3.5" />
+                              Remover
                             </button>
                           )}
                         </div>

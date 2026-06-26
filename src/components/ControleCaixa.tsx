@@ -2898,110 +2898,207 @@ export default function ControleCaixa({
             <p className="text-xs font-sans italic text-emerald-500/50">Nenhum jogador registrado como pagante (comprovante quitado) para o mês de {mesSelecionado.split('-').reverse().join('/')}.</p>
           </div>
         ) : (
-          <div className="overflow-x-auto text-[11px]">
-            <table className="w-full text-left border-collapse font-sans text-[11px] text-white">
-              <thead>
-                <tr className="border-b border-white/5 text-[10px] text-emerald-400 uppercase tracking-widest bg-black/10">
-                  <th className="py-3 px-4 font-bold">Jogador / Atleta</th>
-                  <th className="py-3 px-4 font-bold">Tipo</th>
-                  <th className="py-3 px-4 font-bold">Posição</th>
-                  <th className="py-3 px-4 font-bold">Data do Pagamento</th>
-                  <th className="py-3 px-4 font-bold">Mês/Dia de Referência</th>
-                  <th className="py-3 px-4 font-bold text-right">Valor Pago</th>
-                  <th className="py-3 px-4 font-bold text-center">Status</th>
-                </tr>
-              </thead>
-              <tbody className="divide-y divide-white/5">
-                {pagantesDetalhado.map(({ pagamento, jogador }) => {
-                  const avatar = AVATAR_PRESETS.find(p => p.id === jogador.foto) || AVATAR_PRESETS[0];
-                  return (
-                    <tr 
-                      key={pagamento.id} 
-                      className="hover:bg-white/5 transition-colors"
-                    >
-                      <td className="py-3.5 px-4">
-                        <div className="flex items-center gap-2.5">
-                          <div 
-                            className="w-8 h-8 rounded-full flex items-center justify-center text-xs font-bold shrink-0 border border-white/10 cursor-zoom-in hover:scale-110 active:scale-95 transition-all duration-200 overflow-hidden"
-                            style={{ backgroundColor: avatar.color }}
-                            onClick={() => {
-                              if (jogador.foto && (jogador.foto.startsWith('http') || jogador.foto.startsWith('data:'))) {
-                                (window as any).ampliarFoto?.(jogador.foto, `${jogador.nome} ${jogador.sobrenome}`);
+          <>
+            {/* VIEW DESKTOP E TABLET GRANDE (TABELA) */}
+            <div className="hidden md:block overflow-x-auto text-[11px]">
+              <table className="w-full text-left border-collapse font-sans text-[11px] text-white">
+                <thead>
+                  <tr className="border-b border-white/5 text-[10px] text-emerald-400 uppercase tracking-widest bg-black/10">
+                    <th className="py-3 px-4 font-bold">Jogador / Atleta</th>
+                    <th className="py-3 px-4 font-bold">Tipo</th>
+                    <th className="py-3 px-4 font-bold">Posição</th>
+                    <th className="py-3 px-4 font-bold">Data do Pagamento</th>
+                    <th className="py-3 px-4 font-bold">Mês/Dia de Referência</th>
+                    <th className="py-3 px-4 font-bold text-right">Valor Pago</th>
+                    <th className="py-3 px-4 font-bold text-center">Status</th>
+                  </tr>
+                </thead>
+                <tbody className="divide-y divide-white/5">
+                  {pagantesDetalhado.map(({ pagamento, jogador }) => {
+                    const avatar = AVATAR_PRESETS.find(p => p.id === jogador.foto) || AVATAR_PRESETS[0];
+                    return (
+                      <tr 
+                        key={pagamento.id} 
+                        className="hover:bg-white/5 transition-colors"
+                      >
+                        <td className="py-3.5 px-4">
+                          <div className="flex items-center gap-2.5">
+                            <div 
+                              className="w-8 h-8 rounded-full flex items-center justify-center text-xs font-bold shrink-0 border border-white/10 cursor-zoom-in hover:scale-110 active:scale-95 transition-all duration-200 overflow-hidden"
+                              style={{ backgroundColor: avatar.color }}
+                              onClick={() => {
+                                if (jogador.foto && (jogador.foto.startsWith('http') || jogador.foto.startsWith('data:'))) {
+                                  (window as any).ampliarFoto?.(jogador.foto, `${jogador.nome} ${jogador.sobrenome}`);
+                                }
+                              }}
+                              title={jogador.foto ? "Clique para ampliar a foto" : undefined}
+                            >
+                              {jogador.foto && (jogador.foto.startsWith('http') || jogador.foto.startsWith('data:')) ? (
+                                <img src={jogador.foto} className="w-full h-full object-cover rounded-full" alt="" referrerPolicy="no-referrer" />
+                              ) : (
+                                jogador.posicao.substring(0, 1)
+                              )}
+                            </div>
+                            <div>
+                              <p className="font-bold text-white text-xs">{jogador.nome} {jogador.sobrenome}</p>
+                              <p className="text-[10px] text-emerald-400 font-mono">{jogador.email}</p>
+                            </div>
+                          </div>
+                        </td>
+                        <td className="py-3.5 px-4">
+                          <span className={`inline-block px-2.5 py-0.5 rounded-full text-[10px] font-bold uppercase tracking-wider ${
+                            jogador.membroStatus === 'mensalista' 
+                              ? 'bg-amber-500/10 border border-amber-500/20 text-amber-400' 
+                              : 'bg-indigo-500/10 border border-indigo-500/20 text-indigo-400'
+                          }`}>
+                            {jogador.membroStatus}
+                          </span>
+                        </td>
+                        <td className="py-3.5 px-4 font-mono text-[11px] text-emerald-300">
+                          {jogador.posicao}
+                        </td>
+                        <td className="py-3.5 px-4 text-emerald-300/80 font-mono text-[11px]">
+                          {pagamento.dataPagamento 
+                            ? pagamento.dataPagamento.split('T')[0].split('-').reverse().join('/') 
+                            : 'Sincronizado'}
+                        </td>
+                        <td className="py-3.5 px-4 font-mono text-[11px] text-teal-300/85">
+                          {(() => {
+                            if (jogador.membroStatus === 'mensalista') {
+                              return pagamento.mesRef.split('-').reverse().join('/');
+                            } else {
+                              const pObj = pagamento.partidaId ? partidas.find(pt => pt.id === pagamento.partidaId) : null;
+                              if (pObj) {
+                                return pObj.data.split('T')[0].split('-').reverse().join('/');
                               }
-                            }}
-                            title={jogador.foto ? "Clique para ampliar a foto" : undefined}
-                          >
-                            {jogador.foto && (jogador.foto.startsWith('http') || jogador.foto.startsWith('data:')) ? (
-                              <img src={jogador.foto} className="w-full h-full object-cover rounded-full" alt="" referrerPolicy="no-referrer" />
-                            ) : (
-                              jogador.posicao.substring(0, 1)
-                            )}
+                              return `Diária ${pagamento.mesRef.split('-').reverse().join('/')}`;
+                            }
+                          })()}
+                        </td>
+                        <td className="py-3.5 px-4 text-right font-mono font-bold text-teal-300 text-[11px]">
+                          R$ {pagamento.valor.toFixed(2)}
+                        </td>
+                        <td className="py-3.5 px-4 text-center">
+                          <div className="flex items-center justify-center gap-1.5">
+                            <span className="inline-flex items-center gap-1 bg-teal-500/10 border border-teal-500/30 text-teal-400 text-[9.5px] font-bold rounded px-2 py-0.5 uppercase font-mono">
+                              <CheckCircle2 className="w-2.5 h-2.5 text-teal-400 shrink-0" />
+                              Validado
+                            </span>
+                            <button
+                              type="button"
+                              id={`btn-estornar-tabela-${pagamento.id}`}
+                              onClick={() => {
+                                if (onRegistrarPagamento) {
+                                  onRegistrarPagamento(jogador.id, pagamento.mesRef, 'pendente', null, pagamento.valor, pagamento.partidaId);
+                                }
+                              }}
+                              className="text-[9.5px] font-bold text-rose-450 hover:text-white hover:bg-rose-500 border border-rose-500/20 py-0.5 px-2 rounded hover:bg-rose-950 hover:border-rose-500/40 transition-all cursor-pointer"
+                            >
+                              Estornar
+                            </button>
                           </div>
-                          <div>
-                            <p className="font-bold text-white text-xs">{jogador.nome} {jogador.sobrenome}</p>
-                            <p className="text-[10px] text-emerald-400 font-mono">{jogador.email}</p>
-                          </div>
+                        </td>
+                      </tr>
+                    );
+                  })}
+                </tbody>
+              </table>
+            </div>
+
+            {/* VIEW MOBILE E TABLET PEQUENO (LISTA DE CARDS) */}
+            <div className="block md:hidden space-y-3">
+              {pagantesDetalhado.map(({ pagamento, jogador }) => {
+                const avatar = AVATAR_PRESETS.find(p => p.id === jogador.foto) || AVATAR_PRESETS[0];
+                return (
+                  <div 
+                    key={`card-pagamento-mobile-${pagamento.id}`}
+                    className="bg-emerald-950/40 border border-white/5 rounded-xl p-4 space-y-3 text-xs"
+                  >
+                    <div className="flex items-start justify-between gap-2.5">
+                      <div className="flex items-center gap-2.5">
+                        <div 
+                          className="w-9 h-9 rounded-full flex items-center justify-center text-xs font-bold shrink-0 border border-white/10 overflow-hidden"
+                          style={{ backgroundColor: avatar.color }}
+                          onClick={() => {
+                            if (jogador.foto && (jogador.foto.startsWith('http') || jogador.foto.startsWith('data:'))) {
+                              (window as any).ampliarFoto?.(jogador.foto, `${jogador.nome} ${jogador.sobrenome}`);
+                            }
+                          }}
+                        >
+                          {jogador.foto && (jogador.foto.startsWith('http') || jogador.foto.startsWith('data:')) ? (
+                            <img src={jogador.foto} className="w-full h-full object-cover rounded-full" alt="" referrerPolicy="no-referrer" />
+                          ) : (
+                            jogador.posicao.substring(0, 1)
+                          )}
                         </div>
-                      </td>
-                      <td className="py-3.5 px-4">
-                        <span className={`inline-block px-2.5 py-0.5 rounded-full text-[10px] font-bold uppercase tracking-wider ${
+                        <div>
+                          <p className="font-bold text-white text-xs">{jogador.nome} {jogador.sobrenome}</p>
+                          <p className="text-[10px] text-emerald-400/80 font-mono leading-none mt-0.5">{jogador.posicao}</p>
+                        </div>
+                      </div>
+
+                      <div className="text-right">
+                        <p className="font-mono font-black text-teal-300 text-sm">R$ {pagamento.valor.toFixed(2)}</p>
+                        <span className={`inline-block px-1.5 py-0.5 rounded text-[8px] font-black uppercase tracking-wider mt-1 ${
                           jogador.membroStatus === 'mensalista' 
                             ? 'bg-amber-500/10 border border-amber-500/20 text-amber-400' 
                             : 'bg-indigo-500/10 border border-indigo-500/20 text-indigo-400'
                         }`}>
                           {jogador.membroStatus}
                         </span>
-                      </td>
-                      <td className="py-3.5 px-4 font-mono text-[11px] text-emerald-300">
-                        {jogador.posicao}
-                      </td>
-                      <td className="py-3.5 px-4 text-emerald-300/80 font-mono text-[11px]">
-                        {pagamento.dataPagamento 
-                          ? pagamento.dataPagamento.split('T')[0].split('-').reverse().join('/') 
-                          : 'Sincronizado'}
-                      </td>
-                      <td className="py-3.5 px-4 font-mono text-[11px] text-teal-300/85">
-                        {(() => {
-                          if (jogador.membroStatus === 'mensalista') {
-                            return pagamento.mesRef.split('-').reverse().join('/');
-                          } else {
-                            const pObj = pagamento.partidaId ? partidas.find(pt => pt.id === pagamento.partidaId) : null;
-                            if (pObj) {
-                              return pObj.data.split('T')[0].split('-').reverse().join('/');
-                            }
-                            return `Diária ${pagamento.mesRef.split('-').reverse().join('/')}`;
-                          }
-                        })()}
-                      </td>
-                      <td className="py-3.5 px-4 text-right font-mono font-bold text-teal-300 text-[11px]">
-                        R$ {pagamento.valor.toFixed(2)}
-                      </td>
-                      <td className="py-3.5 px-4 text-center">
-                        <div className="flex items-center justify-center gap-1.5">
-                          <span className="inline-flex items-center gap-1 bg-teal-500/10 border border-teal-500/30 text-teal-400 text-[9.5px] font-bold rounded px-2 py-0.5 uppercase font-mono">
-                            <CheckCircle2 className="w-2.5 h-2.5 text-teal-400 shrink-0" />
-                            Validado
-                          </span>
-                          <button
-                            type="button"
-                            id={`btn-estornar-tabela-${pagamento.id}`}
-                            onClick={() => {
-                              if (onRegistrarPagamento) {
-                                onRegistrarPagamento(jogador.id, pagamento.mesRef, 'pendente', null, pagamento.valor, pagamento.partidaId);
+                      </div>
+                    </div>
+
+                    <div className="grid grid-cols-2 gap-2 pt-2 border-t border-white/5 text-[10px] text-emerald-300/80 font-mono">
+                      <div>
+                        <p className="text-emerald-500/60 uppercase font-black tracking-wider text-[8px]">Pago em</p>
+                        <p className="text-white font-medium mt-0.5">
+                          {pagamento.dataPagamento 
+                            ? pagamento.dataPagamento.split('T')[0].split('-').reverse().join('/') 
+                            : 'Sincronizado'}
+                        </p>
+                      </div>
+                      <div>
+                        <p className="text-emerald-500/60 uppercase font-black tracking-wider text-[8px]">Referência</p>
+                        <p className="text-teal-300 font-medium mt-0.5">
+                          {(() => {
+                            if (jogador.membroStatus === 'mensalista') {
+                              return pagamento.mesRef.split('-').reverse().join('/');
+                            } else {
+                              const pObj = pagamento.partidaId ? partidas.find(pt => pt.id === pagamento.partidaId) : null;
+                              if (pObj) {
+                                return pObj.data.split('T')[0].split('-').reverse().join('/');
                               }
-                            }}
-                            className="text-[9.5px] font-bold text-rose-400 hover:text-rose-300 bg-rose-950/40 border border-rose-500/20 py-0.5 px-2 rounded hover:bg-rose-950 hover:border-rose-500/40 transition-all cursor-pointer"
-                          >
-                            Estornar
-                          </button>
-                        </div>
-                      </td>
-                    </tr>
-                  );
-                })}
-              </tbody>
-            </table>
-          </div>
+                              return `Diária ${pagamento.mesRef.split('-').reverse().join('/')}`;
+                            }
+                          })()}
+                        </p>
+                      </div>
+                    </div>
+
+                    <div className="flex items-center justify-between pt-2 border-t border-white/5 gap-2">
+                      <span className="inline-flex items-center gap-1 bg-teal-500/10 border border-teal-500/20 text-teal-400 text-[9px] font-bold rounded px-2 py-0.5 uppercase font-mono">
+                        <CheckCircle2 className="w-2.5 h-2.5 text-teal-400 shrink-0" />
+                        Validado
+                      </span>
+                      <button
+                        type="button"
+                        id={`btn-estornar-card-mobile-${pagamento.id}`}
+                        onClick={() => {
+                          if (onRegistrarPagamento) {
+                            onRegistrarPagamento(jogador.id, pagamento.mesRef, 'pendente', null, pagamento.valor, pagamento.partidaId);
+                          }
+                        }}
+                        className="text-[9.5px] font-black uppercase text-rose-400 hover:text-rose-300 bg-rose-950/40 border border-rose-500/20 py-1 px-2.5 rounded-lg hover:bg-rose-950 transition-all cursor-pointer"
+                      >
+                        Estornar
+                      </button>
+                    </div>
+                  </div>
+                );
+              })}
+            </div>
+          </>
         )}
       </div>
 
