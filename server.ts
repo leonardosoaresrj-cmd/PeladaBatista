@@ -161,9 +161,24 @@ async function startServer() {
     app.use(vite.middlewares);
   } else {
     const distPath = path.join(process.cwd(), 'dist');
-    app.use(express.static(distPath));
+    app.use(express.static(distPath, {
+      setHeaders: (res, filePath) => {
+        // Se for o index.html ou qualquer arquivo .html servido estaticamente, desativar cache completamente
+        if (filePath.endsWith('.html') || path.basename(filePath) === 'index.html') {
+          res.setHeader('Cache-Control', 'no-store, no-cache, must-revalidate, proxy-revalidate, max-age=0');
+          res.setHeader('Pragma', 'no-cache');
+          res.setHeader('Expires', '0');
+        } else if (filePath.match(/\.(js|css|woff2?|eot|ttf|otf|png|gif|jpe?g|svg|ico|webp)$/)) {
+          // Arquivos estáticos compilados com hash pelo Vite podem ter cache agressivo de 1 ano
+          res.setHeader('Cache-Control', 'public, max-age=31536000, immutable');
+        }
+      }
+    }));
     // Fallback para SPA em produção, express 4 é get('*')
     app.get('*', (req, res) => {
+      res.setHeader('Cache-Control', 'no-store, no-cache, must-revalidate, proxy-revalidate, max-age=0');
+      res.setHeader('Pragma', 'no-cache');
+      res.setHeader('Expires', '0');
       res.sendFile(path.join(distPath, 'index.html'));
     });
   }
