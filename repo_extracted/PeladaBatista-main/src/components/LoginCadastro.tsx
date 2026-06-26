@@ -9,7 +9,6 @@ import { AVATAR_PRESETS } from '../data';
 import { KeyRound, Mail, User, Calendar, Shield, Users, Check, AlertCircle, ArrowLeft, Send, Loader2 } from 'lucide-react';
 import logoPelada from '../assets/images/logo_pelada.svg';
 import { isFechamentoMensalistas, obterJanelaRenovacaoParaMesRef } from '../utils/confirmationRules';
-import { obterCredenciaisSupabase } from '../supabaseClient';
 
 interface LoginCadastroProps {
   jogadores: Jogador[];
@@ -73,10 +72,10 @@ export default function LoginCadastro({ jogadores, onLoginSuccess, onRegistrar }
     setIsSending(true);
 
     try {
-      // Obter credenciais do Supabase (dinâmicas ou padrão)
-      const { url: supabaseUrl, key: supabaseAnonKey } = obterCredenciaisSupabase();
+      // Lê a anon key do localStorage (salva nas configurações do Supabase do portal)
+      const supabaseAnonKey = localStorage.getItem('supabase_key_config') || '';
 
-      const response = await fetch(`${supabaseUrl}/functions/v1/recover-password`, {
+      const response = await fetch('https://gqasacnaubkhokqyrpwc.supabase.co/functions/v1/recover-password', {
         method: 'POST',
         headers: {
           'Content-Type': 'application/json',

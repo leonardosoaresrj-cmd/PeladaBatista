@@ -33,7 +33,6 @@ import {
   salvarConfiguracaoNoSupabase,
   carregarBotLogsDoSupabase,
   limparBotLogsDoSupabase,
-  salvarBotLogNoSupabase,
   atualizarStatusPresencaUsuario
 } from './supabaseClient';
 import LoginCadastro from './components/LoginCadastro';
@@ -336,8 +335,15 @@ export default function App() {
       return updated;
     });
     
-    if (getSupabase()) {
-      salvarBotLogNoSupabase(novoLog);
+    const supabase = getSupabase();
+    if (supabase) {
+       // Omitimos o ID customizado "log-..." para que o Postgres possa usar o default uuid_generate_v4()
+       const { id, ...supabaseLogPayload } = novoLog;
+       try {
+         await supabase.from('bot_logs').insert(supabaseLogPayload);
+       } catch (e) {
+         console.error('Erro ao salvar log no Supabase:', e);
+       }
     }
 
     if (whatsappAutomacaoAtiva && whatsappWebhookUrl) {
@@ -376,8 +382,13 @@ export default function App() {
               return updated;
             });
 
-            if (getSupabase()) {
-              salvarBotLogNoSupabase(logFalha);
+            if (supabase) {
+               const { id, ...supabaseLogPayload } = logFalha;
+               try {
+                 await supabase.from('bot_logs').insert(supabaseLogPayload);
+               } catch (e) {
+                 console.error(e);
+               }
             }
           } else {
             // Log de sucesso opcional para que o usuário sinta segurança de que deu certo de fato
@@ -395,8 +406,13 @@ export default function App() {
               return updated;
             });
 
-            if (getSupabase()) {
-              salvarBotLogNoSupabase(logSucesso);
+            if (supabase) {
+               const { id, ...supabaseLogPayload } = logSucesso;
+               try {
+                 await supabase.from('bot_logs').insert(supabaseLogPayload);
+               } catch (e) {
+                 console.error(e);
+               }
             }
           }
         } catch (error: any) {
@@ -415,8 +431,13 @@ export default function App() {
             return updated;
           });
 
-          if (getSupabase()) {
-            salvarBotLogNoSupabase(logFalha);
+          if (supabase) {
+             const { id, ...supabaseLogPayload } = logFalha;
+             try {
+               await supabase.from('bot_logs').insert(supabaseLogPayload);
+             } catch (e) {
+               console.error(e);
+             }
           }
         }
       }, 50);
@@ -481,28 +502,37 @@ export default function App() {
     };
   }, []);
 
-  // Alerta de aprovações pendentes (cadastros, desligamentos ou pagamentos) para o administrador após login
+  // Alerta de novos cadastros pendentes para o administrador após login
   useEffect(() => {
     if (jogadorAtual && jogadorAtual.role === 'admin') {
       const sessaoAlertaAdminChave = `alerta_admin_aprovacoes_mostrada_${jogadorAtual.id}`;
       const jaMostradoAdmin = sessionStorage.getItem(sessaoAlertaAdminChave);
       
-      const pendentesAtletas = jogadores.filter(j => j.status === 'pendente_aprovacao' || j.status === 'solicitou_exclusao');
-      const pendentesPagamentos = pagamentos.filter(p => p.status === 'pendente_confirmacao');
-      
-      if ((pendentesAtletas.length > 0 || pendentesPagamentos.length > 0) && !jaMostradoAdmin) {
+      const pendentes = jogadores.filter(j => j.status === 'pendente_aprovacao' || j.status === 'solicitou_exclusao');
+      if (pendentes.length > 0 && !jaMostradoAdmin) {
         setMostrarPopUpAlertaAdminAprovacoes(true);
         sessionStorage.setItem(sessaoAlertaAdminChave, 'true');
       }
     } else {
       setMostrarPopUpAlertaAdminAprovacoes(false);
     }
-  }, [jogadorAtual, jogadores, pagamentos]);
+  }, [jogadorAtual, jogadores]);
 
-  // Desativado por unificação no popup geral de aprovações
+  // Alerta de pagamentos pendentes para o administrador após login
   useEffect(() => {
-    setMostrarPopUpAlertaAdminPagamentos(false);
-  }, []);
+    if (jogadorAtual && jogadorAtual.role === 'admin') {
+      const sessaoAlertaAdminPagamentosChave = `alerta_admin_pagamentos_mostrada_${jogadorAtual.id}`;
+      const jaMostradoAdminPagamentos = sessionStorage.getItem(sessaoAlertaAdminPagamentosChave);
+      
+      const pendentesPagamentos = pagamentos.filter(p => p.status === 'pendente_confirmacao');
+      if (pendentesPagamentos.length > 0 && !jaMostradoAdminPagamentos) {
+        setMostrarPopUpAlertaAdminPagamentos(true);
+        sessionStorage.setItem(sessaoAlertaAdminPagamentosChave, 'true');
+      }
+    } else {
+      setMostrarPopUpAlertaAdminPagamentos(false);
+    }
+  }, [jogadorAtual, pagamentos]);
 
   // Helpers de status de membros dinâmicos/efetivos baseados em adimplência
   const jogadorAtualEfetivo = useMemo(() => {
@@ -1835,10 +1865,8 @@ export default function App() {
                 <PainelAdmin
                   jogadores={jogadoresEfetivos}
                   partidas={partidasMescladas}
-                  pagamentos={pagamentos}
                   jogadorAtual={jogadorAtual}
                   onAprovarJogador={handleAprovarJogador}
-                  onRegistrarPagamento={handleRegistrarPagamento}
                 />
               )}
 
@@ -2096,8 +2124,8 @@ export default function App() {
                   <UserPlus className="w-5 h-5 animate-pulse" />
                 </div>
                 <div>
-                  <h3 className="font-display font-black text-sm uppercase tracking-wide text-teal-300">Aprovações Pendentes (Geral)</h3>
-                  <p className="text-[10px] text-emerald-400/80 font-mono">Solicitações de atletas e quitações financeiras aguardando liberação</p>
+                  <h3 className="font-display font-black text-sm uppercase tracking-wide text-teal-300">Solicitações de Acesso & Desligamento</h3>
+                  <p className="text-[10px] text-emerald-400/80 font-mono">Solicitações de atletas aguardando deliberação de cadastro ou exclusão</p>
                 </div>
               </div>
               <button
@@ -2111,11 +2139,10 @@ export default function App() {
             </div>
             
             <p className="text-xs text-emerald-200 leading-relaxed font-sans mb-4 shrink-0">
-              Olá, Administrador <b>{jogadorAtual.nome}</b>. Identificamos solicitações pendentes de novos atletas, desligamentos de perfil de jogador ou confirmações de pagamento:
+              Olá, Administrador <b>{jogadorAtual.nome}</b>. Identificamos solicitações pendentes de novos atletas ou desligamento de perfil de jogador:
             </p>
             
             <div className="flex-grow overflow-y-auto space-y-3 pr-1 mb-5 select-none scrollbar-thin font-sans">
-              {/* Seção 1: Atletas */}
               {jogadores.filter(j => j.status === 'pendente_aprovacao' || j.status === 'solicitou_exclusao').map((j) => {
                 const isExclusao = j.status === 'solicitou_exclusao';
                 return (
@@ -2162,7 +2189,7 @@ export default function App() {
                       </div>
                     </div>
                     
-                    <div className="flex gap-2 shrink-0 self-end sm:self-center">
+                    <div className="flex gap-2 shrink-0">
                       {isExclusao ? (
                         <>
                           <button
@@ -2187,7 +2214,7 @@ export default function App() {
                             className="px-3 py-1.5 bg-emerald-950 hover:bg-emerald-900 border border-white/10 text-emerald-300 font-bold text-[10px] uppercase rounded-lg transition-all flex items-center gap-1 cursor-pointer active:scale-95"
                           >
                             <X className="w-3.5 h-3.5" />
-                            Rejeitar
+                            Rejeitar / Manter
                           </button>
                         </>
                       ) : (
@@ -2218,83 +2245,9 @@ export default function App() {
                   </div>
                 );
               })}
-
-              {/* Seção 2: Pagamentos */}
-              {pagamentos.filter(p => p.status === 'pendente_confirmacao').map((p) => {
-                const jogador = jogadores.find(j => j.id === p.jogadorId);
-                const partidaObj = p.partidaId ? partidas.find(pt => pt.id === p.partidaId) : null;
-                if (!jogador) return null;
-                
-                return (
-                  <div 
-                    key={p.id} 
-                    className="p-3.5 rounded-xl border border-amber-500/15 bg-amber-950/15 hover:bg-amber-955/25 flex flex-col sm:flex-row sm:items-center justify-between gap-3 transition-all"
-                  >
-                    <div className="flex items-center gap-3 min-w-0">
-                      <div 
-                        className="w-9 h-9 rounded-full flex items-center justify-center text-xs font-bold shrink-0 shadow-inner overflow-hidden text-black font-sans"
-                        style={{ 
-                          backgroundColor: getSessaoAvatarProps ? getSessaoAvatarProps(jogador.foto || '').color : '#10b981',
-                          color: getSessaoAvatarProps && getSessaoAvatarProps(jogador.foto || '').text === '⚪' ? '#fff' : '#000'
-                        }}
-                      >
-                        {jogador.foto && (jogador.foto.startsWith('http') || jogador.foto.startsWith('data:')) ? (
-                          <img src={jogador.foto} className="w-full h-full object-cover rounded-full" alt="" referrerPolicy="no-referrer" />
-                        ) : (
-                          jogador.nome.substring(0, 1).toUpperCase()
-                        )}
-                      </div>
-                      <div className="min-w-0 text-left">
-                        <div className="flex items-center gap-1.5 flex-wrap">
-                          <p className="text-xs font-bold text-white truncate leading-tight">{jogador.nome} {jogador.sobrenome}</p>
-                          <span className="text-[8px] font-black uppercase text-amber-400 bg-amber-950/60 border border-amber-500/25 px-1 py-0.5 rounded leading-none">
-                            Quitação PIX
-                          </span>
-                        </div>
-                        <p className="text-[10px] text-emerald-350 font-mono mt-1 leading-none text-left">
-                          {partidaObj 
-                            ? `Diária Jogo: ${partidaObj.titulo}` 
-                            : `Mensalidade: ${p.mesRef.split('-').reverse().join('/')}`}
-                        </p>
-                      </div>
-                    </div>
-                    
-                    <div className="flex items-center gap-2 self-end sm:self-center shrink-0">
-                      <div className="text-right mr-2 shrink-0">
-                        <span className="block font-mono font-black text-white text-xs">
-                          R$ {p.valor.toFixed(2)}
-                        </span>
-                      </div>
-                      <button
-                        type="button"
-                        onClick={() => {
-                          const hojeStr = new Date().toISOString().split('T')[0];
-                          handleRegistrarPagamento(jogador.id, p.mesRef, 'pago', hojeStr, p.valor, p.partidaId);
-                        }}
-                        className="px-3 py-1.5 bg-teal-500 hover:bg-teal-400 text-emerald-950 font-black text-[10px] uppercase rounded-lg transition-all flex items-center gap-1 cursor-pointer active:scale-95"
-                      >
-                        <Check className="w-3.5 h-3.5" />
-                        Aprovar
-                      </button>
-                      <button
-                        type="button"
-                        onClick={() => {
-                          handleRegistrarPagamento(jogador.id, p.mesRef, 'pendente', null, p.valor, p.partidaId);
-                        }}
-                        className="px-3 py-1.5 bg-rose-500/10 hover:bg-rose-500 border border-rose-500/30 hover:border-transparent text-rose-300 hover:text-white font-bold text-[10px] uppercase rounded-lg transition-all flex items-center gap-1 cursor-pointer active:scale-95"
-                      >
-                        <X className="w-3.5 h-3.5" />
-                        Estornar
-                      </button>
-                    </div>
-                  </div>
-                );
-              })}
-
-              {jogadores.filter(j => j.status === 'pendente_aprovacao' || j.status === 'solicitou_exclusao').length === 0 && 
-               pagamentos.filter(p => p.status === 'pendente_confirmacao').length === 0 && (
+              {jogadores.filter(j => j.status === 'pendente_aprovacao' || j.status === 'solicitou_exclusao').length === 0 && (
                 <div className="text-center py-6 text-emerald-400/60 italic text-xs">
-                  Todas as solicitações e confirmações pendentes já foram processadas!
+                  Todas as solicitações pendentes já foram processadas!
                 </div>
               )}
             </div>

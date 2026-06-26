@@ -362,12 +362,8 @@ export default function CheckoutPixModal({
                   </div>
                   <div className="flex gap-2">
                     <button onClick={handleJaPaguei}
-                      className="flex-1 bg-amber-500/20 border border-amber-500/40 text-amber-300 font-bold text-[10px] py-2.5 rounded-xl uppercase tracking-wider">
-                      ✅ Já Paguei
-                    </button>
-                    <button onClick={handleConfirmarQuitacao}
-                      className="flex-1 bg-amber-500 text-black font-bold text-[10px] py-2.5 rounded-xl uppercase tracking-wider">
-                      ⚡ Confirmar Quitação
+                      className="w-full bg-amber-500/20 border border-amber-500/40 text-amber-300 font-bold text-[10px] py-2.5 rounded-xl uppercase tracking-wider">
+                      ✅ JÁ PAGUEI — CONFIRMAR QUITAÇÃO
                     </button>
                   </div>
                 </div>
@@ -382,9 +378,9 @@ export default function CheckoutPixModal({
                       </p>
                     </div>
                   </div>
-                  <button onClick={handleConfirmarQuitacao}
-                    className="w-full bg-teal-500/15 border border-teal-500/35 text-teal-300 font-bold text-[10px] py-2.5 rounded-xl uppercase tracking-wider">
-                    ✅ Já Paguei — Confirmar
+                  <button onClick={handleJaPaguei}
+                    className="w-full bg-amber-500/15 border border-amber-500/35 text-amber-300 font-bold text-[10px] py-2.5 rounded-xl uppercase tracking-wider">
+                    ✅ JÁ PAGUEI — CONFIRMAR QUITAÇÃO
                   </button>
                 </div>
               )}

@@ -15,17 +15,11 @@ const SUPABASE_URL_PADRAO  = 'https://gqasacnaubkhokqyrpwc.supabase.co';
 const SUPABASE_ANON_KEY    = 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6ImdxYXNhY25hdWJraG9rcXlycHdjIiwicm9sZSI6ImFub24iLCJpYXQiOjE3ODA0OTIzOTAsImV4cCI6MjA5NjA2ODM5MH0.rRgF_yoLeVRVg9eK_VSKSnBUkf7MXaY1yJAlvWBEfzQ';
 
 export function obterCredenciaisSupabase() {
-  const customUrl = localStorage.getItem('supabase_url_config');
-  const customKey = localStorage.getItem('supabase_key_config');
-  
-  const isUrlValid = customUrl && customUrl.trim() !== '' && customUrl.trim() !== 'null' && customUrl.trim() !== 'undefined' && !customUrl.includes('your-supabase-url');
-  const isKeyValid = customKey && customKey.trim() !== '' && customKey.trim() !== 'null' && customKey.trim() !== 'undefined' && !customKey.includes('your-anon-key') && !customKey.includes('COLE_SUA_ANON_KEY_AQUI');
-
-  if (isUrlValid && isKeyValid) {
-    return { url: customUrl!.trim(), key: customKey!.trim(), isCustom: true };
-  }
-  
-  return { url: SUPABASE_URL_PADRAO, key: SUPABASE_ANON_KEY, isCustom: false };
+  // Prioriza localStorage (configuração manual do admin), fallback nas credenciais padrão
+  const url      = localStorage.getItem('supabase_url_config') || SUPABASE_URL_PADRAO;
+  const key      = localStorage.getItem('supabase_key_config') || SUPABASE_ANON_KEY;
+  const isCustom = !!localStorage.getItem('supabase_key_config');
+  return { url, key, isCustom };
 }
 
 export function salvarCredenciaisSupabase(url: string, key: string) {
@@ -43,10 +37,8 @@ let supabaseInstanceUrl: string | null = null;
 
 export function getSupabase(): SupabaseClient | null {
   const { url, key } = obterCredenciaisSupabase();
-  const isUrlValid = url && url.trim() !== '' && url.trim() !== 'null' && url.trim() !== 'undefined' && !url.includes('your-supabase-url');
-  const isKeyValid = key && key.trim() !== '' && key.trim() !== 'null' && key.trim() !== 'undefined' && !key.includes('your-anon-key') && !key.includes('COLE_SUA_ANON_KEY_AQUI');
-
-  if (!isUrlValid || !isKeyValid) {
+  // Bloqueia apenas se não houver credenciais ou se for placeholder
+  if (!url || !key || key === 'COLE_SUA_ANON_KEY_AQUI' || key.includes('your-anon-key')) {
     return null;
   }
 
@@ -456,7 +448,7 @@ export async function salvarConfiguracaoNoSupabase(chave: string, valor: string)
 }
 
 /**
- * Carregar Logs do Bot de WhatsApp da tabela bot_logs (com fallback para whatsapp_logs)
+ * Carregar Logs do Bot de WhatsApp da tabela bot_logs
  */
 export async function carregarBotLogsDoSupabase(): Promise<BotLog[] | null> {
   const supabase = getSupabase();
@@ -469,27 +461,7 @@ export async function carregarBotLogsDoSupabase(): Promise<BotLog[] | null> {
       .order('enviado_em', { ascending: false })
       .limit(50);
 
-    if (error) {
-      if (error.code === '42P01') { // A tabela bot_logs não existe
-        const { data: wData, error: wError } = await supabase
-          .from('whatsapp_logs')
-          .select('*')
-          .order('data', { ascending: false })
-          .limit(50);
-
-        if (wError) throw wError;
-        if (!wData) return [];
-
-        return wData.map((d: any) => ({
-          id: d.id,
-          evento: d.partida || 'WhatsApp',
-          tabela: d.atleta || '',
-          mensagem: d.mensagem,
-          enviado_em: d.data
-        }));
-      }
-      throw error;
-    }
+    if (error) throw error;
     return data;
   } catch (err) {
     console.error('Erro ao carregar bot_logs do Supabase:', err);
@@ -498,39 +470,7 @@ export async function carregarBotLogsDoSupabase(): Promise<BotLog[] | null> {
 }
 
 /**
- * Salvar um log na tabela bot_logs (com fallback para whatsapp_logs)
- */
-export async function salvarBotLogNoSupabase(log: BotLog): Promise<boolean> {
-  const supabase = getSupabase();
-  if (!supabase) return false;
-
-  try {
-    const { id, ...supabaseLogPayload } = log;
-    const { error } = await supabase.from('bot_logs').insert(supabaseLogPayload);
-
-    if (error) {
-      if (error.code === '42P01') { // A tabela bot_logs não existe
-        const { error: wError } = await supabase.from('whatsapp_logs').insert({
-          atleta: log.tabela || 'WhatsApp',
-          partida: log.evento || '',
-          mensagem: log.mensagem,
-          status: log.evento?.includes('FALHA') ? 'falha' : 'sucesso',
-          data: log.enviado_em || new Date().toISOString()
-        });
-        if (wError) throw wError;
-        return true;
-      }
-      throw error;
-    }
-    return true;
-  } catch (err) {
-    console.error('Erro ao salvar bot_log no Supabase:', err);
-    return false;
-  }
-}
-
-/**
- * Deletar todos os logs da tabela bot_logs (com fallback para whatsapp_logs)
+ * Deletar todos os logs da tabela bot_logs
  */
 export async function limparBotLogsDoSupabase(): Promise<boolean> {
   const supabase = getSupabase();
@@ -542,17 +482,7 @@ export async function limparBotLogsDoSupabase(): Promise<boolean> {
       .delete()
       .neq('id', 'dummy'); // Deleta todos
 
-    if (error) {
-      if (error.code === '42P01') { // A tabela bot_logs não existe
-        const { error: wError } = await supabase
-          .from('whatsapp_logs')
-          .delete()
-          .neq('id', 'dummy');
-        if (wError) throw wError;
-        return true;
-      }
-      throw error;
-    }
+    if (error) throw error;
     return true;
   } catch (err) {
     console.error('Erro ao limpar bot_logs:', err);
