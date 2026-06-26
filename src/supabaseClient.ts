@@ -123,7 +123,7 @@ export async function salvarJogadorNoSupabase(jogador: Jogador): Promise<boolean
     }
     return true;
   } catch (error) {
-    console.error('Erro ao sincronizar jogador no Supabase:', error);
+    console.warn('Erro ao sincronizar jogador no Supabase:', error);
     return false;
   }
 }
@@ -161,7 +161,7 @@ export async function carregarJogadoresDoSupabase(): Promise<Jogador[] | null> {
       isGold: d.is_gold
     }));
   } catch (error) {
-    console.error('Erro ao buscar jogadores do Supabase:', error);
+    console.warn('Erro ao buscar jogadores do Supabase:', error);
     return null;
   }
 }
@@ -212,7 +212,7 @@ export async function salvarPartidaNoSupabase(partida: Partida): Promise<boolean
     // }
     return true;
   } catch (error) {
-    console.error('Erro ao salvar partida no Supabase:', error);
+    console.warn('Erro ao salvar partida no Supabase:', error);
     return false;
   }
 }
@@ -242,7 +242,7 @@ export async function atualizarStatusPresencaUsuario(partidaId: string, jogadorI
         });
     }
   } catch (err) {
-    console.error('Erro ao atualizar presenca individual:', err);
+    console.warn('Erro ao atualizar presenca individual:', err);
   }
 }
 
@@ -276,7 +276,7 @@ async function sincronizarPresencasNoSupabase(partidaId: string, jogadoresIds: s
       }
     }
   } catch (err) {
-    console.error('Erro em sincronizarPresencasNoSupabase:', err);
+    console.warn('Erro em sincronizarPresencasNoSupabase:', err);
   }
 }
 
@@ -325,7 +325,7 @@ export async function carregarPartidasDoSupabase(): Promise<Partida[] | null> {
     });
 
   } catch (error) {
-    console.error('Erro ao buscar partidas do Supabase:', error);
+    console.warn('Erro ao buscar partidas do Supabase:', error);
     return null;
   }
 }
@@ -361,7 +361,7 @@ export async function salvarPagamentoNoSupabase(pagamento: Pagamento): Promise<b
     if (error) throw error;
     return true;
   } catch (error) {
-    console.error('Erro ao salvar pagamento no Supabase:', error);
+    console.warn('Erro ao salvar pagamento no Supabase:', error);
     return false;
   }
 }
@@ -387,7 +387,7 @@ export async function carregarPagamentosDoSupabase(): Promise<Pagamento[] | null
       valor: Number(d.valor)
     }));
   } catch (error) {
-    console.error('Erro ao buscar pagamentos do Supabase:', error);
+    console.warn('Erro ao buscar pagamentos do Supabase:', error);
     return null;
   }
 }
@@ -408,7 +408,7 @@ export async function deletarPartidaNoSupabase(id: string): Promise<boolean> {
     if (error) throw error;
     return true;
   } catch (error) {
-    console.error('Erro ao excluir partida no Supabase:', error);
+    console.warn('Erro ao excluir partida no Supabase:', error);
     return false;
   }
 }
@@ -430,7 +430,7 @@ export async function obterConfiguracaoDoSupabase(chave: string): Promise<string
     if (error) throw error;
     return data ? data.valor : null;
   } catch (error) {
-    console.error(`Erro ao obter config ${chave} do Supabase:`, error);
+    console.warn(`Erro ao obter config ${chave} do Supabase:`, error);
     return null;
   }
 }
@@ -450,7 +450,7 @@ export async function salvarConfiguracaoNoSupabase(chave: string, valor: string)
     if (error) throw error;
     return true;
   } catch (error) {
-    console.error(`Erro ao salvar config ${chave} no Supabase:`, error);
+    console.warn(`Erro ao salvar config ${chave} no Supabase:`, error);
     return false;
   }
 }
@@ -492,7 +492,7 @@ export async function carregarBotLogsDoSupabase(): Promise<BotLog[] | null> {
     }
     return data;
   } catch (err) {
-    console.error('Erro ao carregar bot_logs do Supabase:', err);
+    console.warn('Erro ao carregar bot_logs do Supabase:', err);
     return null;
   }
 }
@@ -524,7 +524,7 @@ export async function salvarBotLogNoSupabase(log: BotLog): Promise<boolean> {
     }
     return true;
   } catch (err) {
-    console.error('Erro ao salvar bot_log no Supabase:', err);
+    console.warn('Erro ao salvar bot_log no Supabase:', err);
     return false;
   }
 }
@@ -555,7 +555,7 @@ export async function limparBotLogsDoSupabase(): Promise<boolean> {
     }
     return true;
   } catch (err) {
-    console.error('Erro ao limpar bot_logs:', err);
+    console.warn('Erro ao limpar bot_logs:', err);
     return false;
   }
 }

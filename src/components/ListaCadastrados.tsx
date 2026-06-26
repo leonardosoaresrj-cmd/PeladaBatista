@@ -485,7 +485,7 @@ export default function ListaCadastrados({
               </span>
             </div>
             
-            <div className="flex items-center justify-between gap-1 mt-1">
+            <div className="flex flex-wrap items-center justify-between gap-2 mt-1">
               <div className="flex items-center gap-1.5 text-xs font-semibold">
                 {proximaPartida.confirmados.includes(j.id) ? (
                   <span className="inline-flex items-center gap-1 text-emerald-400 bg-emerald-500/10 px-2 py-0.5 rounded-md border border-emerald-500/20 text-[10px] font-bold">
@@ -541,14 +541,14 @@ export default function ListaCadastrados({
 
         {/* Área de Ações (Admin ou Próprio Jogador) */}
         {(jogadorAtual.role === 'admin' || jogadorAtual.id === j.id) && (
-          <div className="p-3 bg-emerald-950/40 border-t border-white/10 flex items-center justify-end gap-2 shrink-0">
+          <div className="p-3 bg-emerald-950/40 border-t border-white/10 grid grid-cols-2 gap-2 shrink-0">
             {isEditing ? (
               <>
                 <button
                   id={`btn-salvar-edicao-${j.id}`}
                   type="button"
                   onClick={() => handleSalvarEdicao(j.id)}
-                  className="bg-white hover:bg-emerald-50 text-black text-[11px] font-bold px-3 py-1.5 rounded-lg transition-colors flex items-center gap-1"
+                  className="bg-white hover:bg-emerald-50 text-black text-[11px] font-bold px-3 py-1.5 rounded-lg transition-colors flex items-center justify-center gap-1 w-full"
                 >
                   <Check className="w-3.5 h-3.5" />
                   Salvar
@@ -557,7 +557,7 @@ export default function ListaCadastrados({
                   id={`btn-cancelar-edicao-${j.id}`}
                   type="button"
                   onClick={() => setJogadorEditandoId(null)}
-                  className="bg-emerald-950 border border-white/10 text-emerald-300 hover:text-white text-[11px] font-bold px-3 py-1.5 rounded-lg transition-colors"
+                  className="bg-emerald-950 border border-white/10 text-emerald-300 hover:text-white text-[11px] font-bold px-3 py-1.5 rounded-lg transition-colors flex items-center justify-center w-full"
                 >
                   Cancelar
                 </button>
@@ -569,7 +569,7 @@ export default function ListaCadastrados({
                     id={`btn-historico-atleta-${j.id}`}
                     type="button"
                     onClick={() => setJogadorHistoricoSelecionado(j)}
-                    className="text-[11px] font-bold text-teal-300 hover:text-white hover:bg-teal-950/40 bg-teal-950/20 border border-teal-500/20 px-3 py-1.5 rounded-lg transition-colors flex items-center gap-1 cursor-pointer"
+                    className="text-[11px] font-bold text-teal-300 hover:text-white hover:bg-teal-950/40 bg-teal-950/20 border border-teal-500/20 px-3 py-1.5 rounded-lg transition-colors flex items-center justify-center gap-1 cursor-pointer w-full"
                     title="Visualizar histórico mensal do atleta"
                   >
                     <History className="w-3.5 h-3.5 text-teal-400" />
@@ -581,7 +581,7 @@ export default function ListaCadastrados({
                   id={`btn-editar-atleta-${j.id}`}
                   type="button"
                   onClick={() => iniciarEdicao(j)}
-                  className="text-[11px] font-bold text-white hover:bg-white/10 bg-white/5 border border-white/5 px-3 py-1.5 rounded-lg transition-colors flex items-center gap-1"
+                  className="text-[11px] font-bold text-white hover:bg-white/10 bg-white/5 border border-white/5 px-3 py-1.5 rounded-lg transition-colors flex items-center justify-center gap-1 w-full"
                   title="Editar cadastro do atleta"
                 >
                   <Edit2 className="w-3 h-3 text-emerald-450" />
@@ -597,7 +597,7 @@ export default function ListaCadastrados({
                         onEditarJogador(j.id, { status: 'ativo' });
                       }
                     }}
-                    className="text-[11px] font-bold text-emerald-300 hover:bg-emerald-950/30 hover:text-white bg-emerald-950/15 border border-emerald-500/15 px-3 py-1.5 rounded-lg transition-colors flex items-center gap-1"
+                    className="text-[11px] font-bold text-emerald-300 hover:bg-emerald-950/30 hover:text-white bg-emerald-950/15 border border-emerald-500/15 px-3 py-1.5 rounded-lg transition-colors flex items-center justify-center gap-1 w-full"
                     title="Reativar a conta deste jogador"
                   >
                     <Check className="w-3 h-3" />
@@ -614,7 +614,7 @@ export default function ListaCadastrados({
                         onEditarJogador(j.id, { status: 'suspenso' });
                       }
                     }}
-                    className="text-[11px] font-bold text-rose-350 hover:bg-rose-950/30 hover:text-white bg-rose-950/15 border border-rose-500/15 px-3 py-1.5 rounded-lg transition-colors flex items-center gap-1"
+                    className="text-[11px] font-bold text-rose-350 hover:bg-rose-950/30 hover:text-white bg-rose-950/15 border border-rose-500/15 px-3 py-1.5 rounded-lg transition-colors flex items-center justify-center gap-1 w-full"
                     title="Suspender a conta deste jogador"
                   >
                     <ShieldAlert className="w-3 h-3" />
@@ -633,11 +633,11 @@ export default function ListaCadastrados({
                       } else {
                         const msg = `Tem certeza que deseja excluir as informações de ${j.nome} ${j.sobrenome} definitivamente?`;
                         if (confirm(msg)) {
-                          onExcluirJogador(j.id);
+                           onExcluirJogador(j.id);
                         }
                       }
                     }}
-                    className="text-[11px] font-bold text-rose-350 hover:bg-rose-950/30 hover:text-white bg-rose-950/15 border border-rose-500/15 px-3 py-1.5 rounded-lg transition-colors flex items-center gap-1"
+                    className="text-[11px] font-bold text-rose-350 hover:bg-rose-950/30 hover:text-white bg-rose-950/15 border border-rose-500/15 px-3 py-1.5 rounded-lg transition-colors flex items-center justify-center gap-1 w-full"
                     title={j.id === jogadorAtual.id ? "Excluir minha conta do portal" : "Remover atleta do portal"}
                   >
                     <Trash2 className="w-3 h-3" />
