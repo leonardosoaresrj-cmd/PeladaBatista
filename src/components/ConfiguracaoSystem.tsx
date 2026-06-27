@@ -609,11 +609,11 @@ https://peladabatista.onrender.com`}
           <div className="bg-rose-950/20 border border-rose-500/25 rounded-2xl p-5 shadow-xl backdrop-blur-sm space-y-4">
             <h3 className="font-display font-semibold text-sm text-rose-400 flex items-center gap-2 uppercase tracking-wide">
               <Database className="w-4 h-4 text-rose-400" />
-              Reset Geral da Base de Dados
+              Reset de Partidas e Agenda
             </h3>
             
             <p className="text-xs text-rose-200/90 leading-relaxed font-sans">
-              Apaga todo o histórico de partidas, pagamentos e depósitos passados, retornando o banco de dados a um estado de novos cadastros. <strong>O histórico de dados começará a ser contado a partir do mês escolhido abaixo</strong>, que será estabelecido como a data inicial oficial do sistema de cobranças.
+              Apaga todo o histórico de partidas agendadas e confirmadas passadas, retornando a agenda de jogos a um estado inicial. <strong>Os atletas cadastrados, as credenciais de acesso, e todo o histórico financeiro (mensalidades, faturamentos e despesas passadas no caixa) são totalmente preservados.</strong> O novo histórico de partidas começará a ser contado a partir do mês escolhido abaixo.
             </p>
 
             <div className="space-y-3">
@@ -631,26 +631,28 @@ https://peladabatista.onrender.com`}
 
               {resetSuccess && (
                 <div className="p-2.5 bg-rose-950/50 border border-rose-500/30 text-rose-350 text-[10.5px] rounded-xl font-sans font-bold">
-                  ✓ Base de dados reiniciada com sucesso! Histórico limpo iniciando em {resetMesRef.split('-').reverse().join('/')}.
+                  ✓ Agenda e partidas reiniciadas com sucesso! Histórico limpo iniciando em {resetMesRef.split('-').reverse().join('/')}.
                 </div>
               )}
 
               {!showResetConfirm ? (
                 <button
                   type="button"
+                  id="btn-executar-reset-banco"
                   onClick={() => setShowResetConfirm(true)}
-                  className="w-full bg-rose-600 hover:bg-rose-500 text-white font-extrabold text-xs py-2.5 rounded-xl transition-all shadow-md active:scale-97 cursor-pointer font-sans uppercase"
+                  className="w-full bg-gradient-to-r from-rose-600 to-red-600 hover:from-rose-500 hover:to-red-500 text-white font-black text-xs py-3 rounded-xl transition-all shadow-lg hover:shadow-rose-500/10 active:scale-97 cursor-pointer font-sans uppercase tracking-wider border border-rose-500/30"
                 >
-                  Executar Reset Completo do Banco
+                  Executar Reset de Partidas e Agenda
                 </button>
               ) : (
                 <div className="bg-rose-950/45 border border-rose-500/30 p-3 rounded-xl space-y-2.5 text-center">
                   <p className="text-[10px] text-rose-300 font-bold uppercase leading-tight font-sans">
-                    ⚠️ CONFIRMAR EXCLUSÃO HISTÓRICA? Todos os jogos, pagamentos e caixa serão limpos!
+                    ⚠️ CONFIRMAR RESET? Todas as partidas e a agenda de jogos serão apagadas! Os usuários cadastrados e o histórico financeiro do caixa não sofrerão nenhuma alteração.
                   </p>
                   <div className="flex gap-2.5">
                     <button
                       type="button"
+                      id="btn-confirmar-reset"
                       onClick={() => {
                         setShowResetConfirm(false);
                         if (onResetDatabase) {
@@ -659,14 +661,15 @@ https://peladabatista.onrender.com`}
                         setResetSuccess(true);
                         setTimeout(() => setResetSuccess(false), 4500);
                       }}
-                      className="flex-1 bg-rose-600 hover:bg-rose-500 text-white font-extrabold text-[10px] py-2 rounded-lg transition-all cursor-pointer uppercase font-sans border-0"
+                      className="flex-1 bg-gradient-to-r from-red-600 to-rose-600 hover:from-red-500 hover:to-rose-500 text-white font-extrabold text-[10px] py-2.5 rounded-lg transition-all cursor-pointer uppercase font-sans border border-red-500/30 shadow-md active:scale-97"
                     >
-                      Sim, Resetar
+                      Sim, Resetar Agenda
                     </button>
                     <button
                       type="button"
+                      id="btn-cancelar-reset"
                       onClick={() => setShowResetConfirm(false)}
-                      className="flex-1 bg-emerald-900 border border-white/15 text-white font-extrabold text-[10px] py-2 rounded-lg transition-all cursor-pointer uppercase font-sans"
+                      className="flex-1 bg-emerald-900 border border-white/15 text-white font-extrabold text-[10px] py-2.5 rounded-lg transition-all cursor-pointer uppercase font-sans hover:bg-emerald-850 active:scale-97"
                     >
                       Cancelar
                     </button>

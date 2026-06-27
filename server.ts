@@ -97,6 +97,207 @@ async function startServer() {
     }
   });
 
+  // Rota para envio de e-mail de Boas-vindas (Conta Aprovada)
+  app.post("/api/send-welcome-email", async (req, res) => {
+    try {
+      const { email, nome } = req.body;
+
+      if (!email || !nome) {
+        return res.status(400).json({ error: "Dados incompletos para envio de e-mail." });
+      }
+
+      if (!process.env.SMTP_USER || !process.env.SMTP_PASS) {
+        return res.status(500).json({ 
+          error: "Servidor de e-mail não configurado. Por favor, adicione SMTP_USER e SMTP_PASS nas variáveis de ambiente." 
+        });
+      }
+
+      const resolveIpv4 = (host: string): Promise<string> => {
+        return new Promise((resolve, reject) => {
+          dns.lookup(host, { family: 4 }, (err, address) => {
+            if (err) resolve(host);
+            else resolve(address);
+          });
+        });
+      };
+
+      let smtpHost = 'smtp.gmail.com';
+      try {
+        smtpHost = await resolveIpv4('smtp.gmail.com');
+      } catch(e) {
+        console.warn('Fallback: não foi possível resolver o IP de smtp.gmail.com');
+      }
+
+      const transporter = nodemailer.createTransport({
+        host: smtpHost,
+        port: 465,
+        secure: true,
+        auth: {
+          user: process.env.SMTP_USER,
+          pass: process.env.SMTP_PASS,
+        },
+        tls: {
+          servername: 'smtp.gmail.com',
+        }
+      });
+
+      const mailOptions = {
+        from: `"Pelada Batista" <${process.env.SMTP_USER}>`,
+        to: email,
+        subject: "Bem-vindo ao Pelada Batista! Conta Aprovada 🎉",
+        html: `
+          <div style="font-family: Arial, sans-serif; background-color: #f4f4f4; padding: 20px;">
+            <div style="max-width: 500px; margin: 0 auto; background-color: #ffffff; padding: 30px; border-radius: 8px; box-shadow: 0 4px 6px rgba(0,0,0,0.1); border-top: 5px solid #059669;">
+              <h2 style="color: #064e3b; text-align: center; font-size: 24px; margin-bottom: 20px;">Pelada Batista</h2>
+              <p style="color: #333333; font-size: 16px;">Olá, <b>${nome}</b>! 🎉</p>
+              <p style="color: #333333; font-size: 16px; line-height: 1.5;">Temos o prazer de informar que o seu cadastro no portal <b>Pelada Batista</b> foi aprovado pelo administrador!</p>
+              
+              <div style="background-color: #ecfdf5; border: 1px solid #a7f3d0; padding: 15px; text-align: center; margin: 25px 0; border-radius: 6px;">
+                <p style="color: #065f46; font-size: 15px; font-weight: bold; margin: 0;">Sua conta está ativa e pronta para uso!</p>
+              </div>
+
+              <p style="color: #333333; font-size: 15px; line-height: 1.5;">A partir de agora, você já pode acessar o nosso portal oficial para:</p>
+              <ul style="color: #4b5563; font-size: 14px; line-height: 1.6; padding-left: 20px;">
+                <li>Confirmar presença nas próximas peladas agendadas</li>
+                <li>Verificar seu histórico mensal de partidas e presença</li>
+                <li>Declarar pagamentos de mensalidades de forma simples</li>
+                <li>Visualizar as estatísticas completas do nosso grupo</li>
+              </ul>
+              
+              <div style="text-align: center; margin: 30px 0;">
+                <a href="https://peladabatista.onrender.com" target="_blank" style="background-color: #059669; color: #ffffff; padding: 12px 25px; text-decoration: none; font-weight: bold; border-radius: 6px; display: inline-block;">Acessar o Portal</a>
+              </div>
+              
+              <hr style="border: 0; border-top: 1px solid #e5e7eb; margin: 20px 0;" />
+              <p style="color: #666666; font-size: 14px;">Nos vemos em campo!</p>
+              <p style="color: #666666; font-size: 14px; margin: 0;">Um abraço,<br/>Equipe Pelada Batista</p>
+            </div>
+          </div>
+        `,
+      };
+
+      await transporter.sendMail(mailOptions);
+      return res.status(200).json({ success: true, message: "E-mail de boas-vindas enviado com sucesso." });
+
+    } catch (error: any) {
+      console.error("[WELCOME EMAIL ERROR]", error);
+      return res.status(500).json({ 
+        error: "Falha ao enviar o e-mail de boas-vindas",
+        details: error.message 
+      });
+    }
+  });
+
+  // Rota para envio de Recibo de Pagamento (Pagamento Aprovado)
+  app.post("/api/send-receipt-email", async (req, res) => {
+    try {
+      const { email, nome, valor, referencia, dataPagamento } = req.body;
+
+      if (!email || !nome || !valor || !referencia) {
+        return res.status(400).json({ error: "Dados incompletos para emissão de recibo." });
+      }
+
+      if (!process.env.SMTP_USER || !process.env.SMTP_PASS) {
+        return res.status(500).json({ 
+          error: "Servidor de e-mail não configurado. Por favor, adicione SMTP_USER e SMTP_PASS nas variáveis de ambiente." 
+        });
+      }
+
+      const resolveIpv4 = (host: string): Promise<string> => {
+        return new Promise((resolve, reject) => {
+          dns.lookup(host, { family: 4 }, (err, address) => {
+            if (err) resolve(host);
+            else resolve(address);
+          });
+        });
+      };
+
+      let smtpHost = 'smtp.gmail.com';
+      try {
+        smtpHost = await resolveIpv4('smtp.gmail.com');
+      } catch(e) {
+        console.warn('Fallback: não foi possível resolver o IP de smtp.gmail.com');
+      }
+
+      const transporter = nodemailer.createTransport({
+        host: smtpHost,
+        port: 465,
+        secure: true,
+        auth: {
+          user: process.env.SMTP_USER,
+          pass: process.env.SMTP_PASS,
+        },
+        tls: {
+          servername: 'smtp.gmail.com',
+        }
+      });
+
+      const valorFormatado = Number(valor).toFixed(2).replace('.', ',');
+      const dataFormatada = dataPagamento 
+        ? new Date(dataPagamento).toLocaleDateString('pt-BR') 
+        : new Date().toLocaleDateString('pt-BR');
+
+      const numRecibo = Math.floor(100000 + Math.random() * 900000);
+
+      const mailOptions = {
+        from: `"Pelada Batista" <${process.env.SMTP_USER}>`,
+        to: email,
+        subject: `Recibo de Pagamento Confirmado - Pelada Batista (Nº ${numRecibo}) 🧾`,
+        html: `
+          <div style="font-family: Arial, sans-serif; background-color: #f4f4f4; padding: 20px;">
+            <div style="max-width: 500px; margin: 0 auto; background-color: #ffffff; padding: 30px; border-radius: 8px; box-shadow: 0 4px 6px rgba(0,0,0,0.1); border-top: 5px solid #0d9488;">
+              <h2 style="color: #0f766e; text-align: center; font-size: 24px; margin-bottom: 5px;">Pelada Batista</h2>
+              <p style="text-align: center; color: #6b7280; font-size: 13px; margin-top: 0; margin-bottom: 25px;">COMPROVANTE DE PAGAMENTO</p>
+              
+              <p style="color: #333333; font-size: 16px;">Olá, <b>${nome}</b>,</p>
+              <p style="color: #333333; font-size: 15px; line-height: 1.5;">O seu pagamento manual foi <b>aprovado pelo administrador</b>! Segue abaixo as informações detalhadas do seu recibo:</p>
+              
+              <div style="background-color: #f0fdfa; border: 1px solid #99f6e4; padding: 20px; border-radius: 8px; margin: 25px 0;">
+                <table style="width: 100%; border-collapse: collapse; font-size: 14px; color: #374151;">
+                  <tr style="border-bottom: 1px solid #e2e8f0;">
+                    <td style="padding: 8px 0; font-weight: bold; color: #0f766e;">Recibo Nº:</td>
+                    <td style="padding: 8px 0; text-align: right; font-family: monospace; font-size: 15px;">#${numRecibo}</td>
+                  </tr>
+                  <tr style="border-bottom: 1px solid #e2e8f0;">
+                    <td style="padding: 8px 0; font-weight: bold; color: #0f766e;">Pagador:</td>
+                    <td style="padding: 8px 0; text-align: right;">${nome}</td>
+                  </tr>
+                  <tr style="border-bottom: 1px solid #e2e8f0;">
+                    <td style="padding: 8px 0; font-weight: bold; color: #0f766e;">Referência:</td>
+                    <td style="padding: 8px 0; text-align: right; font-weight: bold;">${referencia}</td>
+                  </tr>
+                  <tr style="border-bottom: 1px solid #e2e8f0;">
+                    <td style="padding: 8px 0; font-weight: bold; color: #0f766e;">Data de Confirmação:</td>
+                    <td style="padding: 8px 0; text-align: right;">${dataFormatada}</td>
+                  </tr>
+                  <tr>
+                    <td style="padding: 12px 0 4px 0; font-weight: bold; font-size: 16px; color: #115e59;">Valor Total:</td>
+                    <td style="padding: 12px 0 4px 0; text-align: right; font-weight: bold; font-size: 18px; color: #115e59;">R$ ${valorFormatado}</td>
+                  </tr>
+                </table>
+              </div>
+
+              <p style="color: #4b5563; font-size: 13px; text-align: center; margin-top: 30px; line-height: 1.4;">Este é um e-mail automático enviado após a validação administrativa de comprovante Pix ou transferência.</p>
+              
+              <hr style="border: 0; border-top: 1px solid #e5e7eb; margin: 20px 0;" />
+              <p style="color: #666666; font-size: 14px; margin: 0;">Agradecemos sua colaboração!<br/>Equipe Pelada Batista</p>
+            </div>
+          </div>
+        `,
+      };
+
+      await transporter.sendMail(mailOptions);
+      return res.status(200).json({ success: true, message: "Recibo enviado com sucesso." });
+
+    } catch (error: any) {
+      console.error("[RECEIPT EMAIL ERROR]", error);
+      return res.status(500).json({ 
+        error: "Falha ao enviar o recibo de pagamento",
+        details: error.message 
+      });
+    }
+  });
+
   // Rota de Proxy: Front-end -> Nosso Servidor -> Robô do Render
   // Isso resolve os problemas de CORS quando o site roda do nosso lado
   app.post("/api/bot-proxy", async (req, res) => {

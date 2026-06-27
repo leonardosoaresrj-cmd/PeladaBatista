@@ -243,43 +243,27 @@ export default function App() {
   };
 
   const handleResetDatabase = async (startingMonth: string) => {
-    // 1. Limpar partidas, pagamentos, despesas avulsas
+    // 1. Limpar apenas partidas e histórico de agenda
     setPartidas([]);
     savePartidas([]);
-
-    setPagamentos([]);
-    savePagamentos([]);
-
-    setLancamentos([]);
-    saveLancamentos([]);
 
     setPartidasDeletadas([]);
     localStorage.setItem('futebol_partidas_deletadas', JSON.stringify([]));
 
-    // 2. Limpar cadastros de jogadores mantendo o administrador Leonardo Soares ativo
-    const adminEmail = 'leonardo.soares.rj@gmail.com';
-    const list = getSavedJogadores();
-    const adminOriginal = list.filter(j => j.email.toLowerCase().trim() === adminEmail);
-    setJogadores(adminOriginal);
-    saveJogadores(adminOriginal);
-
-    // 3. Atualizar configurações de início de recebimento
+    // 2. Atualizar configurações de início de recebimento
     localStorage.setItem('futebol_startup_month', startingMonth);
 
-    // 4. Limpar do Supabase se estiver conectado
+    // 3. Limpar apenas as partidas do Supabase se estiver conectado (a tabela 'presencas' possui cascade delete e será limpa automaticamente)
     const supabase = getSupabase();
     if (supabase) {
       try {
         await supabase.from('partidas').delete().neq('id', 'placeholder-doesnotexist');
-        await supabase.from('pagamentos').delete().neq('id', 'placeholder-doesnotexist');
-        await supabase.from('lancamentos').delete().neq('id', 'placeholder-doesnotexist');
-        await supabase.from('jogadores').delete().neq('email', adminEmail);
       } catch (e) {
-        console.error('Erro ao limpar tabelas no Supabase:', e);
+        console.error('Erro ao limpar partidas no Supabase:', e);
       }
     }
 
-    // 5. Recarregar dados para garantir sincronismo
+    // 4. Recarregar dados para garantir sincronismo de todo o resto intacto
     fetchTodoDados();
   };
 
@@ -806,6 +790,56 @@ export default function App() {
     saveJogadores(atualizados);
 
     await salvarJogadorNoSupabase(novoJogador);
+
+    // Enviar notificação de novo cadastro para o administrador
+    if (whatsappAutomacaoAtiva && whatsappWebhookUrl) {
+      const msgCadastroAdmin = `👤 *NOVO CADASTRO AGUARDANDO APROVAÇÃO* 👤\n\n` +
+        `Um novo jogador se cadastrou no portal e aguarda a sua aprovação:\n\n` +
+        `🏷️ Nome: *${novoJogador.nome} ${novoJogador.sobrenome || ''}*\n` +
+        `📧 E-mail: *${novoJogador.email || 'Não informado'}*\n` +
+        `⚽ Posição: *${novoJogador.posicao || 'Não informada'}*\n` +
+        `⭐ Mensalista/Diarista: *${novoJogador.membroStatus || 'diarista'}*\n\n` +
+        `👉 Acesse o painel do administrador para aprovar:\n${window.location.origin}`;
+
+      setTimeout(async () => {
+        try {
+          await fetch('/api/bot-proxy', {
+            method: 'POST',
+            headers: {
+              'Content-Type': 'application/json'
+            },
+            body: JSON.stringify({
+              url: whatsappWebhookUrl,
+              secret: whatsappWebhookToken,
+              payload: {
+                mensagem: msgCadastroAdmin,
+                grupo_id: 'admin'
+              }
+            })
+          });
+
+          const logSucesso: BotLog = {
+            id: `log-${Date.now()}-${Math.random().toString(36).substr(2, 4)}`,
+            tabela: `${novoJogador.nome} ${novoJogador.sobrenome}`,
+            evento: 'PENDENTE_APROVACAO_ADMIN',
+            mensagem: `Notificação de novo cadastro pendente enviada ao Administrador: "${novoJogador.nome} ${novoJogador.sobrenome}"`,
+            enviado_em: new Date().toISOString()
+          };
+
+          setWhatsappLogs(currentLogs => {
+            const updated = [logSucesso, ...currentLogs].slice(0, 50);
+            saveWhatsappLogs(updated);
+            return updated;
+          });
+
+          if (getSupabase()) {
+            salvarBotLogNoSupabase(logSucesso);
+          }
+        } catch (e: any) {
+          console.warn('Erro ao notificar administrador sobre novo cadastro:', e);
+        }
+      }, 200);
+    }
   };
 
   // 2. Aprovar / Recusar cadastro pendente (Ação administrativa)
@@ -830,6 +864,22 @@ export default function App() {
 
     if (modificado) {
       await salvarJogadorNoSupabase(modificado);
+
+      // Enviar e-mail de Boas-vindas (Conta Aprovada) via SMTP
+      if (modificado.email) {
+        try {
+          fetch('/api/send-welcome-email', {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({
+              email: modificado.email,
+              nome: `${modificado.nome} ${modificado.sobrenome || ''}`.trim()
+            })
+          });
+        } catch (err) {
+          console.error("Erro ao solicitar envio de e-mail de boas-vindas:", err);
+        }
+      }
     } else if (!aprovar) {
       const supabase = getSupabase();
       if (supabase) {
@@ -857,8 +907,11 @@ export default function App() {
   // 4. Editar Informações Básicas do Atleta (Ação administrativa)
   const handleEditarJogador = async (id: string, camposAtualizados: Partial<Jogador>) => {
     let modificado: Jogador | null = null;
+    let statusAnterior: string | undefined = undefined;
+
     const atualizados = jogadores.map(j => {
       if (j.id === id) {
+        statusAnterior = j.status;
         modificado = { ...j, ...camposAtualizados };
         return modificado;
       }
@@ -869,6 +922,22 @@ export default function App() {
 
     if (modificado) {
       await salvarJogadorNoSupabase(modificado);
+
+      // Se o status mudou para 'ativo' vindo de pendente_aprovacao, enviar e-mail de Boas-Vindas
+      if (camposAtualizados.status === 'ativo' && statusAnterior === 'pendente_aprovacao' && modificado.email) {
+        try {
+          fetch('/api/send-welcome-email', {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({
+              email: modificado.email,
+              nome: `${modificado.nome} ${modificado.sobrenome || ''}`.trim()
+            })
+          });
+        } catch (err) {
+          console.error("Erro ao solicitar envio de e-mail de boas-vindas:", err);
+        }
+      }
     }
 
     // Atualizar sessão corrente caso tenha editado o próprio perfil
@@ -1114,9 +1183,11 @@ export default function App() {
     valor: number,
     partidaId?: string
   ) => {
-    const existe = partidaId 
-      ? pagamentos.some(p => p.jogadorId === jogadorId && p.partidaId === partidaId)
-      : pagamentos.some(p => p.jogadorId === jogadorId && p.mesRef === mesRef && !p.partidaId);
+    const pagamentoAnterior = partidaId 
+      ? pagamentos.find(p => p.jogadorId === jogadorId && p.partidaId === partidaId)
+      : pagamentos.find(p => p.jogadorId === jogadorId && p.mesRef === mesRef && !p.partidaId);
+    
+    const existe = !!pagamentoAnterior;
     
     let atualizados: Pagamento[];
     let pagModificado: Pagamento;
@@ -1170,6 +1241,32 @@ export default function App() {
     if (pagModificado!) {
       await salvarPagamentoNoSupabase(pagModificado);
 
+      // Se o status mudou para 'pago' (e não era pago antes), enviar e-mail de Recibo via SMTP
+      if (status === 'pago' && (!pagamentoAnterior || pagamentoAnterior.status !== 'pago')) {
+        const atleta = jogadores.find(j => j.id === jogadorId);
+        if (atleta && atleta.email) {
+          const descReferencia = partidaId 
+            ? `Partida avulsa`
+            : `Mensalidade ref. ${mesRef.split('-').reverse().join('/')}`;
+
+          try {
+            fetch('/api/send-receipt-email', {
+              method: 'POST',
+              headers: { 'Content-Type': 'application/json' },
+              body: JSON.stringify({
+                email: atleta.email,
+                nome: `${atleta.nome} ${atleta.sobrenome || ''}`.trim(),
+                valor: valor,
+                referencia: descReferencia,
+                dataPagamento: dataPagamento
+              })
+            });
+          } catch (err) {
+            console.error("Erro ao enviar e-mail de recibo:", err);
+          }
+        }
+      }
+
       // Se for quitação de mensalidade (sem partidaId associada) e o bot estiver ativo, disparar mensagem com a lista atualizada
       if (whatsappAutomacaoAtiva && !partidaId && status === 'pago') {
         const msgCompleta = obterTextoListaRenovacao(mesRef, jogadores, atualizados, valor4Sabados, valor5Sabados);
@@ -1180,6 +1277,61 @@ export default function App() {
           `Renovação de Mensalidade ${mesRef.split('-').reverse().join('/')}`,
           msgCompleta
         );
+      }
+
+      // Se for um novo pagamento manual informado aguardando aprovação, notificar o administrador
+      if (whatsappAutomacaoAtiva && status === 'pendente_confirmacao' && whatsappWebhookUrl) {
+        const atleta = jogadores.find(j => j.id === jogadorId);
+        const atletaNome = atleta ? `${atleta.nome} ${atleta.sobrenome}` : 'Atleta';
+        const descReferencia = partidaId 
+          ? `Partida avulsa`
+          : `Mensalidade ref. ${mesRef.split('-').reverse().join('/')}`;
+
+        const msgPagamentoAdmin = `💰 *NOVO PAGAMENTO DECLARADO* 💰\n\n` +
+          `Um pagamento manual foi informado e aguarda sua validação no portal:\n\n` +
+          `👤 Atleta: *${atletaNome}*\n` +
+          `💵 Valor: *R$ ${Number(valor).toFixed(2).replace('.', ',')}*\n` +
+          `📝 Referência: *${descReferencia}*\n\n` +
+          `👉 Acesse o portal para conferir o comprovante e aprovar:\n${window.location.origin}`;
+
+        setTimeout(async () => {
+          try {
+            await fetch('/api/bot-proxy', {
+              method: 'POST',
+              headers: {
+                'Content-Type': 'application/json'
+              },
+              body: JSON.stringify({
+                url: whatsappWebhookUrl,
+                secret: whatsappWebhookToken,
+                payload: {
+                  mensagem: msgPagamentoAdmin,
+                  grupo_id: 'admin'
+                }
+              })
+            });
+
+            const logSucesso: BotLog = {
+              id: `log-${Date.now()}-${Math.random().toString(36).substr(2, 4)}`,
+              tabela: atletaNome,
+              evento: 'PAGAMENTO_DECLARADO_ADMIN',
+              mensagem: `Notificação de pagamento pendente enviada ao Administrador: "${atletaNome} - R$ ${Number(valor).toFixed(2).replace('.', ',')}"`,
+              enviado_em: new Date().toISOString()
+            };
+
+            setWhatsappLogs(currentLogs => {
+              const updated = [logSucesso, ...currentLogs].slice(0, 50);
+              saveWhatsappLogs(updated);
+              return updated;
+            });
+
+            if (getSupabase()) {
+              salvarBotLogNoSupabase(logSucesso);
+            }
+          } catch (e: any) {
+            console.warn('Erro ao notificar administrador sobre pagamento manual:', e);
+          }
+        }, 200);
       }
     }
   };
@@ -1196,11 +1348,19 @@ export default function App() {
   ) => {
     let atualizados = [...pagamentos];
     const modificados: Pagamento[] = [];
+    const statusAnterioresMap = new Map<string, string | undefined>();
 
     for (const item of items) {
       const existeIndex = item.partidaId
         ? atualizados.findIndex(p => p.jogadorId === jogadorId && p.partidaId === item.partidaId)
         : atualizados.findIndex(p => p.jogadorId === jogadorId && p.mesRef === item.mesRef && !p.partidaId);
+
+      const key = item.partidaId ? `partida-${item.partidaId}` : `mesRef-${item.mesRef}`;
+      if (existeIndex >= 0) {
+        statusAnterioresMap.set(key, atualizados[existeIndex].status);
+      } else {
+        statusAnterioresMap.set(key, undefined);
+      }
 
       let pagModificado: Pagamento;
       if (existeIndex >= 0) {
@@ -1248,6 +1408,90 @@ export default function App() {
 
     for (const pag of modificados) {
       await salvarPagamentoNoSupabase(pag);
+
+      const key = pag.partidaId ? `partida-${pag.partidaId}` : `mesRef-${pag.mesRef}`;
+      const statusAnterior = statusAnterioresMap.get(key);
+
+      // Se o status mudou para 'pago' (e não era pago antes), enviar e-mail de Recibo via SMTP
+      if (pag.status === 'pago' && statusAnterior !== 'pago') {
+        const atleta = jogadores.find(j => j.id === jogadorId);
+        if (atleta && atleta.email) {
+          const descReferencia = pag.partidaId 
+            ? `Partida avulsa`
+            : `Mensalidade ref. ${pag.mesRef.split('-').reverse().join('/')}`;
+
+          try {
+            fetch('/api/send-receipt-email', {
+              method: 'POST',
+              headers: { 'Content-Type': 'application/json' },
+              body: JSON.stringify({
+                email: atleta.email,
+                nome: `${atleta.nome} ${atleta.sobrenome || ''}`.trim(),
+                valor: pag.valor,
+                referencia: descReferencia,
+                dataPagamento: pag.dataPagamento
+              })
+            });
+          } catch (err) {
+            console.error("Erro ao enviar e-mail de recibo em lote:", err);
+          }
+        }
+      }
+
+      // Se for um novo pagamento manual informado aguardando aprovação, notificar o administrador
+      if (whatsappAutomacaoAtiva && pag.status === 'pendente_confirmacao' && whatsappWebhookUrl) {
+        const atleta = jogadores.find(j => j.id === jogadorId);
+        const atletaNome = atleta ? `${atleta.nome} ${atleta.sobrenome}` : 'Atleta';
+        const descReferencia = pag.partidaId 
+          ? `Partida avulsa`
+          : `Mensalidade ref. ${pag.mesRef.split('-').reverse().join('/')}`;
+
+        const msgPagamentoAdmin = `💰 *NOVO PAGAMENTO DECLARADO* 💰\n\n` +
+          `Um pagamento manual foi informado e aguarda sua validação no portal:\n\n` +
+          `👤 Atleta: *${atletaNome}*\n` +
+          `💵 Valor: *R$ ${Number(pag.valor).toFixed(2).replace('.', ',')}*\n` +
+          `📝 Referência: *${descReferencia}*\n\n` +
+          `👉 Acesse o portal para conferir o comprovante e aprovar:\n${window.location.origin}`;
+
+        setTimeout(async () => {
+          try {
+            await fetch('/api/bot-proxy', {
+              method: 'POST',
+              headers: {
+                'Content-Type': 'application/json'
+              },
+              body: JSON.stringify({
+                url: whatsappWebhookUrl,
+                secret: whatsappWebhookToken,
+                payload: {
+                  mensagem: msgPagamentoAdmin,
+                  grupo_id: 'admin'
+                }
+              })
+            });
+
+            const logSucesso: BotLog = {
+              id: `log-${Date.now()}-${Math.random().toString(36).substr(2, 4)}`,
+              tabela: atletaNome,
+              evento: 'PAGAMENTO_DECLARADO_ADMIN',
+              mensagem: `Notificação de pagamento pendente enviada ao Administrador: "${atletaNome} - R$ ${Number(pag.valor).toFixed(2).replace('.', ',')}"`,
+              enviado_em: new Date().toISOString()
+            };
+
+            setWhatsappLogs(currentLogs => {
+              const updated = [logSucesso, ...currentLogs].slice(0, 50);
+              saveWhatsappLogs(updated);
+              return updated;
+            });
+
+            if (getSupabase()) {
+              salvarBotLogNoSupabase(logSucesso);
+            }
+          } catch (e: any) {
+            console.warn('Erro ao notificar administrador sobre pagamento manual:', e);
+          }
+        }, 200);
+      }
     }
   };
 
