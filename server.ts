@@ -14,6 +14,42 @@ async function startServer() {
   // Usa middleware JSON para APIs criadas aqui
   app.use(express.json());
 
+  // Configuração reutilizável e robusta para Nodemailer com suporte a fallback IPv4 e TLS resiliente
+  const obterSMTPTransporter = async () => {
+    const smtpHost = process.env.SMTP_HOST || 'smtp.gmail.com';
+    const smtpPort = Number(process.env.SMTP_PORT) || 465;
+    const isSecure = smtpPort === 465;
+
+    let targetHost = smtpHost;
+    if (smtpHost === 'smtp.gmail.com') {
+      try {
+        const address = await new Promise<string>((resolve, reject) => {
+          dns.lookup('smtp.gmail.com', { family: 4 }, (err, addr) => {
+            if (err) reject(err);
+            else resolve(addr);
+          });
+        });
+        targetHost = address;
+      } catch (err) {
+        console.warn('Fallback: não foi possível resolver o IP de smtp.gmail.com', err);
+      }
+    }
+
+    return nodemailer.createTransport({
+      host: targetHost,
+      port: smtpPort,
+      secure: isSecure,
+      auth: {
+        user: process.env.SMTP_USER,
+        pass: process.env.SMTP_PASS,
+      },
+      tls: {
+        servername: 'smtp.gmail.com',
+        rejectUnauthorized: false, // Evita falhas por certificados CA locais ausentes no container
+      }
+    });
+  };
+
   // Rota de recuperação de senha via E-mail
   app.post("/api/recover-password", async (req, res) => {
     try {
@@ -30,35 +66,7 @@ async function startServer() {
         });
       }
 
-      // Configuração do Nodemailer com forçamento de IPv4 (Render block workaround)
-      const resolveIpv4 = (host: string): Promise<string> => {
-        return new Promise((resolve, reject) => {
-          dns.lookup(host, { family: 4 }, (err, address) => {
-            if (err) reject(err);
-            else resolve(address);
-          });
-        });
-      };
-
-      let smtpHost = 'smtp.gmail.com';
-      try {
-        smtpHost = await resolveIpv4('smtp.gmail.com');
-      } catch(e) {
-        console.warn('Fallback: não foi possível resolver o IP de smtp.gmail.com');
-      }
-
-      const transporter = nodemailer.createTransport({
-        host: smtpHost,
-        port: 465,
-        secure: true,
-        auth: {
-          user: process.env.SMTP_USER,
-          pass: process.env.SMTP_PASS, // Senha de App do Gmail
-        },
-        tls: {
-          servername: 'smtp.gmail.com', // Necessário para validação de certificado TLS
-        }
-      });
+      const transporter = await obterSMTPTransporter();
 
       const mailOptions = {
         from: `"Pelada Batista" <${process.env.SMTP_USER}>`,
@@ -112,34 +120,7 @@ async function startServer() {
         });
       }
 
-      const resolveIpv4 = (host: string): Promise<string> => {
-        return new Promise((resolve, reject) => {
-          dns.lookup(host, { family: 4 }, (err, address) => {
-            if (err) resolve(host);
-            else resolve(address);
-          });
-        });
-      };
-
-      let smtpHost = 'smtp.gmail.com';
-      try {
-        smtpHost = await resolveIpv4('smtp.gmail.com');
-      } catch(e) {
-        console.warn('Fallback: não foi possível resolver o IP de smtp.gmail.com');
-      }
-
-      const transporter = nodemailer.createTransport({
-        host: smtpHost,
-        port: 465,
-        secure: true,
-        auth: {
-          user: process.env.SMTP_USER,
-          pass: process.env.SMTP_PASS,
-        },
-        tls: {
-          servername: 'smtp.gmail.com',
-        }
-      });
+      const transporter = await obterSMTPTransporter();
 
       const mailOptions = {
         from: `"Pelada Batista" <${process.env.SMTP_USER}>`,
@@ -203,34 +184,7 @@ async function startServer() {
         });
       }
 
-      const resolveIpv4 = (host: string): Promise<string> => {
-        return new Promise((resolve, reject) => {
-          dns.lookup(host, { family: 4 }, (err, address) => {
-            if (err) resolve(host);
-            else resolve(address);
-          });
-        });
-      };
-
-      let smtpHost = 'smtp.gmail.com';
-      try {
-        smtpHost = await resolveIpv4('smtp.gmail.com');
-      } catch(e) {
-        console.warn('Fallback: não foi possível resolver o IP de smtp.gmail.com');
-      }
-
-      const transporter = nodemailer.createTransport({
-        host: smtpHost,
-        port: 465,
-        secure: true,
-        auth: {
-          user: process.env.SMTP_USER,
-          pass: process.env.SMTP_PASS,
-        },
-        tls: {
-          servername: 'smtp.gmail.com',
-        }
-      });
+      const transporter = await obterSMTPTransporter();
 
       const valorFormatado = Number(valor).toFixed(2).replace('.', ',');
       const dataFormatada = dataPagamento 

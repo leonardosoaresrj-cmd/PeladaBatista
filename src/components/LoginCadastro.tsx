@@ -73,19 +73,14 @@ export default function LoginCadastro({ jogadores, onLoginSuccess, onRegistrar }
     setIsSending(true);
 
     try {
-      // Obter credenciais do Supabase (dinâmicas ou padrão)
-      const { url: supabaseUrl, key: supabaseAnonKey } = obterCredenciaisSupabase();
-
-      const response = await fetch(`${supabaseUrl}/functions/v1/recover-password`, {
+      const response = await fetch('/api/recover-password', {
         method: 'POST',
         headers: {
           'Content-Type': 'application/json',
-          'apikey': supabaseAnonKey,
-          'Authorization': `Bearer ${supabaseAnonKey}`,
         },
         body: JSON.stringify({
           email: found.email,
-          nome: `${found.nome} ${found.sobrenome}`,
+          nome: `${found.nome} ${found.sobrenome || ''}`.trim(),
           senha: found.senha
         })
       });
