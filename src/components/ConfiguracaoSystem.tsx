@@ -6,7 +6,7 @@
 import React, { useState, useEffect } from 'react';
 import { Database, Copy, Check, Server, Share2, HelpCircle, ToggleLeft, ToggleRight, MessageSquare, ListFilter, Trash2, Send, ShieldCheck, Zap, Coins, Mail } from 'lucide-react';
 import { DATABASE_SQL_SCHEMA } from '../data';
-import { obterCredenciaisSupabase, salvarCredenciaisSupabase, getSupabase } from '../supabaseClient';
+import { obterCredenciaisSupabase, salvarCredenciaisSupabase, getSupabase, salvarConfiguracaoNoSupabase, obterConfiguracaoDoSupabase } from '../supabaseClient';
 
 interface ConfiguracaoSystemProps {
   onConfigUpdated?: () => void;
@@ -148,11 +148,19 @@ export default function ConfiguracaoSystem({
     setIsLive(!!getSupabase());
 
     // Carregar credenciais Mercado Pago e Chave PIX direta
-    setMpAccessToken(localStorage.getItem('mercado_pago_access_token') || '');
-    setMpPublicKey(localStorage.getItem('mercado_pago_public_key') || '');
-    setDiretoPixChave(localStorage.getItem('direto_pix_chave') || '');
-    setDiretoPixNome(localStorage.getItem('direto_pix_nome') || 'Pelada Batista Sábado');
-    setDiretoPixCidade(localStorage.getItem('direto_pix_cidade') || 'SAO PAULO');
+    // Supabase primeiro (sincronizado), localStorage como fallback
+    (async () => {
+      const [dbPixChave, dbPixNome, dbPixCidade] = await Promise.all([
+        obterConfiguracaoDoSupabase('direto_pix_chave'),
+        obterConfiguracaoDoSupabase('direto_pix_nome'),
+        obterConfiguracaoDoSupabase('direto_pix_cidade'),
+      ]);
+      setMpAccessToken(localStorage.getItem('mercado_pago_access_token') || '');
+      setMpPublicKey(localStorage.getItem('mercado_pago_public_key') || '');
+      setDiretoPixChave(dbPixChave ?? localStorage.getItem('direto_pix_chave') ?? '');
+      setDiretoPixNome(dbPixNome ?? localStorage.getItem('direto_pix_nome') ?? 'Pelada Batista');
+      setDiretoPixCidade(dbPixCidade ?? localStorage.getItem('direto_pix_cidade') ?? 'RIO DE JANEIRO');
+    })();
   }, []);
 
   const handleSalvarMercadoPago = (e: React.FormEvent) => {
@@ -162,6 +170,10 @@ export default function ConfiguracaoSystem({
     localStorage.setItem('direto_pix_chave', diretoPixChave);
     localStorage.setItem('direto_pix_nome', diretoPixNome);
     localStorage.setItem('direto_pix_cidade', diretoPixCidade);
+    // Persistir PIX no Supabase — sincroniza para todos os dispositivos
+    salvarConfiguracaoNoSupabase('direto_pix_chave',  diretoPixChave);
+    salvarConfiguracaoNoSupabase('direto_pix_nome',   diretoPixNome);
+    salvarConfiguracaoNoSupabase('direto_pix_cidade', diretoPixCidade);
     setMpSuccessMsg('✓ Credenciais e dados PIX salvos com sucesso!');
     setTimeout(() => setMpSuccessMsg(''), 3000);
   };
