@@ -126,10 +126,18 @@ export default function App() {
     setWhatsappAutomacaoAtiva(ativa);
     setWhatsappWebhookUrl(webhookUrl);
     setWhatsappWebhookToken(token);
+
+    // Salvar no localStorage (imediato, offline)
     localStorage.setItem('racha_whatsapp_grupo_link', link);
     localStorage.setItem('racha_whatsapp_automacao_ativa', ativa.toString());
     localStorage.setItem('racha_whatsapp_webhook_url', webhookUrl);
     localStorage.setItem('racha_whatsapp_webhook_token', token);
+
+    // Salvar no Supabase (persiste em qualquer navegador)
+    salvarConfiguracaoNoSupabase('whatsapp_grupo_link',    link);
+    salvarConfiguracaoNoSupabase('whatsapp_automacao_ativa', ativa.toString());
+    salvarConfiguracaoNoSupabase('whatsapp_webhook_url',   webhookUrl);
+    salvarConfiguracaoNoSupabase('whatsapp_webhook_token', token);
   };
 
   // Estados de Controle de Caixa e Lançamentos
@@ -602,6 +610,33 @@ export default function App() {
           } catch (e) {
             console.error(e);
           }
+        }
+
+        // Carregar configurações de WhatsApp do Supabase
+        // (substituem o localStorage para funcionar em qualquer navegador)
+        const [dbGrupoLink, dbAutomacao, dbWebhookUrl, dbWebhookToken] = await Promise.all([
+          obterConfiguracaoDoSupabase('whatsapp_grupo_link'),
+          obterConfiguracaoDoSupabase('whatsapp_automacao_ativa'),
+          obterConfiguracaoDoSupabase('whatsapp_webhook_url'),
+          obterConfiguracaoDoSupabase('whatsapp_webhook_token'),
+        ]);
+
+        if (dbGrupoLink !== null) {
+          setWhatsappGrupoLink(dbGrupoLink);
+          localStorage.setItem('racha_whatsapp_grupo_link', dbGrupoLink);
+        }
+        if (dbAutomacao !== null) {
+          const ativa = dbAutomacao === 'true';
+          setWhatsappAutomacaoAtiva(ativa);
+          localStorage.setItem('racha_whatsapp_automacao_ativa', dbAutomacao);
+        }
+        if (dbWebhookUrl !== null) {
+          setWhatsappWebhookUrl(dbWebhookUrl);
+          localStorage.setItem('racha_whatsapp_webhook_url', dbWebhookUrl);
+        }
+        if (dbWebhookToken !== null) {
+          setWhatsappWebhookToken(dbWebhookToken);
+          localStorage.setItem('racha_whatsapp_webhook_token', dbWebhookToken);
         }
 
         // Carregar logs do bot
