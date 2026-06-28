@@ -14,12 +14,17 @@ async function startServer() {
   // Usa middleware JSON para APIs criadas aqui
   app.use(express.json());
 
-  // Configuração reutilizável e robusta para Nodemailer com suporte a fallback IPv4 e TLS resiliente
-  const obterSMTPTransporter = async () => {
+  // Envia e-mail de forma resiliente, tentando as portas 587 (STARTTLS) e 465 (SSL) com timeouts baixos para failover rápido
+  const enviarEmailResiliente = async (mailOptions: any) => {
     const smtpHost = process.env.SMTP_HOST || 'smtp.gmail.com';
-    const smtpPort = Number(process.env.SMTP_PORT) || 465;
-    const isSecure = smtpPort === 465;
+    const smtpUser = process.env.SMTP_USER;
+    const smtpPass = process.env.SMTP_PASS;
 
+    if (!smtpUser || !smtpPass) {
+      throw new Error("SMTP_USER ou SMTP_PASS não definidos nas variáveis de ambiente.");
+    }
+
+    // Tentar resolver o host para IPv4 (evita problemas com IPv6 no Render/GCP)
     let targetHost = smtpHost;
     if (smtpHost === 'smtp.gmail.com') {
       try {
@@ -35,19 +40,54 @@ async function startServer() {
       }
     }
 
-    return nodemailer.createTransport({
-      host: targetHost,
-      port: smtpPort,
-      secure: isSecure,
-      auth: {
-        user: process.env.SMTP_USER,
-        pass: process.env.SMTP_PASS,
-      },
-      tls: {
-        servername: 'smtp.gmail.com',
-        rejectUnauthorized: false, // Evita falhas por certificados CA locais ausentes no container
+    // Configurar portas a serem testadas.
+    // Preferimos 587 em ambientes de nuvem (Render/GCP) por ser muito mais provável de estar aberta,
+    // e usamos 465 como fallback secundário.
+    const portasParaTentar: { port: number; secure: boolean }[] = [];
+    if (process.env.SMTP_PORT) {
+      const p = Number(process.env.SMTP_PORT);
+      portasParaTentar.push({ port: p, secure: p === 465 });
+      if (p !== 587) portasParaTentar.push({ port: 587, secure: false });
+      if (p !== 465) portasParaTentar.push({ port: 465, secure: true });
+    } else {
+      portasParaTentar.push({ port: 587, secure: false });
+      portasParaTentar.push({ port: 465, secure: true });
+    }
+
+    let ultimoErro: any = null;
+    for (const t of portasParaTentar) {
+      console.log(`[SMTP] Tentando enviar e-mail para ${mailOptions.to} via ${smtpHost} na porta ${t.port} (secure: ${t.secure})...`);
+      try {
+        const transporter = nodemailer.createTransport({
+          host: targetHost,
+          port: t.port,
+          secure: t.secure,
+          auth: {
+            user: smtpUser,
+            pass: smtpPass,
+          },
+          tls: {
+            servername: 'smtp.gmail.com',
+            rejectUnauthorized: false,
+          },
+          connectionTimeout: 6000, // Timeout curto de 6s para failover rápido
+          greetingTimeout: 5000,
+          socketTimeout: 8000,
+        });
+
+        const info = await transporter.sendMail({
+          ...mailOptions,
+          from: mailOptions.from || `"Pelada Batista" <${smtpUser}>`
+        });
+        console.log(`[SMTP] E-mail enviado com sucesso na porta ${t.port}! MessageId: ${info.messageId}`);
+        return info;
+      } catch (err: any) {
+        console.error(`[SMTP ERROR] Falha na porta ${t.port}:`, err.message || err);
+        ultimoErro = err;
       }
-    });
+    }
+
+    throw ultimoErro || new Error("Falha ao conectar a todos os servidores/portas SMTP disponíveis.");
   };
 
   // Rota de recuperação de senha via E-mail
@@ -65,8 +105,6 @@ async function startServer() {
           error: "Servidor de e-mail não configurado. Por favor, adicione SMTP_USER e SMTP_PASS nas variáveis de ambiente." 
         });
       }
-
-      const transporter = await obterSMTPTransporter();
 
       const mailOptions = {
         from: `"Pelada Batista" <${process.env.SMTP_USER}>`,
@@ -92,7 +130,7 @@ async function startServer() {
         `,
       };
 
-      await transporter.sendMail(mailOptions);
+      await enviarEmailResiliente(mailOptions);
 
       return res.status(200).json({ success: true, message: "E-mail enviado com sucesso" });
 
@@ -119,8 +157,6 @@ async function startServer() {
           error: "Servidor de e-mail não configurado. Por favor, adicione SMTP_USER e SMTP_PASS nas variáveis de ambiente." 
         });
       }
-
-      const transporter = await obterSMTPTransporter();
 
       const mailOptions = {
         from: `"Pelada Batista" <${process.env.SMTP_USER}>`,
@@ -157,7 +193,7 @@ async function startServer() {
         `,
       };
 
-      await transporter.sendMail(mailOptions);
+      await enviarEmailResiliente(mailOptions);
       return res.status(200).json({ success: true, message: "E-mail de boas-vindas enviado com sucesso." });
 
     } catch (error: any) {
@@ -183,8 +219,6 @@ async function startServer() {
           error: "Servidor de e-mail não configurado. Por favor, adicione SMTP_USER e SMTP_PASS nas variáveis de ambiente." 
         });
       }
-
-      const transporter = await obterSMTPTransporter();
 
       const valorFormatado = Number(valor).toFixed(2).replace('.', ',');
       const dataFormatada = dataPagamento 
@@ -240,7 +274,7 @@ async function startServer() {
         `,
       };
 
-      await transporter.sendMail(mailOptions);
+      await enviarEmailResiliente(mailOptions);
       return res.status(200).json({ success: true, message: "Recibo enviado com sucesso." });
 
     } catch (error: any) {
