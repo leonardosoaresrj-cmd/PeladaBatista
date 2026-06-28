@@ -302,7 +302,7 @@ export default function App() {
     saveAluguelCampo(valor);
   };
 
-  const handleRegistrarLogAutomacao = async (atletaNome: string, partidaTitulo: string, msg: string) => {
+  const handleRegistrarLogAutomacao = async (atletaNome: string, partidaTitulo: string, msg: string, grupoIdOverride?: string) => {
     // Insere o evento de teste inicial com ID local temporário
     const logId = `log-${Date.now()}-${Math.random().toString(36).substr(2, 4)}`;
     const novoLog: BotLog = {
@@ -313,7 +313,7 @@ export default function App() {
       enviado_em: new Date().toISOString()
     };
     
-    // Atualização instantânea e persistente do estado local
+    // Atualização instantânea e persistentente do estado local
     setWhatsappLogs(currentLogs => {
       const updated = [novoLog, ...currentLogs].slice(0, 50);
       saveWhatsappLogs(updated);
@@ -337,7 +337,7 @@ export default function App() {
               secret: whatsappWebhookToken,
               payload: {
                 mensagem: msg,
-                grupo_id: whatsappGrupoLink
+                grupo_id: grupoIdOverride || whatsappGrupoLink
               }
             })
           });
@@ -365,11 +365,12 @@ export default function App() {
             }
           } else {
             // Log de sucesso opcional para que o usuário sinta segurança de que deu certo de fato
+            const destinatarioNome = (grupoIdOverride || whatsappGrupoLink) === 'admin' ? 'administrador' : 'grupo';
             const logSucesso: BotLog = {
               id: `log-${Date.now()}-${Math.random().toString(36).substr(2, 4)}`,
               tabela: atletaNome,
               evento: 'SUCESSO_DISPARO',
-              mensagem: `Mensagem enviada com sucesso ao grupo: "${msg.substring(0, 60)}..."`,
+              mensagem: `Mensagem enviada com sucesso ao ${destinatarioNome}: "${msg.substring(0, 60)}..."`,
               enviado_em: new Date().toISOString()
             };
 
@@ -413,11 +414,12 @@ export default function App() {
     await limparBotLogsDoSupabase();
   };
 
-  const handleSendTestAlert = (msg?: string) => {
+  const handleSendTestAlert = (msg?: string, destinatario?: 'grupo' | 'admin') => {
     handleRegistrarLogAutomacao(
-      'Automação (Teste)',
-      'Teste Painel',
-      msg || '📢 [ALERTA DE TESTE]: Disparo de teste bem-sucedido via painel de controle!'
+      destinatario === 'admin' ? 'Administrador' : 'Automação (Teste)',
+      destinatario === 'admin' ? 'PENDENTE_APROVACAO_ADMIN' : 'Teste Painel',
+      msg || '📢 [ALERTA DE TESTE]: Disparo de teste bem-sucedido via painel de controle!',
+      destinatario === 'admin' ? 'admin' : undefined
     );
   };
 

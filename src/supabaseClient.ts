@@ -343,7 +343,7 @@ export async function salvarPagamentoNoSupabase(pagamento: Pagamento): Promise<b
       return false;
     }
 
-    const record = {
+    const record: any = {
       ...(pagamento.id && !pagamento.id.startsWith('pag-') ? { id: pagamento.id } : {}),
       jogador_id: pagamento.jogadorId,
       mes_ref: pagamento.mesRef,
@@ -351,6 +351,10 @@ export async function salvarPagamentoNoSupabase(pagamento: Pagamento): Promise<b
       data_pagamento: pagamento.dataPagamento ? `${pagamento.dataPagamento}T12:00:00Z` : null,
       valor: pagamento.valor,
     };
+
+    if (pagamento.partidaId) {
+      record.partida_id = pagamento.partidaId;
+    }
 
     const { error } = await supabase
       .from('pagamentos')
@@ -384,7 +388,8 @@ export async function carregarPagamentosDoSupabase(): Promise<Pagamento[] | null
       mesRef: d.mes_ref,
       status: d.status,
       dataPagamento: d.data_pagamento ? d.data_pagamento.substring(0, 10) : null,
-      valor: Number(d.valor)
+      valor: Number(d.valor),
+      partidaId: d.partida_id || undefined
     }));
   } catch (error) {
     console.warn('Erro ao buscar pagamentos do Supabase:', error);

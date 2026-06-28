@@ -98,10 +98,16 @@ export default function ListaCadastrados({
         quitado = true;
         detalhesStatus = 'Isento';
       } else if (j.membroStatus === 'mensalista') {
-        // Encontrar pagamento mensal (onde partidaId está ausente)
+        // Encontrar pagamento de mensalidade (onde partidaId está ausente), incluindo cancelados
+        const pagMensalCancelado = pagamentos.find((p) => p.jogadorId === j.id && p.mesRef === mes && !p.partidaId && p.status === 'cancelado');
         const pagMensal = pagamentosDoMes.find((p) => !p.partidaId);
 
-        if (pagMensal?.status === 'pago') {
+        if (pagMensalCancelado) {
+          situacao = 'Mensalista';
+          quitado = true;
+          detalhesStatus = 'Cobrança Cancelada 🚫';
+          rebaixadoTemporario = false;
+        } else if (pagMensal?.status === 'pago') {
           situacao = 'Mensalista';
           quitado = true;
           detalhesStatus = 'Quitado (Mensalidade)';
@@ -130,22 +136,29 @@ export default function ListaCadastrados({
           quitado = true;
           detalhesStatus = 'Nenhuma Pelada Confirmada';
         } else {
-          // Verificar se todos os pagamentos de diária foram realizados
-          const todasPagas = partidasConfirmadas.every((ptId) => {
-            const pgEncontrado = pagamentosDoMes.find((p) => p.partidaId === ptId.id);
-            return pgEncontrado?.status === 'pago';
+          // Verificar se todos os pagamentos de diária foram realizados ou cancelados
+          const todasPagasOuCanceladas = partidasConfirmadas.every((ptId) => {
+            const pgEncontrado = pagamentos.find((p) => p.jogadorId === j.id && p.partidaId === ptId.id);
+            return pgEncontrado?.status === 'pago' || pgEncontrado?.status === 'cancelado';
           });
 
-          quitado = todasPagas;
+          quitado = todasPagasOuCanceladas;
 
           const nPagas = partidasConfirmadas.filter((ptId) => {
-            const pgEncontrado = pagamentosDoMes.find((p) => p.partidaId === ptId.id);
+            const pgEncontrado = pagamentos.find((p) => p.jogadorId === j.id && p.partidaId === ptId.id);
             return pgEncontrado?.status === 'pago';
           }).length;
 
-          detalhesStatus = todasPagas
-            ? 'Quitado'
-            : `${nPagas} de ${partidasConfirmadas.length} Jogos Pagos`;
+          const nCanceladas = partidasConfirmadas.filter((ptId) => {
+            const pgEncontrado = pagamentos.find((p) => p.jogadorId === j.id && p.partidaId === ptId.id);
+            return pgEncontrado?.status === 'cancelado';
+          }).length;
+
+          if (todasPagasOuCanceladas) {
+            detalhesStatus = nCanceladas === partidasConfirmadas.length ? 'Isento/Cancelado 🚫' : 'Quitado';
+          } else {
+            detalhesStatus = `${nPagas} de ${partidasConfirmadas.length} Jogos Pagos`;
+          }
         }
       }
 

@@ -17,7 +17,7 @@ interface ConfiguracaoSystemProps {
   onUpdateWhatsappConfig: (link: string, ativa: boolean, webhookUrl: string, token: string) => void;
   whatsappLogs: any[];
   onClearLogs: () => void;
-  onSendTestAlert: (msg?: string) => void;
+  onSendTestAlert: (msg?: string, destinatario?: 'grupo' | 'admin') => void;
   valor4Sabados: number;
   valor5Sabados: number;
   valorDiaria: number;
@@ -592,7 +592,7 @@ https://peladabatista.onrender.com`}
               <button
                 type="button"
                 onClick={() => {
-                  onSendTestAlert(`👤 *NOVO CADASTRO AGUARDANDO APROVAÇÃO* 👤\n\nUm novo jogador se cadastrou no portal e aguarda a sua aprovação:\n\n🏷️ Nome: *Carlos Alberto (Teste)*\n📧 E-mail: *carlos.teste@gmail.com*\n⚽ Posição: *Meio*\n⭐ Mensalista/Diarista: *mensalista*\n\n👉 Acesse o painel do administrador para aprovar:\nhttps://peladabatista.onrender.com`);
+                  onSendTestAlert(`👤 *NOVO CADASTRO AGUARDANDO APROVAÇÃO* 👤\n\nUm novo jogador se cadastrou no portal e aguarda a sua aprovação:\n\n🏷️ Nome: *Carlos Alberto (Teste)*\n📧 E-mail: *carlos.teste@gmail.com*\n⚽ Posição: *Meio*\n⭐ Mensalista/Diarista: *mensalista*\n\n👉 Acesse o painel do administrador para aprovar:\nhttps://peladabatista.onrender.com`, 'admin');
                   setSuccessMsg('Mensagem 5 (Novo Cadastro Admin) disparada!');
                   setTimeout(() => setSuccessMsg(''), 4000);
                 }}
