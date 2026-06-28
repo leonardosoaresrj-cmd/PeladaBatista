@@ -5,6 +5,9 @@ import { createServer as createViteServer } from "vite";
 const SUPABASE_SEND_EMAIL_URL =
   "https://gqasacnaubkhokqyrpwc.supabase.co/functions/v1/send-email";
 
+// Anon key publica do Supabase (segura para uso no servidor)
+const SUPABASE_ANON_KEY = "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6ImdxYXNhY25hdWJraG9rcXlycHdjIiwicm9sZSI6ImFub24iLCJpYXQiOjE3ODA0OTIzOTAsImV4cCI6MjA5NjA2ODM5MH0.rRgF_yoLeVRVg9eK_VSKSnBUkf7MXaY1yJAlvWBEfzQ";
+
 async function enviarEmailGmail(
   to: string,
   subject: string,
@@ -12,8 +15,12 @@ async function enviarEmailGmail(
 ): Promise<void> {
   const resp = await fetch(SUPABASE_SEND_EMAIL_URL, {
     method:  "POST",
-    headers: { "Content-Type": "application/json" },
-    body:    JSON.stringify({ to, subject, html }),
+    headers: {
+      "Content-Type":  "application/json",
+      "Authorization": `Bearer ${SUPABASE_ANON_KEY}`,
+      "apikey":        SUPABASE_ANON_KEY,
+    },
+    body: JSON.stringify({ to, subject, html }),
   });
   if (!resp.ok) {
     const err = await resp.json().catch(() => ({}));
