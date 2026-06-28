@@ -14,80 +14,50 @@ async function startServer() {
   // Usa middleware JSON para APIs criadas aqui
   app.use(express.json());
 
-  // Envia e-mail de forma resiliente, tentando as portas 587 (STARTTLS) e 465 (SSL) com timeouts baixos para failover rápido
-  const enviarEmailResiliente = async (mailOptions: any) => {
-    const smtpHost = process.env.SMTP_HOST || 'smtp.gmail.com';
-    const smtpUser = process.env.SMTP_USER;
-    const smtpPass = process.env.SMTP_PASS;
+  // Função de envio via SMTP direta por Nodemailer com resolução de IPv4, idêntica à que funcionava perfeitamente antes
+  const enviarEmailSMTP = async (mailOptions: any) => {
+    const smtpHostEnv = process.env.SMTP_HOST || 'smtp.gmail.com';
+    const smtpPortEnv = Number(process.env.SMTP_PORT) || 465;
+    const isSecure = smtpPortEnv === 465;
 
-    if (!smtpUser || !smtpPass) {
-      throw new Error("SMTP_USER ou SMTP_PASS não definidos nas variáveis de ambiente.");
-    }
-
-    // Tentar resolver o host para IPv4 (evita problemas com IPv6 no Render/GCP)
-    let targetHost = smtpHost;
-    if (smtpHost === 'smtp.gmail.com') {
-      try {
-        const address = await new Promise<string>((resolve, reject) => {
-          dns.lookup('smtp.gmail.com', { family: 4 }, (err, addr) => {
-            if (err) reject(err);
-            else resolve(addr);
-          });
+    const resolveIpv4 = (host: string): Promise<string> => {
+      return new Promise((resolve) => {
+        dns.lookup(host, { family: 4 }, (err, address) => {
+          if (err) resolve(host);
+          else resolve(address);
         });
-        targetHost = address;
-      } catch (err) {
-        console.warn('Fallback: não foi possível resolver o IP de smtp.gmail.com', err);
+      });
+    };
+
+    let targetHost = smtpHostEnv;
+    if (smtpHostEnv === 'smtp.gmail.com') {
+      try {
+        targetHost = await resolveIpv4('smtp.gmail.com');
+      } catch (e) {
+        console.warn('Fallback: não foi possível resolver o IP de smtp.gmail.com');
       }
     }
 
-    // Configurar portas a serem testadas.
-    // Preferimos 587 em ambientes de nuvem (Render/GCP) por ser muito mais provável de estar aberta,
-    // e usamos 465 como fallback secundário.
-    const portasParaTentar: { port: number; secure: boolean }[] = [];
-    if (process.env.SMTP_PORT) {
-      const p = Number(process.env.SMTP_PORT);
-      portasParaTentar.push({ port: p, secure: p === 465 });
-      if (p !== 587) portasParaTentar.push({ port: 587, secure: false });
-      if (p !== 465) portasParaTentar.push({ port: 465, secure: true });
-    } else {
-      portasParaTentar.push({ port: 587, secure: false });
-      portasParaTentar.push({ port: 465, secure: true });
-    }
-
-    let ultimoErro: any = null;
-    for (const t of portasParaTentar) {
-      console.log(`[SMTP] Tentando enviar e-mail para ${mailOptions.to} via ${smtpHost} na porta ${t.port} (secure: ${t.secure})...`);
-      try {
-        const transporter = nodemailer.createTransport({
-          host: targetHost,
-          port: t.port,
-          secure: t.secure,
-          auth: {
-            user: smtpUser,
-            pass: smtpPass,
-          },
-          tls: {
-            servername: 'smtp.gmail.com',
-            rejectUnauthorized: false,
-          },
-          connectionTimeout: 6000, // Timeout curto de 6s para failover rápido
-          greetingTimeout: 5000,
-          socketTimeout: 8000,
-        });
-
-        const info = await transporter.sendMail({
-          ...mailOptions,
-          from: mailOptions.from || `"Pelada Batista" <${smtpUser}>`
-        });
-        console.log(`[SMTP] E-mail enviado com sucesso na porta ${t.port}! MessageId: ${info.messageId}`);
-        return info;
-      } catch (err: any) {
-        console.error(`[SMTP ERROR] Falha na porta ${t.port}:`, err.message || err);
-        ultimoErro = err;
+    const transporter = nodemailer.createTransport({
+      host: targetHost,
+      port: smtpPortEnv,
+      secure: isSecure,
+      auth: {
+        user: process.env.SMTP_USER,
+        pass: process.env.SMTP_PASS,
+      },
+      tls: {
+        servername: smtpHostEnv, // Necessário para validação do certificado TLS do Gmail
       }
-    }
+    });
 
-    throw ultimoErro || new Error("Falha ao conectar a todos os servidores/portas SMTP disponíveis.");
+    console.log(`[SMTP] Enviando e-mail para ${mailOptions.to} via ${smtpHostEnv} na porta ${smtpPortEnv}...`);
+    const info = await transporter.sendMail({
+      ...mailOptions,
+      from: mailOptions.from || `"Pelada Batista" <${process.env.SMTP_USER}>`
+    });
+    console.log(`[SMTP] E-mail enviado com sucesso! MessageID: ${info.messageId}`);
+    return info;
   };
 
   // Rota de recuperação de senha via E-mail
@@ -130,7 +100,7 @@ async function startServer() {
         `,
       };
 
-      await enviarEmailResiliente(mailOptions);
+      await enviarEmailSMTP(mailOptions);
 
       return res.status(200).json({ success: true, message: "E-mail enviado com sucesso" });
 
@@ -152,6 +122,7 @@ async function startServer() {
         return res.status(400).json({ error: "Dados incompletos para envio de e-mail." });
       }
 
+      // Verifica se as configurações de SMTP estão preenchidas
       if (!process.env.SMTP_USER || !process.env.SMTP_PASS) {
         return res.status(500).json({ 
           error: "Servidor de e-mail não configurado. Por favor, adicione SMTP_USER e SMTP_PASS nas variáveis de ambiente." 
@@ -193,7 +164,7 @@ async function startServer() {
         `,
       };
 
-      await enviarEmailResiliente(mailOptions);
+      await enviarEmailSMTP(mailOptions);
       return res.status(200).json({ success: true, message: "E-mail de boas-vindas enviado com sucesso." });
 
     } catch (error: any) {
@@ -214,6 +185,7 @@ async function startServer() {
         return res.status(400).json({ error: "Dados incompletos para emissão de recibo." });
       }
 
+      // Verifica se as configurações de SMTP estão preenchidas
       if (!process.env.SMTP_USER || !process.env.SMTP_PASS) {
         return res.status(500).json({ 
           error: "Servidor de e-mail não configurado. Por favor, adicione SMTP_USER e SMTP_PASS nas variáveis de ambiente." 
@@ -274,7 +246,7 @@ async function startServer() {
         `,
       };
 
-      await enviarEmailResiliente(mailOptions);
+      await enviarEmailSMTP(mailOptions);
       return res.status(200).json({ success: true, message: "Recibo enviado com sucesso." });
 
     } catch (error: any) {
