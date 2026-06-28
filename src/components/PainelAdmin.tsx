@@ -92,7 +92,7 @@ export default function PainelAdmin({
                     {/* Perfil básico */}
                     <div className="flex items-center gap-3">
                       <div 
-                        className="w-10 h-10 rounded-full flex items-center justify-center text-xs font-bold shrink-0 border border-white/10 overflow-hidden cursor-zoom-in hover:scale-110 active:scale-95 transition-all duration-200"
+                        className="w-12 h-12 rounded-full flex items-center justify-center text-sm font-bold shrink-0 border border-white/10 overflow-hidden cursor-zoom-in hover:scale-110 active:scale-95 transition-all duration-200"
                         style={{ backgroundColor: avatar.color, color: avatar.text === '⚪' ? '#fff' : '#000' }}
                         onClick={() => {
                           if (p.foto && (p.foto.startsWith('http') || p.foto.startsWith('data:'))) {
@@ -234,7 +234,7 @@ export default function PainelAdmin({
                     {/* Atleta e Informações */}
                     <div className="flex items-center gap-3">
                       <div 
-                        className="w-10 h-10 rounded-full flex items-center justify-center text-xs font-bold shrink-0 border border-white/10 overflow-hidden cursor-zoom-in hover:scale-110 active:scale-95 transition-all duration-200"
+                        className="w-12 h-12 rounded-full flex items-center justify-center text-sm font-bold shrink-0 border border-white/10 overflow-hidden cursor-zoom-in hover:scale-110 active:scale-95 transition-all duration-200"
                         style={{ backgroundColor: avatar.color, color: avatar.text === '⚪' ? '#fff' : '#000' }}
                         onClick={() => {
                           if (jogador.foto && (jogador.foto.startsWith('http') || jogador.foto.startsWith('data:'))) {

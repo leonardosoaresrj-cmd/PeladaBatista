@@ -1991,9 +1991,9 @@ export default function ControleCaixa({
 
       {/* POPUP DE LANÇAMENTO AVULSO */}
       {showFormAvulso && (
-        <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/85 backdrop-blur-md animate-fade-in text-white font-sans">
+        <div className="fixed inset-0 z-50 flex items-center justify-center p-4 overflow-y-auto bg-black/85 backdrop-blur-md animate-fade-in text-white font-sans">
           <div 
-            className="w-full max-w-md border border-white/10 rounded-2xl p-6 shadow-2xl flex flex-col justify-between overflow-hidden relative"
+            className="w-full max-w-md max-h-[72vh] md:max-h-[85vh] overflow-y-auto border border-white/10 rounded-2xl p-6 shadow-2xl flex flex-col justify-between overflow-hidden relative"
             style={{ backgroundColor: '#021a14' }}
             onClick={(e) => e.stopPropagation()}
           >
@@ -2479,7 +2479,7 @@ export default function ControleCaixa({
                         >
                           <div className="flex items-center gap-2 overflow-hidden">
                             <div 
-                              className="w-7 h-7 rounded-full flex items-center justify-center text-[10.5px] font-bold shrink-0 border border-white/10 cursor-zoom-in hover:scale-110 active:scale-95 transition-all duration-200 overflow-hidden"
+                              className="w-11 h-11 rounded-full flex items-center justify-center text-[13px] font-bold shrink-0 border border-white/10 cursor-zoom-in hover:scale-110 active:scale-95 transition-all duration-200 overflow-hidden"
                               style={{ backgroundColor: avatar.color }}
                               onClick={() => {
                                 if (atl.foto && (atl.foto.startsWith('http') || atl.foto.startsWith('data:'))) {
@@ -2658,7 +2658,7 @@ export default function ControleCaixa({
                 >
                   <div className="flex items-center gap-3">
                     <div 
-                      className="w-10 h-10 rounded-full flex items-center justify-center text-sm font-bold shrink-0 border border-white/15 cursor-zoom-in hover:scale-110 active:scale-95 transition-all duration-200 overflow-hidden"
+                      className="w-12 h-12 rounded-full flex items-center justify-center text-sm font-bold shrink-0 border border-white/15 cursor-zoom-in hover:scale-110 active:scale-95 transition-all duration-200 overflow-hidden"
                       style={{ backgroundColor: avatar.color }}
                       onClick={() => {
                         if (jogador.foto && (jogador.foto.startsWith('http') || jogador.foto.startsWith('data:'))) {
@@ -2924,7 +2924,7 @@ export default function ControleCaixa({
                         <td className="py-3.5 px-4">
                           <div className="flex items-center gap-2.5">
                             <div 
-                              className="w-8 h-8 rounded-full flex items-center justify-center text-xs font-bold shrink-0 border border-white/10 cursor-zoom-in hover:scale-110 active:scale-95 transition-all duration-200 overflow-hidden"
+                              className="w-11 h-11 rounded-full flex items-center justify-center text-[13px] font-bold shrink-0 border border-white/10 cursor-zoom-in hover:scale-110 active:scale-95 transition-all duration-200 overflow-hidden"
                               style={{ backgroundColor: avatar.color }}
                               onClick={() => {
                                 if (jogador.foto && (jogador.foto.startsWith('http') || jogador.foto.startsWith('data:'))) {
@@ -3017,7 +3017,7 @@ export default function ControleCaixa({
                     <div className="flex items-start justify-between gap-2.5">
                       <div className="flex items-center gap-2.5">
                         <div 
-                          className="w-9 h-9 rounded-full flex items-center justify-center text-xs font-bold shrink-0 border border-white/10 overflow-hidden"
+                          className="w-12 h-12 rounded-full flex items-center justify-center text-sm font-bold shrink-0 border border-white/10 overflow-hidden"
                           style={{ backgroundColor: avatar.color }}
                           onClick={() => {
                             if (jogador.foto && (jogador.foto.startsWith('http') || jogador.foto.startsWith('data:'))) {
@@ -3104,9 +3104,9 @@ export default function ControleCaixa({
 
       {/* POPUP DE DETALHAMENTO FINANCEIRO DO MÊS */}
       {detalhesMesModal && statsModal && (
-        <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/80 backdrop-blur-md animate-fade-in text-white">
+        <div className="fixed inset-0 z-50 flex items-center justify-center p-4 overflow-y-auto bg-black/80 backdrop-blur-md animate-fade-in text-white">
           <div 
-            className="w-full max-w-4xl max-h-[90vh] border border-white/10 rounded-2xl p-6 shadow-2xl flex flex-col justify-between overflow-hidden relative font-sans"
+            className="w-full max-w-4xl max-h-[72vh] md:max-h-[85vh] border border-white/10 rounded-2xl p-6 shadow-2xl flex flex-col justify-between overflow-hidden relative font-sans"
             onClick={(e) => e.stopPropagation()}
             style={{ backgroundColor: '#021a14' }}
           >
@@ -3222,10 +3222,10 @@ export default function ControleCaixa({
                       {statsModal.pagantesM.map((p, idx) => {
                         const avatar = AVATAR_PRESETS.find(pr => pr.id === p.jogador.foto) || AVATAR_PRESETS[0];
                         return (
-                          <div key={p.pagamento.id || idx} className="flex items-center justify-between p-2 bg-emerald-955/10 rounded-lg border border-white/5 h-12">
+                          <div key={p.pagamento.id || idx} className="flex items-center justify-between p-2 bg-emerald-955/10 rounded-lg border border-white/5 min-h-[48px] py-1.5">
                             <div className="flex items-center gap-2 overflow-hidden">
                               <div 
-                                className="w-6.5 h-6.5 rounded-full flex items-center justify-center text-[10px] font-bold shrink-0 border border-white/5 text-white overflow-hidden cursor-zoom-in hover:scale-110 active:scale-95 transition-all duration-200" 
+                                className="w-10 h-10 rounded-full flex items-center justify-center text-[12px] font-bold shrink-0 border border-white/5 text-white overflow-hidden cursor-zoom-in hover:scale-110 active:scale-95 transition-all duration-200" 
                                 style={{ backgroundColor: avatar.color }}
                                 onClick={() => {
                                   if (p.jogador.foto && (p.jogador.foto.startsWith('http') || p.jogador.foto.startsWith('data:'))) {
@@ -3275,10 +3275,10 @@ export default function ControleCaixa({
                         const avatar = AVATAR_PRESETS.find(pr => pr.id === at.foto) || AVATAR_PRESETS[0];
                         const jaPago = pagamentos.some(p => p.jogadorId === at.id && p.mesRef === detalhesMesModal && p.status === 'pago');
                         return (
-                          <div key={at.id || idx} className="flex items-center justify-between p-2 bg-emerald-955/10 rounded-lg border border-white/5 h-12">
+                          <div key={at.id || idx} className="flex items-center justify-between p-2 bg-emerald-955/10 rounded-lg border border-white/5 min-h-[48px] py-1.5">
                             <div className="flex items-center gap-2 overflow-hidden">
                               <div 
-                                className="w-6.5 h-6.5 rounded-full flex items-center justify-center text-[10px] font-bold shrink-0 border border-white/5 text-white overflow-hidden cursor-zoom-in hover:scale-110 active:scale-95 transition-all duration-200" 
+                                className="w-10 h-10 rounded-full flex items-center justify-center text-[12px] font-bold shrink-0 border border-white/5 text-white overflow-hidden cursor-zoom-in hover:scale-110 active:scale-95 transition-all duration-200"
                                 style={{ backgroundColor: avatar.color }}
                                 onClick={() => {
                                   if (at.foto && (at.foto.startsWith('http') || at.foto.startsWith('data:'))) {
@@ -3338,7 +3338,7 @@ export default function ControleCaixa({
                           <div key={deb.id || idx} className="flex items-center justify-between p-2.5 bg-rose-955/15 hover:bg-rose-955/25 transition-all rounded-lg border border-rose-500/10">
                             <div className="flex items-center gap-2 overflow-hidden">
                               <div 
-                                className="w-7 h-7 rounded-full flex items-center justify-center text-[10px] font-bold shrink-0 border border-white/5 text-white overflow-hidden cursor-zoom-in hover:scale-110 active:scale-95 transition-all duration-200" 
+                                className="w-10 h-10 rounded-full flex items-center justify-center text-[12px] font-bold shrink-0 border border-white/5 text-white overflow-hidden cursor-zoom-in hover:scale-110 active:scale-95 transition-all duration-200" 
                                 style={{ backgroundColor: avatar.color }}
                                 onClick={() => {
                                   if (deb.jogadorFoto && (deb.jogadorFoto.startsWith('http') || deb.jogadorFoto.startsWith('data:'))) {

@@ -1809,7 +1809,7 @@ export default function App() {
       </header>
 
       {/* ÁREA DE CONTEÚDO PRINCIPAL COM LAYOUT FLEX ADAPTÁVEL PARA CELULAR (flex-col) E DESKTOP (flex-row) */}
-      <div className={`flex-grow w-full max-w-7xl mx-auto flex flex-col md:flex-row items-start p-3 sm:p-4 md:p-6 pb-28 md:pb-6 gap-4 sm:gap-5 md:gap-6 relative z-10`}>
+      <div className={`flex-grow w-full max-w-7xl mx-auto flex flex-col md:flex-row items-start p-3 sm:p-4 md:p-6 pb-28 md:pb-6 gap-4 sm:gap-5 md:gap-6 relative`}>
         
         {/* MENU NAVEGAÇÃO DE DESKTOP (Somente se autenticado) */}
         {jogadorAtual && (
@@ -2128,9 +2128,9 @@ export default function App() {
       {showConfirmacaoModal && (
         <div 
           id="confirmacao-sucesso-popup"
-          className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/80 backdrop-blur-md animate-fade-in"
+          className="fixed inset-0 z-50 flex items-center justify-center p-4 overflow-y-auto bg-black/80 backdrop-blur-md animate-fade-in"
         >
-          <div className="bg-emerald-900 border border-emerald-500/35 rounded-2xl max-w-sm w-full p-6 text-center shadow-2xl relative animate-scale-up">
+          <div className="bg-emerald-900 border border-emerald-500/35 rounded-2xl max-w-sm w-full max-h-[72vh] md:max-h-[85vh] overflow-y-auto p-6 text-center shadow-2xl relative animate-scale-up">
             <div className="w-16 h-16 bg-emerald-500/10 border-2 border-emerald-500 text-teal-400 rounded-full flex items-center justify-center mx-auto mb-4">
               <Check className="w-8 h-8" />
             </div>
@@ -2154,9 +2154,9 @@ export default function App() {
       {showSessaoExpiradaModal && (
         <div 
           id="popup-sessao-expirada"
-          className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/90 backdrop-blur-md animate-fade-in text-white font-sans"
+          className="fixed inset-0 z-50 flex items-center justify-center p-4 overflow-y-auto bg-black/90 backdrop-blur-md animate-fade-in text-white font-sans"
         >
-          <div className="bg-emerald-950 border border-teal-500/30 rounded-2xl max-w-sm w-full p-6 text-center shadow-2xl relative animate-scale-up">
+          <div className="bg-emerald-950 border border-teal-500/30 rounded-2xl max-w-sm w-full max-h-[72vh] md:max-h-[85vh] overflow-y-auto p-6 text-center shadow-2xl relative animate-scale-up">
             <div className="w-16 h-16 bg-teal-500/10 border-2 border-teal-500 text-teal-400 rounded-full flex items-center justify-center mx-auto mb-4">
               <Lock className="w-8 h-8 animate-pulse" />
             </div>
@@ -2180,9 +2180,9 @@ export default function App() {
       {jogadorAtual && jogadorAtual.status === 'suspenso' && (
         <div 
           id="popup-conta-suspensa"
-          className="fixed inset-0 z-[100] flex items-center justify-center p-4 bg-black/95 backdrop-blur-md animate-fade-in text-white font-sans"
+          className="fixed inset-0 z-[100] flex items-center justify-center p-4 overflow-y-auto bg-black/95 backdrop-blur-md animate-fade-in text-white font-sans"
         >
-          <div className="bg-emerald-950 border border-rose-500/30 rounded-2xl max-w-sm w-full p-6 text-center shadow-2xl relative animate-scale-up">
+          <div className="bg-emerald-950 border border-rose-500/30 rounded-2xl max-w-sm w-full max-h-[72vh] md:max-h-[85vh] overflow-y-auto p-6 text-center shadow-2xl relative animate-scale-up">
             <div className="w-16 h-16 bg-rose-500/10 border-2 border-rose-500 text-rose-400 rounded-full flex items-center justify-center mx-auto mb-4">
               <ShieldAlert className="w-8 h-8 animate-pulse" />
             </div>
@@ -2210,9 +2210,9 @@ export default function App() {
       {mostrarPopUpAlertaMensalista && jogadorAtual && (
         <div 
           id="popup-alerta-mensalidade-pendente"
-          className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/80 backdrop-blur-md animate-fade-in"
+          className="fixed inset-0 z-50 flex items-center justify-center p-4 overflow-y-auto bg-black/80 backdrop-blur-md animate-fade-in"
         >
-          <div className="bg-emerald-950 border border-amber-500/30 rounded-2xl max-w-md w-full p-6 text-left shadow-2xl relative animate-scale-up">
+          <div className="bg-emerald-950 border border-amber-500/30 rounded-2xl max-w-md w-full max-h-[72vh] md:max-h-[85vh] overflow-y-auto p-6 text-left shadow-2xl relative animate-scale-up">
             <div className="flex items-center gap-3 border-b border-white/10 pb-3.5 mb-4">
               <div className="w-10 h-10 bg-amber-500/10 border border-amber-500/30 text-amber-400 rounded-xl flex items-center justify-center shrink-0">
                 <ShieldAlert className="w-5 h-5 animate-pulse" />
@@ -2261,9 +2261,9 @@ export default function App() {
       {mostrarPopUpAlertaDiarista && jogadorAtual && (
         <div 
           id="popup-alerta-diaria-pendente"
-          className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/80 backdrop-blur-md animate-fade-in"
+          className="fixed inset-0 z-50 flex items-center justify-center p-4 overflow-y-auto bg-black/80 backdrop-blur-md animate-fade-in"
         >
-          <div className="bg-emerald-955 border border-rose-500/30 rounded-2xl max-w-md w-full p-6 text-left shadow-2xl relative animate-scale-up">
+          <div className="bg-emerald-955 border border-rose-500/30 rounded-2xl max-w-md w-full max-h-[72vh] md:max-h-[85vh] overflow-y-auto p-6 text-left shadow-2xl relative animate-scale-up">
             <div className="flex items-center gap-3 border-b border-white/10 pb-3.5 mb-4">
               <div className="w-10 h-10 bg-rose-500/10 border border-rose-500/30 text-rose-400 rounded-xl flex items-center justify-center shrink-0">
                 <ShieldAlert className="w-5 h-5 animate-pulse" />
@@ -2331,9 +2331,9 @@ export default function App() {
       {mostrarPopUpAlertaAdminAprovacoes && jogadorAtual && jogadorAtual.role === 'admin' && (
         <div 
           id="popup-alerta-admin-aprovacoes"
-          className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/80 backdrop-blur-md animate-fade-in"
+          className="fixed inset-0 z-50 flex items-center justify-center p-4 overflow-y-auto bg-black/80 backdrop-blur-md animate-fade-in"
         >
-          <div className="bg-emerald-950 border border-teal-500/30 rounded-2xl max-w-lg w-full p-6 text-left shadow-2xl relative animate-scale-up max-h-[90vh] flex flex-col">
+          <div className="bg-emerald-950 border border-teal-500/30 rounded-2xl max-w-lg w-full max-h-[72vh] md:max-h-[85vh] overflow-y-auto p-6 text-left shadow-2xl relative animate-scale-up flex flex-col">
             <div className="flex items-center justify-between border-b border-white/10 pb-3.5 mb-4 shrink-0">
               <div className="flex items-center gap-3">
                 <div className="w-10 h-10 bg-teal-500/10 border border-teal-500/30 text-teal-400 rounded-xl flex items-center justify-center shrink-0">
@@ -2570,9 +2570,9 @@ export default function App() {
       {mostrarPopUpAlertaAdminPagamentos && jogadorAtual && jogadorAtual.role === 'admin' && (
         <div 
           id="popup-alerta-admin-pagamentos"
-          className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/80 backdrop-blur-md animate-fade-in"
+          className="fixed inset-0 z-50 flex items-center justify-center p-4 overflow-y-auto bg-black/80 backdrop-blur-md animate-fade-in"
         >
-          <div className="bg-emerald-950 border border-amber-500/30 rounded-2xl max-w-lg w-full p-6 text-left shadow-2xl relative animate-scale-up max-h-[90vh] flex flex-col">
+          <div className="bg-emerald-950 border border-amber-500/30 rounded-2xl max-w-lg w-full max-h-[72vh] md:max-h-[85vh] overflow-y-auto p-6 text-left shadow-2xl relative animate-scale-up flex flex-col">
             <div className="flex items-center justify-between border-b border-white/10 pb-3.5 mb-4 shrink-0">
               <div className="flex items-center gap-3">
                 <div className="w-10 h-10 bg-amber-500/10 border border-amber-500/30 text-amber-400 rounded-xl flex items-center justify-center shrink-0">
@@ -2673,9 +2673,9 @@ export default function App() {
       {modalPerfilAberto && jogadorAtual && (
         <div 
           id="modal-editar-perfil-atual"
-          className="fixed inset-0 z-40 flex items-center justify-center p-4 bg-black/80 backdrop-blur-md"
+          className="fixed inset-0 z-40 flex items-center justify-center p-4 overflow-y-auto bg-black/80 backdrop-blur-md"
         >
-          <div className="bg-emerald-900 border border-white/10 rounded-2xl max-w-md w-full p-5 sm:p-6 shadow-2xl relative max-h-[90vh] overflow-y-auto">
+          <div className="bg-emerald-900 border border-white/10 rounded-2xl max-w-md w-full max-h-[72vh] md:max-h-[85vh] overflow-y-auto p-5 sm:p-6 shadow-2xl relative">
             
             {/* Cabeçalho do Modal */}
             <div className="flex items-center justify-between border-b border-white/10 pb-3 mb-4">
@@ -3001,11 +3001,11 @@ export default function App() {
       {fotoZoomada && (
         <div 
           id="popup-foto-zoom"
-          className="fixed inset-0 z-[100] flex items-center justify-center p-4 bg-black/90 backdrop-blur-md animate-fade-in"
+          className="fixed inset-0 z-[100] flex items-center justify-center p-4 overflow-y-auto bg-black/90 backdrop-blur-md animate-fade-in"
           onClick={() => setFotoZoomada(null)}
         >
           <div 
-            className="relative max-w-md w-full bg-emerald-950 border border-white/10 rounded-2xl p-4 text-center shadow-2xl animate-scale-up"
+            className="relative max-w-md w-full max-h-[72vh] md:max-h-[85vh] overflow-y-auto bg-emerald-950 border border-white/10 rounded-2xl p-4 text-center shadow-2xl animate-scale-up"
             onClick={(e) => e.stopPropagation()}
           >
             <button
@@ -3136,9 +3136,9 @@ export default function App() {
 
       {showLogoutConfirm && (
         <div 
-          className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/80 backdrop-blur-md animate-fade-in"
+          className="fixed inset-0 z-50 flex items-center justify-center p-4 overflow-y-auto bg-black/80 backdrop-blur-md animate-fade-in"
         >
-          <div className="bg-emerald-955 border border-teal-500/30 rounded-2xl max-w-sm w-full p-6 text-center shadow-2xl relative animate-scale-up">
+          <div className="bg-emerald-955 border border-teal-500/30 rounded-2xl max-w-sm w-full max-h-[72vh] md:max-h-[85vh] overflow-y-auto p-6 text-center shadow-2xl relative animate-scale-up">
             <div className="w-12 h-12 bg-rose-500/10 border border-rose-500/30 text-rose-400 rounded-full flex items-center justify-center mx-auto mb-4">
               <LogOut className="w-6 h-6" />
             </div>

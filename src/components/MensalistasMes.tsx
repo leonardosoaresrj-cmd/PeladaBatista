@@ -333,7 +333,7 @@ export default function MensalistasMes({
               >
                 <div className="flex items-center gap-3 min-w-0">
                   <div 
-                    className="w-9 h-9 rounded-full flex items-center justify-center text-xs font-bold shrink-0 border border-white/10 cursor-zoom-in hover:scale-110 active:scale-95 transition-all duration-200"
+                    className="w-12 h-12 rounded-full flex items-center justify-center text-sm font-bold shrink-0 border border-white/10 cursor-zoom-in hover:scale-110 active:scale-95 transition-all duration-200"
                     style={{ backgroundColor: avatar.color }}
                     onClick={() => {
                       if (jogador.foto && (jogador.foto.startsWith('http') || jogador.foto.startsWith('data:'))) {

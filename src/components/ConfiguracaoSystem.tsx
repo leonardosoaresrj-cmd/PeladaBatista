@@ -4,7 +4,7 @@
  */
 
 import React, { useState, useEffect } from 'react';
-import { Database, Copy, Check, Server, Share2, HelpCircle, ToggleLeft, ToggleRight, MessageSquare, ListFilter, Trash2, Send, ShieldCheck, Zap, Coins } from 'lucide-react';
+import { Database, Copy, Check, Server, Share2, HelpCircle, ToggleLeft, ToggleRight, MessageSquare, ListFilter, Trash2, Send, ShieldCheck, Zap, Coins, Mail } from 'lucide-react';
 import { DATABASE_SQL_SCHEMA } from '../data';
 import { obterCredenciaisSupabase, salvarCredenciaisSupabase, getSupabase } from '../supabaseClient';
 
@@ -79,6 +79,67 @@ export default function ConfiguracaoSystem({
   });
   const [resetSuccess, setResetSuccess] = useState(false);
   const [showResetConfirm, setShowResetConfirm] = useState(false);
+
+  // States para testes de email SMTP
+  const [loadingWelcomeEmail, setLoadingWelcomeEmail] = useState(false);
+  const [welcomeEmailStatus, setWelcomeEmailStatus] = useState('');
+  const [loadingReceiptEmail, setLoadingReceiptEmail] = useState(false);
+  const [receiptEmailStatus, setReceiptEmailStatus] = useState('');
+
+  const handleEnviarEmailBoasVindasTeste = async () => {
+    setLoadingWelcomeEmail(true);
+    setWelcomeEmailStatus('');
+    try {
+      const response = await fetch('/api/send-welcome-email', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          email: 'peladabatista.tijuca@gmail.com',
+          nome: 'Atleta Teste'
+        })
+      });
+      const data = await response.json();
+      if (response.ok) {
+        setWelcomeEmailStatus('✓ E-mail de boas-vindas enviado com sucesso!');
+      } else {
+        setWelcomeEmailStatus(`❌ Erro: ${data.error || 'Falha no envio'}`);
+      }
+    } catch (err: any) {
+      setWelcomeEmailStatus(`❌ Erro: ${err.message}`);
+    } finally {
+      setLoadingWelcomeEmail(false);
+      setTimeout(() => setWelcomeEmailStatus(''), 6000);
+    }
+  };
+
+  const handleEnviarEmailReciboTeste = async () => {
+    setLoadingReceiptEmail(true);
+    setReceiptEmailStatus('');
+    try {
+      const response = await fetch('/api/send-receipt-email', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          email: 'peladabatista.tijuca@gmail.com',
+          nome: 'Atleta Teste',
+          valor: 85.00,
+          referencia: 'Mensalidade ref. 06/2026 (Teste)',
+          dataPagamento: new Date().toISOString()
+        })
+      });
+      const data = await response.json();
+      if (response.ok) {
+        setReceiptEmailStatus('✓ E-mail de recibo enviado com sucesso!');
+      } else {
+        setReceiptEmailStatus(`❌ Erro: ${data.error || 'Falha no envio'}`);
+      }
+    } catch (err: any) {
+      setReceiptEmailStatus(`❌ Erro: ${err.message}`);
+    } finally {
+      setLoadingReceiptEmail(false);
+      setTimeout(() => setReceiptEmailStatus(''), 6000);
+    }
+  };
 
   useEffect(() => {
     const creds = obterCredenciaisSupabase();
@@ -372,7 +433,7 @@ export default function ConfiguracaoSystem({
             </h3>
             
             <p className="text-[10px] text-emerald-300/80 leading-relaxed font-sans">
-              Testes práticos para checar a automação das 4 mensagens principais oficiais do sistema.
+              Testes práticos para checar a automação das 5 mensagens principais oficiais do sistema.
             </p>
 
             {/* MESSAGE 1 */}
@@ -509,6 +570,35 @@ https://peladabatista.onrender.com`}
                 className="w-full bg-emerald-800 hover:bg-emerald-700 text-white font-bold text-[9px] py-1.5 flex items-center justify-center gap-1.5 rounded transition-colors"
               >
                 <Send className="w-3 h-3 text-teal-300" /> Teste 4: Renovação Mensalistas
+              </button>
+            </div>
+
+            {/* MESSAGE 5 */}
+            <div className="bg-emerald-950/70 p-3 rounded-lg border border-white/5 space-y-2">
+              <strong className="text-white text-[10px] block font-sans">5. Novo Cadastro (Notificação ao Administrador)</strong>
+              <div className="font-mono text-[8px] text-emerald-300 whitespace-pre">
+{`👤 *NOVO CADASTRO AGUARDANDO APROVAÇÃO* 👤
+
+Um novo jogador se cadastrou no portal e aguarda a sua aprovação:
+
+🏷️ Nome: *Carlos Alberto (Teste)*
+📧 E-mail: *carlos.teste@gmail.com*
+⚽ Posição: *Meio*
+⭐ Mensalista/Diarista: *mensalista*
+
+👉 Acesse o painel do administrador para aprovar:
+https://peladabatista.onrender.com`}
+              </div>
+              <button
+                type="button"
+                onClick={() => {
+                  onSendTestAlert(`👤 *NOVO CADASTRO AGUARDANDO APROVAÇÃO* 👤\n\nUm novo jogador se cadastrou no portal e aguarda a sua aprovação:\n\n🏷️ Nome: *Carlos Alberto (Teste)*\n📧 E-mail: *carlos.teste@gmail.com*\n⚽ Posição: *Meio*\n⭐ Mensalista/Diarista: *mensalista*\n\n👉 Acesse o painel do administrador para aprovar:\nhttps://peladabatista.onrender.com`);
+                  setSuccessMsg('Mensagem 5 (Novo Cadastro Admin) disparada!');
+                  setTimeout(() => setSuccessMsg(''), 4000);
+                }}
+                className="w-full bg-emerald-800 hover:bg-emerald-700 text-white font-bold text-[9px] py-1.5 flex items-center justify-center gap-1.5 rounded transition-colors"
+              >
+                <Send className="w-3 h-3 text-teal-300" /> Teste 5: Novo Cadastro Admin
               </button>
             </div>
 
@@ -783,6 +873,76 @@ https://peladabatista.onrender.com`}
                 </p>
               )}
             </form>
+          </div>
+
+          {/* AMBIENTE DE TESTES DE ENVIO DE E-MAIL (SMTP) */}
+          <div className="bg-emerald-900/40 border border-white/10 rounded-2xl p-5 shadow-xl backdrop-blur-sm space-y-4">
+            <h3 className="font-display font-semibold text-sm text-teal-400 flex items-center gap-2 uppercase tracking-wide">
+              <Mail className="w-4 h-4 text-teal-400" />
+              Ambiente de Testes de E-mail (SMTP)
+            </h3>
+            
+            <p className="text-xs text-emerald-300/80 leading-relaxed font-sans">
+              Cheque o funcionamento de sua integração de e-mails via SMTP de forma imediata. Para que você possa validar o visual real na sua caixa de entrada, <strong>o destinatário é fixado como peladabatista.tijuca@gmail.com</strong>.
+            </p>
+
+            <div className="space-y-3.5 pt-1">
+              <div className="bg-emerald-950/40 p-3.5 border border-white/5 rounded-xl space-y-3">
+                <span className="text-[10px] font-bold text-teal-300 uppercase tracking-wider block">
+                  📧 Teste 1: E-mail de Boas-Vindas (Conta Aprovada)
+                </span>
+                <p className="text-[10px] text-emerald-400/90 leading-normal font-sans">
+                  Envia a saudação oficial e as instruções de primeiro acesso para um novo jogador aprovado.
+                </p>
+                <button
+                  type="button"
+                  id="btn-testar-email-boas-vindas"
+                  disabled={loadingWelcomeEmail}
+                  onClick={handleEnviarEmailBoasVindasTeste}
+                  className="w-full bg-emerald-800 hover:bg-emerald-700 text-white font-extrabold text-[10.5px] py-2 rounded-lg transition-colors cursor-pointer flex items-center justify-center gap-2 disabled:opacity-50"
+                >
+                  {loadingWelcomeEmail ? (
+                    <span className="animate-spin h-3.5 w-3.5 border-2 border-white border-t-transparent rounded-full" />
+                  ) : (
+                    <Send className="w-3.5 h-3.5 text-teal-300" />
+                  )}
+                  Disparar E-mail de Boas-Vindas
+                </button>
+                {welcomeEmailStatus && (
+                  <p className={`text-[10px] font-bold text-center ${welcomeEmailStatus.includes('sucesso') ? 'text-teal-300' : 'text-rose-400'}`}>
+                    {welcomeEmailStatus}
+                  </p>
+                )}
+              </div>
+
+              <div className="bg-emerald-950/40 p-3.5 border border-white/5 rounded-xl space-y-3">
+                <span className="text-[10px] font-bold text-teal-300 uppercase tracking-wider block">
+                  🧾 Teste 2: Recibo de Pagamento (Pagamento Aprovado)
+                </span>
+                <p className="text-[10px] text-emerald-400/90 leading-normal font-sans">
+                  Emite o comprovante de pagamento oficial para uma mensalidade fictícia de R$ 85,00.
+                </p>
+                <button
+                  type="button"
+                  id="btn-testar-email-recibo"
+                  disabled={loadingReceiptEmail}
+                  onClick={handleEnviarEmailReciboTeste}
+                  className="w-full bg-emerald-800 hover:bg-emerald-700 text-white font-extrabold text-[10.5px] py-2 rounded-lg transition-colors cursor-pointer flex items-center justify-center gap-2 disabled:opacity-50"
+                >
+                  {loadingReceiptEmail ? (
+                    <span className="animate-spin h-3.5 w-3.5 border-2 border-white border-t-transparent rounded-full" />
+                  ) : (
+                    <Send className="w-3.5 h-3.5 text-teal-300" />
+                  )}
+                  Disparar E-mail de Recibo (R$ 85,00)
+                </button>
+                {receiptEmailStatus && (
+                  <p className={`text-[10px] font-bold text-center ${receiptEmailStatus.includes('sucesso') ? 'text-teal-300' : 'text-rose-400'}`}>
+                    {receiptEmailStatus}
+                  </p>
+                )}
+              </div>
+            </div>
           </div>
 
         </div>
