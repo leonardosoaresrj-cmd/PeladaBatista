@@ -134,10 +134,10 @@ export default function App() {
     localStorage.setItem('racha_whatsapp_webhook_token', token);
 
     // Salvar no Supabase (persiste em qualquer navegador)
-    salvarConfiguracaoNoSupabase('whatsapp_grupo_link',    link);
-    salvarConfiguracaoNoSupabase('whatsapp_automacao_ativa', ativa.toString());
-    salvarConfiguracaoNoSupabase('whatsapp_webhook_url',   webhookUrl);
-    salvarConfiguracaoNoSupabase('whatsapp_webhook_token', token);
+    salvarConfiguracaoNoSupabase('racha_whatsapp_grupo_link',    link);
+    salvarConfiguracaoNoSupabase('racha_whatsapp_automacao_ativa', ativa.toString());
+    salvarConfiguracaoNoSupabase('racha_whatsapp_webhook_url',   webhookUrl);
+    salvarConfiguracaoNoSupabase('racha_whatsapp_webhook_token', token);
   };
 
   // Estados de Controle de Caixa e Lançamentos
@@ -306,9 +306,8 @@ export default function App() {
     }
 
     localStorage.setItem('futebol_aluguel_mensal_map', JSON.stringify(map));
-    // Persistir no Supabase
-    salvarConfiguracaoNoSupabase('futebol_aluguel_campo_base', valor.toString());
-    salvarConfiguracaoNoSupabase('futebol_aluguel_mensal_map', JSON.stringify(map));
+    salvarConfiguracaoNoSupabase('futebol_aluguel_campo_base',  valor.toString());
+    salvarConfiguracaoNoSupabase('futebol_aluguel_mensal_map',  JSON.stringify(map));
 
     setAluguelCampoBase(valor);
     saveAluguelCampo(valor);
@@ -442,10 +441,9 @@ export default function App() {
     localStorage.setItem('racha_valor_4s', v4.toString());
     localStorage.setItem('racha_valor_5s', v5.toString());
     localStorage.setItem('racha_valor_diaria', vDiaria.toString());
-    // Persistir no Supabase para sincronizar entre dispositivos
-    salvarConfiguracaoNoSupabase('racha_valor_4s', v4.toString());
-    salvarConfiguracaoNoSupabase('racha_valor_5s', v5.toString());
-    salvarConfiguracaoNoSupabase('racha_valor_diaria', vDiaria.toString());
+    salvarConfiguracaoNoSupabase('racha_valor_4s',      v4.toString());
+    salvarConfiguracaoNoSupabase('racha_valor_5s',      v5.toString());
+    salvarConfiguracaoNoSupabase('racha_valor_diaria',  vDiaria.toString());
   };
 
   // Estados para Modal de Edição de Perfil
@@ -620,12 +618,12 @@ export default function App() {
           }
         }
 
-        // ── Carregar TODAS as configurações do Supabase ──────────────────
-        // Garante que qualquer navegador/dispositivo usa os mesmos valores
+        // ── Carregar TODAS as configurações do Supabase ──────────────
+        // Substitui localStorage — funciona em qualquer browser/dispositivo
         const [
           dbGrupoLink, dbAutomacao, dbWebhookUrl, dbWebhookToken,
           dbValor4s, dbValor5s, dbValorDiaria,
-          dbStartupMonth, dbAluguelBase,
+          dbStartupMonth, dbAluguelBase, dbAluguelMap,
           dbPixChave, dbPixNome, dbPixCidade,
         ] = await Promise.all([
           obterConfiguracaoDoSupabase('racha_whatsapp_grupo_link'),
@@ -637,30 +635,32 @@ export default function App() {
           obterConfiguracaoDoSupabase('racha_valor_diaria'),
           obterConfiguracaoDoSupabase('futebol_startup_month'),
           obterConfiguracaoDoSupabase('futebol_aluguel_campo_base'),
+          obterConfiguracaoDoSupabase('futebol_aluguel_mensal_map'),
           obterConfiguracaoDoSupabase('direto_pix_chave'),
           obterConfiguracaoDoSupabase('direto_pix_nome'),
           obterConfiguracaoDoSupabase('direto_pix_cidade'),
         ]);
 
         // WhatsApp
-        if (dbGrupoLink !== null) { setWhatsappGrupoLink(dbGrupoLink); localStorage.setItem('racha_whatsapp_grupo_link', dbGrupoLink); }
-        if (dbAutomacao !== null) { setWhatsappAutomacaoAtiva(dbAutomacao === 'true'); localStorage.setItem('racha_whatsapp_automacao_ativa', dbAutomacao); }
-        if (dbWebhookUrl !== null) { setWhatsappWebhookUrl(dbWebhookUrl); localStorage.setItem('racha_whatsapp_webhook_url', dbWebhookUrl); }
-        if (dbWebhookToken !== null) { setWhatsappWebhookToken(dbWebhookToken); localStorage.setItem('racha_whatsapp_webhook_token', dbWebhookToken); }
+        if (dbGrupoLink   !== null) { setWhatsappGrupoLink(dbGrupoLink);                          localStorage.setItem('racha_whatsapp_grupo_link',        dbGrupoLink); }
+        if (dbAutomacao   !== null) { setWhatsappAutomacaoAtiva(dbAutomacao === 'true');           localStorage.setItem('racha_whatsapp_automacao_ativa',   dbAutomacao); }
+        if (dbWebhookUrl  !== null) { setWhatsappWebhookUrl(dbWebhookUrl);                         localStorage.setItem('racha_whatsapp_webhook_url',        dbWebhookUrl); }
+        if (dbWebhookToken!== null) { setWhatsappWebhookToken(dbWebhookToken);                     localStorage.setItem('racha_whatsapp_webhook_token',      dbWebhookToken); }
 
-        // Valores de mensalidade / diária
-        if (dbValor4s !== null) { setValor4Sabados(parseFloat(dbValor4s)); localStorage.setItem('racha_valor_4s', dbValor4s); }
-        if (dbValor5s !== null) { setValor5Sabados(parseFloat(dbValor5s)); localStorage.setItem('racha_valor_5s', dbValor5s); }
-        if (dbValorDiaria !== null) { setValorDiaria(parseFloat(dbValorDiaria)); localStorage.setItem('racha_valor_diaria', dbValorDiaria); }
+        // Valores mensalidade / diária
+        if (dbValor4s     !== null) { setValor4Sabados(parseFloat(dbValor4s));                     localStorage.setItem('racha_valor_4s',                   dbValor4s); }
+        if (dbValor5s     !== null) { setValor5Sabados(parseFloat(dbValor5s));                     localStorage.setItem('racha_valor_5s',                   dbValor5s); }
+        if (dbValorDiaria !== null) { setValorDiaria(parseFloat(dbValorDiaria));                   localStorage.setItem('racha_valor_diaria',               dbValorDiaria); }
 
-        // Mês de referência / aluguel
-        if (dbStartupMonth !== null) { localStorage.setItem('futebol_startup_month', dbStartupMonth); }
-        if (dbAluguelBase !== null) { localStorage.setItem('futebol_aluguel_campo_base', dbAluguelBase); }
+        // Aluguel e mês de referência
+        if (dbAluguelBase !== null) {                                                               localStorage.setItem('futebol_aluguel_campo_base',       dbAluguelBase); }
+        if (dbAluguelMap  !== null) {                                                               localStorage.setItem('futebol_aluguel_mensal_map',       dbAluguelMap); }
+        if (dbStartupMonth!== null) {                                                               localStorage.setItem('futebol_startup_month',            dbStartupMonth); }
 
-        // PIX direto
-        if (dbPixChave !== null) { localStorage.setItem('direto_pix_chave', dbPixChave); }
-        if (dbPixNome !== null) { localStorage.setItem('direto_pix_nome', dbPixNome); }
-        if (dbPixCidade !== null) { localStorage.setItem('direto_pix_cidade', dbPixCidade); }
+        // PIX direto — propaga para localStorage para CheckoutPixModal e ControlePagamentos
+        if (dbPixChave    !== null) {                                                               localStorage.setItem('direto_pix_chave',                 dbPixChave); }
+        if (dbPixNome     !== null) {                                                               localStorage.setItem('direto_pix_nome',                  dbPixNome); }
+        if (dbPixCidade   !== null) {                                                               localStorage.setItem('direto_pix_cidade',                dbPixCidade); }
 
         // Carregar logs do bot
         const bLogs = await carregarBotLogsDoSupabase();
