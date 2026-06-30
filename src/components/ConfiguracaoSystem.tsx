@@ -8,7 +8,7 @@ import { Database, Copy, Check, Server, Share2, HelpCircle, ToggleLeft, ToggleRi
 import { DATABASE_SQL_SCHEMA } from '../data';
 import { obterCredenciaisSupabase, salvarCredenciaisSupabase, getSupabase, salvarConfiguracaoNoSupabase, obterConfiguracaoDoSupabase } from '../supabaseClient';
 import { Partida, Jogador, Pagamento } from '../types';
-import { obterTextoListaCompletaPartida, obterTextoListaRenovacao, obterTextoPartidaCancelada, obterTextoAlertaSemanal, getJanelaConfirmacao } from '../utils/confirmationRules';
+import { obterTextoListaCompletaPartida, obterTextoListaRenovacao, obterTextoPartidaCancelada, obterTextoAlertaSemanal, getJanelaConfirmacao, obterMesReferenciaParaRenovacao } from '../utils/confirmationRules';
 
 interface ConfiguracaoSystemProps {
   onConfigUpdated?: () => void;
@@ -507,10 +507,7 @@ export default function ConfiguracaoSystem({
               <button
                 type="button"
                 onClick={() => {
-                  const hoje = new Date();
-                  const refAno = hoje.getFullYear();
-                  const refMesString = String(hoje.getMonth() + 1).padStart(2, '0');
-                  const mesRef = `${refAno}-${refMesString}`;
+                  const mesRef = obterMesReferenciaParaRenovacao(partidas);
                   const msg = obterTextoListaRenovacao(mesRef, jogadores, pagamentos, valor4Sabados, valor5Sabados);
                   
                   onRegistrarLogAutomacao?.(

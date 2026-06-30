@@ -48,7 +48,7 @@ import MensalistasMes from './components/MensalistasMes';
 import HistoricoJogos from './components/HistoricoJogos';
 import { mesclarPartidasAutomáticas } from './utils/partidaHelper';
 import { isJogadorFuncionalmenteGold } from './utils/goldRules';
-import { obterTextoListaCompletaPartida, obterTextoListaRenovacao, obterStatusMembroEfetivo, obterDebitosDoJogador, obterTextoPartidaCancelada, obterJanelaRenovacaoParaMesRef, isFechamentoMensalistas, getJanelaConfirmacao } from './utils/confirmationRules';
+import { obterTextoListaCompletaPartida, obterTextoListaRenovacao, obterStatusMembroEfetivo, obterDebitosDoJogador, obterTextoPartidaCancelada, obterJanelaRenovacaoParaMesRef, isFechamentoMensalistas, getJanelaConfirmacao, obterMesReferenciaParaRenovacao } from './utils/confirmationRules';
 import logoPelada from './assets/images/logo_pelada.svg';
 import { Calendar, Users, DollarSign, ShieldAlert, LogOut, Database, Award, User, Settings, UserCheck, History, CheckSquare, Check, X, Lock, Cake, TrendingUp, UserPlus, AlertCircle, Trash2 } from 'lucide-react';
 
@@ -753,9 +753,7 @@ export default function App() {
 
       // Se ontem foi o último sábado do seu respectivo mês:
       if (ontem.getMonth() !== proximoSabado.getMonth()) {
-        const refAno = proximoSabado.getFullYear();
-        const refMesString = String(proximoSabado.getMonth() + 1).padStart(2, '0');
-        const mesRef = `${refAno}-${refMesString}`;
+        const mesRef = obterMesReferenciaParaRenovacao(partidas);
 
         const key = `renew_alert_sent_${mesRef}`;
         if (!localStorage.getItem(key)) {
@@ -769,7 +767,7 @@ export default function App() {
         }
       }
     }
-  }, [jogadores, pagamentos, whatsappAutomacaoAtiva, valor4Sabados, valor5Sabados]);
+  }, [jogadores, pagamentos, whatsappAutomacaoAtiva, valor4Sabados, valor5Sabados, partidas]);
 
   // Alerta de Abertura de Janela de Confirmação Semanal Automática
   useEffect(() => {
