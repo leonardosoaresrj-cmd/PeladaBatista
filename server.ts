@@ -65,11 +65,11 @@ async function startServer() {
 
   app.post("/api/send-receipt-email", async (req, res) => {
     try {
-      const { email, nome, valor, referencia, dataPagamento } = req.body;
+      const { email, nome, valor, referencia, dataPagamento, numRecibo: numReciboBody } = req.body;
       if (!email || !nome || !valor || !referencia) return res.status(400).json({ error: "Dados incompletos." });
       const valorFormatado = Number(valor).toFixed(2).replace(".", ",");
       const dataFormatada = dataPagamento ? new Date(dataPagamento).toLocaleDateString("pt-BR") : new Date().toLocaleDateString("pt-BR");
-      const numRecibo = Math.floor(100000 + Math.random() * 900000);
+      const numRecibo = numReciboBody || Math.floor(100000 + Math.random() * 900000);
       await enviarEmailGmail(email, `Recibo de Pagamento - Pelada Batista (No ${numRecibo})`,
         `<div style="font-family:Arial,sans-serif;padding:20px"><h2>Pelada Batista - Recibo #${numRecibo}</h2><p>Ola, <b>${nome}</b>,</p><p>Seu pagamento foi <b>aprovado pelo administrador</b>!</p><table style="width:100%;border-collapse:collapse;margin:20px 0"><tr><td style="padding:8px;border-bottom:1px solid #eee"><b>Pagador:</b></td><td style="padding:8px;border-bottom:1px solid #eee;text-align:right">${nome}</td></tr><tr><td style="padding:8px;border-bottom:1px solid #eee"><b>Referencia:</b></td><td style="padding:8px;border-bottom:1px solid #eee;text-align:right">${referencia}</td></tr><tr><td style="padding:8px;border-bottom:1px solid #eee"><b>Data:</b></td><td style="padding:8px;border-bottom:1px solid #eee;text-align:right">${dataFormatada}</td></tr><tr><td style="padding:8px"><b>Valor:</b></td><td style="padding:8px;text-align:right;font-size:18px;font-weight:bold;color:#115e59">R$ ${valorFormatado}</td></tr></table><p>Agradecemos!<br/>Equipe Pelada Batista</p></div>`
       );

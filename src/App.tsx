@@ -434,6 +434,29 @@ export default function App() {
     );
   };
 
+  const handleResendMessage = (log: any) => {
+    const parts = log.mensagem.split(' | ⚠️ ');
+    const originalMsg = parts[0];
+
+    let grupoIdOverride: string | undefined = undefined;
+    if (
+      log.tabela?.toLowerCase() === 'administrador' ||
+      log.mensagem.includes('ADMINISTRADOR') ||
+      log.mensagem.includes('Aprovar cadastro')
+    ) {
+      grupoIdOverride = 'admin';
+    }
+
+    const originalEvento = log.evento && !log.evento.includes('FALHA') ? log.evento : 'REENVIO_MENSAGEM';
+
+    handleRegistrarLogAutomacao(
+      log.tabela || 'Reenvio',
+      originalEvento,
+      originalMsg,
+      grupoIdOverride
+    );
+  };
+
   const handleUpdateValoresConfig = (v4: number, v5: number, vDiaria: number) => {
     setValor4Sabados(v4);
     setValor5Sabados(v5);
@@ -2165,11 +2188,16 @@ export default function App() {
                   whatsappLogs={whatsappLogs}
                   onClearLogs={handleClearWhatsappLogs}
                   onSendTestAlert={handleSendTestAlert}
+                  onResendMessage={handleResendMessage}
                   valor4Sabados={valor4Sabados}
                   valor5Sabados={valor5Sabados}
                   valorDiaria={valorDiaria}
                   onUpdateValoresConfig={handleUpdateValoresConfig}
                   onResetDatabase={handleResetDatabase}
+                  partidas={partidasMescladas}
+                  jogadores={jogadoresEfetivos}
+                  pagamentos={pagamentos}
+                  onRegistrarLogAutomacao={handleRegistrarLogAutomacao}
                 />
               )}
             </div>

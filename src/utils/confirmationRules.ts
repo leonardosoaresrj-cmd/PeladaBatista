@@ -5,6 +5,19 @@
 
 import { Partida, Pagamento, Jogador } from '../types';
 
+export function obterNumeroRecibo(pagamentoId: string): string {
+  if (!pagamentoId) return '#000000';
+  let hash = 0;
+  for (let i = 0; i < pagamentoId.length; i++) {
+    const char = pagamentoId.charCodeAt(i);
+    hash = (hash << 5) - hash + char;
+    hash = hash & hash;
+  }
+  const positiveHash = Math.abs(hash);
+  const num = 100000 + (positiveHash % 900000);
+  return `#${num}`;
+}
+
 /**
  * Retorna as datas de início (Terça-feira 00:00) e fim (Sexta-feira 23:59)
  * da janela de confirmação para uma partida de acordo com a data do jogo.

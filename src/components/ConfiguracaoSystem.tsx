@@ -7,6 +7,8 @@ import React, { useState, useEffect } from 'react';
 import { Database, Copy, Check, Server, Share2, HelpCircle, ToggleLeft, ToggleRight, MessageSquare, ListFilter, Trash2, Send, ShieldCheck, Zap, Coins, Mail } from 'lucide-react';
 import { DATABASE_SQL_SCHEMA } from '../data';
 import { obterCredenciaisSupabase, salvarCredenciaisSupabase, getSupabase, salvarConfiguracaoNoSupabase, obterConfiguracaoDoSupabase } from '../supabaseClient';
+import { Partida, Jogador, Pagamento } from '../types';
+import { obterTextoListaCompletaPartida, obterTextoListaRenovacao, obterTextoPartidaCancelada, obterTextoAlertaSemanal, getJanelaConfirmacao } from '../utils/confirmationRules';
 
 interface ConfiguracaoSystemProps {
   onConfigUpdated?: () => void;
@@ -18,11 +20,16 @@ interface ConfiguracaoSystemProps {
   whatsappLogs: any[];
   onClearLogs: () => void;
   onSendTestAlert: (msg?: string, destinatario?: 'grupo' | 'admin') => void;
+  onResendMessage?: (log: any) => void;
   valor4Sabados: number;
   valor5Sabados: number;
   valorDiaria: number;
   onUpdateValoresConfig: (v4: number, v5: number, vD: number) => void;
   onResetDatabase?: (startingMonth: string) => void;
+  partidas?: Partida[];
+  jogadores?: Jogador[];
+  pagamentos?: Pagamento[];
+  onRegistrarLogAutomacao?: (atletaNome: string, partidaTitulo: string, msg: string) => void;
 }
 
 export default function ConfiguracaoSystem({
@@ -35,14 +42,20 @@ export default function ConfiguracaoSystem({
   whatsappLogs,
   onClearLogs,
   onSendTestAlert,
+  onResendMessage,
   valor4Sabados,
   valor5Sabados,
   valorDiaria,
   onUpdateValoresConfig,
   onResetDatabase,
+  partidas = [],
+  jogadores = [],
+  pagamentos = [],
+  onRegistrarLogAutomacao,
 }: ConfiguracaoSystemProps) {
   const [copied, setCopied] = useState(false);
   const [successMsg, setSuccessMsg] = useState('');
+  const [resendingLogIds, setResendingLogIds] = useState<Record<string, boolean>>({});
   
   // Configuração Supabase Local
   const [supaUrl, setSupaUrl] = useState('');
@@ -69,6 +82,17 @@ export default function ConfiguracaoSystem({
   const [localV5, setLocalV5] = useState(valor5Sabados);
   const [localVD, setLocalVD] = useState(valorDiaria);
   const [successTarifasMsg, setSuccessTarifasMsg] = useState('');
+  const [manualSuccessMsg, setManualSuccessMsg] = useState('');
+
+  const proximaPartida = (() => {
+    if (!partidas || partidas.length === 0) return null;
+    const hoje = new Date();
+    const sorted = partidas
+      .map(p => ({ ...p, dateObj: new Date(`${p.data}T12:00:00`) }))
+      .filter(p => p.dateObj >= new Date(hoje.getFullYear(), hoje.getMonth(), hoje.getDate()))
+      .sort((a, b) => a.dateObj.getTime() - b.dateObj.getTime());
+    return sorted[0] || partidas[partidas.length - 1];
+  })();
 
   // States locais para reset do banco
   const [resetMesRef, setResetMesRef] = useState(() => {
@@ -380,6 +404,137 @@ export default function ConfiguracaoSystem({
             </form>
           </div>
 
+          {/* PAINEL DE DISPARO MANUAL DE MENSAGENS PADRÃO */}
+          <div className="bg-emerald-900/40 border border-white/10 rounded-2xl p-5 shadow-xl backdrop-blur-sm space-y-4 text-left">
+            <h3 className="font-display font-semibold text-xs text-white flex items-center gap-2 uppercase tracking-wide">
+              <Zap className="w-3.5 h-3.5 text-teal-400" />
+              Disparo Manual de Mensagens Padrão do WhatsApp
+            </h3>
+            <p className="text-xs text-emerald-300/80 leading-relaxed">
+              Dispare as 5 mensagens padrão para o robô de WhatsApp do grupo de forma manual. Esse envio é imediato e <strong>não altera</strong> o comportamento das regras automáticas existentes.
+            </p>
+
+            <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-3">
+              <button
+                type="button"
+                onClick={() => {
+                  if (!proximaPartida) {
+                    setManualSuccessMsg('Nenhuma partida encontrada no sistema para convocação.');
+                    setTimeout(() => setManualSuccessMsg(''), 4000);
+                    return;
+                  }
+                  const msg = obterTextoListaCompletaPartida(proximaPartida, jogadores, window.location.origin);
+                  onRegistrarLogAutomacao?.(
+                    'Sistema',
+                    `Abertura de Convocação - Jogo ${proximaPartida.data.split('-').reverse().join('/')}`,
+                    msg
+                  );
+                  setManualSuccessMsg(`✓ Mensagem 'Abertura de Convocação' disparada para o jogo do dia ${proximaPartida.data.split('-').reverse().join('/')}!`);
+                  setTimeout(() => setManualSuccessMsg(''), 4000);
+                }}
+                className="bg-emerald-950/60 hover:bg-emerald-900/95 border border-teal-500/25 hover:border-teal-500 text-teal-100 text-xs py-3 px-4 rounded-xl text-left flex flex-col justify-between gap-1 transition-all cursor-pointer font-bold shrink-0 shadow-md active:scale-95"
+              >
+                <span className="text-[10px] text-teal-350 font-mono tracking-wider uppercase font-black">1. Abertura Convocação</span>
+                <span className="text-[9px] text-emerald-300/70 font-normal">Dispara convocação inicial do próximo jogo</span>
+              </button>
+
+              <button
+                type="button"
+                onClick={() => {
+                  if (!proximaPartida) {
+                    setManualSuccessMsg('Nenhuma partida encontrada no sistema.');
+                    setTimeout(() => setManualSuccessMsg(''), 4000);
+                    return;
+                  }
+                  const msg = obterTextoListaCompletaPartida(proximaPartida, jogadores, window.location.origin);
+                  onRegistrarLogAutomacao?.(
+                    'Sistema',
+                    `Lista de Presença - Jogo ${proximaPartida.data.split('-').reverse().join('/')}`,
+                    msg
+                  );
+                  setManualSuccessMsg(`✓ Mensagem 'Lista de Presença Atualizada' disparada para o jogo do dia ${proximaPartida.data.split('-').reverse().join('/')}!`);
+                  setTimeout(() => setManualSuccessMsg(''), 4000);
+                }}
+                className="bg-emerald-950/60 hover:bg-emerald-900/95 border border-teal-500/25 hover:border-teal-500 text-teal-100 text-xs py-3 px-4 rounded-xl text-left flex flex-col justify-between gap-1 transition-all cursor-pointer font-bold shrink-0 shadow-md active:scale-95"
+              >
+                <span className="text-[10px] text-teal-355 font-mono tracking-wider uppercase font-black">2. Lista Atualizada</span>
+                <span className="text-[9px] text-emerald-300/70 font-normal">Dispara a lista de presença atual</span>
+              </button>
+
+              <button
+                type="button"
+                onClick={() => {
+                  if (!proximaPartida) {
+                    setManualSuccessMsg('Nenhuma partida encontrada no sistema.');
+                    setTimeout(() => setManualSuccessMsg(''), 4000);
+                    return;
+                  }
+                  const dataJogoDate = new Date(`${proximaPartida.data}T12:00:00`);
+                  let dataAmigavel = dataJogoDate.toLocaleDateString('pt-BR', { weekday: 'long', day: '2-digit', month: '2-digit', year: 'numeric' });
+                  dataAmigavel = dataAmigavel.charAt(0).toUpperCase() + dataAmigavel.slice(1);
+                  const horario = proximaPartida.horario.split(' ')[0];
+                  const msg = `⚽ *PELADA BATISTA SÁBADO* ⚽\n🏆 *NOVO JOGO AGENDADO!* 🏆\n\n📋 *${proximaPartida.titulo}*\n🗓️ Data: *${dataAmigavel} às ${horario}*\n📍 Local: *${proximaPartida.local}*\n\n⏰ *Janela de confirmação:*\n🗓️ Terça-feira às 00:00 até Sexta-feira às 23:59\n\n📲 Confirme sua presença no portal:\nhttps://peladabatista.onrender.com`;
+                  
+                  onRegistrarLogAutomacao?.('Administrador', 'Novo Jogo Agendado', msg);
+                  setManualSuccessMsg(`✓ Mensagem 'Novo Jogo Agendado' disparada com sucesso!`);
+                  setTimeout(() => setManualSuccessMsg(''), 4000);
+                }}
+                className="bg-emerald-950/60 hover:bg-emerald-900/95 border border-teal-500/25 hover:border-teal-500 text-teal-100 text-xs py-3 px-4 rounded-xl text-left flex flex-col justify-between gap-1 transition-all cursor-pointer font-bold shrink-0 shadow-md active:scale-95"
+              >
+                <span className="text-[10px] text-teal-355 font-mono tracking-wider uppercase font-black">3. Novo Jogo</span>
+                <span className="text-[9px] text-emerald-300/70 font-normal">Dispara comunicado de jogo agendado</span>
+              </button>
+
+              <button
+                type="button"
+                onClick={() => {
+                  if (!proximaPartida) {
+                    setManualSuccessMsg('Nenhuma partida encontrada no sistema.');
+                    setTimeout(() => setManualSuccessMsg(''), 4000);
+                    return;
+                  }
+                  const msg = obterTextoPartidaCancelada(proximaPartida);
+                  onRegistrarLogAutomacao?.('Administrador', 'Cancelamento de Jogo', msg);
+                  setManualSuccessMsg(`✓ Mensagem 'Cancelamento de Jogo' disparada com sucesso!`);
+                  setTimeout(() => setManualSuccessMsg(''), 4000);
+                }}
+                className="bg-emerald-950/60 hover:bg-emerald-900/95 border border-teal-500/25 hover:border-teal-500 text-teal-100 text-xs py-3 px-4 rounded-xl text-left flex flex-col justify-between gap-1 transition-all cursor-pointer font-bold shrink-0 shadow-md active:scale-95"
+              >
+                <span className="text-[10px] text-teal-355 font-mono tracking-wider uppercase font-black">4. Jogo Cancelado</span>
+                <span className="text-[9px] text-emerald-300/70 font-normal">Alerta de cancelamento de jogo</span>
+              </button>
+
+              <button
+                type="button"
+                onClick={() => {
+                  const hoje = new Date();
+                  const refAno = hoje.getFullYear();
+                  const refMesString = String(hoje.getMonth() + 1).padStart(2, '0');
+                  const mesRef = `${refAno}-${refMesString}`;
+                  const msg = obterTextoListaRenovacao(mesRef, jogadores, pagamentos, valor4Sabados, valor5Sabados);
+                  
+                  onRegistrarLogAutomacao?.(
+                    'Sistema',
+                    `Abertura Renovação ${mesRef}`,
+                    msg
+                  );
+                  setManualSuccessMsg(`✓ Mensagem de 'Renovação de Mensalidade' disparada para a competência ${mesRef.split('-').reverse().join('/')}!`);
+                  setTimeout(() => setManualSuccessMsg(''), 4000);
+                }}
+                className="bg-emerald-950/60 hover:bg-emerald-900/95 border border-teal-500/25 hover:border-teal-500 text-teal-100 text-xs py-3 px-4 rounded-xl text-left flex flex-col justify-between gap-1 transition-all cursor-pointer font-bold shrink-0 shadow-md active:scale-95"
+              >
+                <span className="text-[10px] text-teal-355 font-mono tracking-wider uppercase font-black">5. Renovação</span>
+                <span className="text-[9px] text-emerald-300/70 font-normal">Dispara situação atual de mensalidades</span>
+              </button>
+            </div>
+
+            {manualSuccessMsg && (
+              <p className="text-[11px] text-teal-300 font-bold text-center mt-2 bg-teal-950/45 py-2 px-3 rounded-lg border border-teal-500/20 animate-fade-in">
+                ✓ {manualSuccessMsg}
+              </p>
+            )}
+          </div>
+
           {/* HISTÓRICO DE LOGS DA AUTOMAÇÃO */}
           <div className="bg-emerald-900/40 border border-white/10 rounded-2xl p-5 shadow-xl backdrop-blur-sm space-y-4 flex flex-col h-[320px]">
             <div className="flex items-center justify-between border-b border-white/5 pb-2.5">
@@ -420,25 +575,52 @@ export default function ConfiguracaoSystem({
                   <p className="text-[11px]">Nenhum disparo de bot registrado até o momento.</p>
                 </div>
               ) : (
-                whatsappLogs.map((log: any) => (
-                  <div key={log.id} className="bg-emerald-950/70 p-2 rounded-lg border border-white/5 space-y-1">
-                    <div className="flex items-center justify-between text-[8px] text-emerald-500">
-                      <span>{log.enviado_em ? new Date(log.enviado_em).toLocaleString('pt-BR') : log.data}</span>
-                      <span className="px-1.5 py-0.2 bg-emerald-900 border border-emerald-500/20 text-emerald-300 rounded uppercase text-[7px] font-black">
-                        {log.evento || 'DISPARO'}
-                      </span>
-                    </div>
-                    <div className="text-[10px] text-white leading-relaxed">
-                      <span className="font-bold text-teal-300 font-sans mr-1">[{log.tabela || log.atleta || ''}]</span>
-                      {log.mensagem}
-                    </div>
-                    {whatsappGrupoLink && (
-                      <div className="text-[8.5px] text-emerald-450 truncate">
-                        Link: <a href={whatsappGrupoLink} target="_blank" rel="noopener noreferrer" className="underline hover:text-white transition-colors">{whatsappGrupoLink}</a>
+                whatsappLogs.map((log: any) => {
+                  const isFalha = log.evento?.includes('FALHA') || log.mensagem?.includes('⚠️') || log.mensagem?.includes('[FALHA');
+                  return (
+                    <div key={log.id} className="bg-emerald-950/70 p-2.5 rounded-lg border border-white/5 space-y-1.5 transition-all hover:bg-emerald-950/90">
+                      <div className="flex items-center justify-between text-[8px] text-emerald-500">
+                        <span>{log.enviado_em ? new Date(log.enviado_em).toLocaleString('pt-BR') : log.data}</span>
+                        <span className={`px-1.5 py-0.2 border rounded uppercase text-[7px] font-black ${isFalha ? 'bg-red-950/60 border-red-500/20 text-rose-300' : 'bg-emerald-900 border-emerald-500/20 text-emerald-300'}`}>
+                          {log.evento || 'DISPARO'}
+                        </span>
                       </div>
-                    )}
-                  </div>
-                ))
+                      <div className="text-[10px] text-white leading-relaxed break-words">
+                        <span className="font-bold text-teal-300 font-sans mr-1">[{log.tabela || log.atleta || ''}]</span>
+                        {log.mensagem}
+                      </div>
+                      {whatsappGrupoLink && (
+                        <div className="text-[8.5px] text-emerald-450 truncate">
+                          Link: <a href={whatsappGrupoLink} target="_blank" rel="noopener noreferrer" className="underline hover:text-white transition-colors">{whatsappGrupoLink}</a>
+                        </div>
+                      )}
+                      {isFalha && onResendMessage && (
+                        <div className="flex justify-end pt-1">
+                          <button
+                            type="button"
+                            disabled={resendingLogIds[log.id]}
+                            onClick={() => {
+                              setResendingLogIds(prev => ({ ...prev, [log.id]: true }));
+                              onResendMessage(log);
+                              setTimeout(() => {
+                                setResendingLogIds(prev => ({ ...prev, [log.id]: false }));
+                              }, 1500);
+                            }}
+                            className={`flex items-center gap-1 text-black text-[9px] font-extrabold px-2 py-1 rounded transition-all cursor-pointer ${
+                              resendingLogIds[log.id]
+                                ? 'bg-amber-600/50 cursor-not-allowed text-black/50'
+                                : 'bg-amber-500 hover:bg-amber-400 active:scale-95'
+                            }`}
+                            title="Tentar disparar essa mensagem novamente para o robô"
+                          >
+                            <Send className="w-2.5 h-2.5" />
+                            {resendingLogIds[log.id] ? 'Reenviando...' : 'Reenviar Mensagem'}
+                          </button>
+                        </div>
+                      )}
+                    </div>
+                  );
+                })
               )}
             </div>
           </div>
