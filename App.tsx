@@ -1474,6 +1474,7 @@ export default function App() {
       }
     }
 
+    let dispatchIndex = 0; // espaça disparos ao bot para evitar 429 (rate limit) em lote
     for (const pag of modificados) {
       await salvarPagamentoNoSupabase(pag);
 
@@ -1521,6 +1522,11 @@ export default function App() {
           `📝 Referência: *${descReferencia}*\n\n` +
           `👉 Acesse o portal para conferir o comprovante e aprovar:\n${window.location.origin}`;
 
+                // Espaça os disparos em 2.5s cada para evitar 429 (rate limit) no bot
+        // quando vários pagamentos são declarados/aprovados em lote
+        const delayMs = dispatchIndex * 2500;
+        dispatchIndex++;
+
         setTimeout(async () => {
           try {
             await fetch('/api/bot-proxy', {
@@ -1558,7 +1564,7 @@ export default function App() {
           } catch (e: any) {
             console.warn('Erro ao notificar administrador sobre pagamento manual:', e);
           }
-        }, 200);
+        }, 200 + delayMs);
       }
     }
   };

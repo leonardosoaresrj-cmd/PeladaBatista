@@ -94,25 +94,41 @@ async function startServer() {
       console.log(`[PROXY] Enviando POST para ${url}`);
 
       const headers: Record<string, string> = {
-        "Content-Type": "application/json"
+        "Content-Type": "application/json",
+        // User-Agent explícito: requisições server-to-server sem User-Agent
+        // padrão de navegador podem ser bloqueadas com 429 pela proteção
+        // anti-bot do Render em serviços do plano gratuito.
+        "User-Agent": "PeladaBatista-Proxy/1.0 (+https://peladabatista.onrender.com)"
       };
 
       if (secret) {
         headers["x-webhook-secret"] = secret;
       }
 
-      // Faz a requisição para o bot real
-      const respostaRender = await fetch(url, {
-        method: "POST",
-        headers,
-        body: JSON.stringify(payload)
-      });
+      // Faz a requisição para o bot real, com retry em caso de 429
+      let respostaRender: Response;
+      let responseText = "";
+      const MAX_TENTATIVAS = 3;
 
-      const responseText = await respostaRender.text();
+      for (let tentativa = 1; tentativa <= MAX_TENTATIVAS; tentativa++) {
+        respostaRender = await fetch(url, {
+          method: "POST",
+          headers,
+          body: JSON.stringify(payload)
+        });
+        responseText = await respostaRender.text();
 
-      if (!respostaRender.ok) {
-        console.error(`[PROXY ERROR] Status ${respostaRender.status}: ${responseText}`);
-        return res.status(respostaRender.status).json({ 
+        if (respostaRender.status !== 429) break;
+
+        console.warn(`[PROXY] 429 recebido (tentativa ${tentativa}/${MAX_TENTATIVAS}) — aguardando antes de tentar novamente`);
+        if (tentativa < MAX_TENTATIVAS) {
+          await new Promise(r => setTimeout(r, tentativa * 1500)); // 1.5s, 3s
+        }
+      }
+
+      if (!respostaRender!.ok) {
+        console.error(`[PROXY ERROR] Status ${respostaRender!.status}: ${responseText}`);
+        return res.status(respostaRender!.status).json({ 
           error: "Erro no bot", 
           details: responseText 
         });
