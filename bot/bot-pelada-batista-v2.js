@@ -78,7 +78,6 @@ let cronInterval      = null;
 let saveDebounceTimer = null;   // debounce do salvarSessao
 
 const jidCache = new Map();
-let sessaoCorrompidaDetectada = false; // true quando MessageCounterError detectado após reconexão
 
 // ─── Express ──────────────────────────────────────────────────────────────────
 const app = express();
@@ -303,7 +302,7 @@ app.post('/teste', async (req, res) => {
 
   try {
     const jid = await resolverJID(grupoAlvo);
-    await sendComTimeout(jid, { text: mensagem });
+    await sock.sendMessage(jid, { text: mensagem });
     console.log(`📤 [/teste] → ${jid} | ${mensagem.substring(0, 60).replace(/\n/g, ' ')}`);
     await supabase.from('bot_logs').insert({
       evento: 'DIRETO', tabela: 'frontend',
@@ -312,15 +311,6 @@ app.post('/teste', async (req, res) => {
     res.json({ success: true, jid });
   } catch (err) {
     console.error('❌ /teste:', err.message);
-    if (ehErroCriptografia(err)) {
-      // Conexão com criptografia corrompida — limpa sessão e reconecta
-      isConnected = false;
-      limparSessao().then(() => setTimeout(conectarWhatsApp, 2000)).catch(() => setTimeout(conectarWhatsApp, 2000));
-      return res.status(503).json({
-        error: 'Sessão WhatsApp corrompida — limpando e reconectando. Tente novamente em 15s.',
-        reconnecting: true,
-      });
-    }
     res.status(500).json({ error: err.message });
   }
 });
@@ -700,7 +690,7 @@ async function processarEventoWebhook(tipo, tabela, rec, recAntigo) {
     setTimeout(async () => {
       try {
         const jidAdmin = await resolverJID('admin');
-        await sendComTimeout(jidAdmin, { text: msgCadastroAdmin });
+        await sock.sendMessage(jidAdmin, { text: msgCadastroAdmin });
         await supabase.from('bot_logs').insert({
           evento: 'PENDENTE_APROVACAO_ADMIN', tabela: 'jogadores',
           mensagem: msgCadastroAdmin.substring(0, 500), enviado_em: new Date().toISOString(),
@@ -733,7 +723,7 @@ async function processarEventoWebhook(tipo, tabela, rec, recAntigo) {
                      `👉 Acesse o portal para conferir o comprovante e aprovar:\nhttps://peladabatista.onrender.com`;
                      
           const jidAdmin = await resolverJID('admin');
-          await sendComTimeout(jidAdmin, { text: msgPagamentoAdmin });
+          await sock.sendMessage(jidAdmin, { text: msgPagamentoAdmin });
           await supabase.from('bot_logs').insert({
             evento: 'PAGAMENTO_DECLARADO_ADMIN', tabela: 'pagamentos',
             mensagem: msgPagamentoAdmin.substring(0, 500), enviado_em: new Date().toISOString(),
@@ -995,44 +985,12 @@ async function resolverJID(grupoId) {
   return jid;
 }
 
-// Wrapper com timeout para evitar que sendMessage fique preso
-// em uma conexão "zumbi" (aberta mas com criptografia Signal corrompida)
-async function sendComTimeout(jid, payload, timeoutMs = 15000) {
-  return Promise.race([
-    sock.sendMessage(jid, payload),
-    new Promise((_, reject) =>
-      setTimeout(() => reject(new Error('Timed Out')), timeoutMs)
-    ),
-  ]);
-}
-
-// Detecta se o erro é de criptografia Signal — nesse caso força reconexão
-function ehErroCriptografia(err) {
-  const msg = err?.message || '';
-  return (
-    msg.includes('Timed Out') ||
-    msg.includes('Bad MAC') ||
-    msg.includes('MessageCounterError') ||
-    msg.includes('Key used already') ||
-    msg.includes('Failed to decrypt')
-  );
-}
-
 async function enviarParaGrupo(texto) {
   if (!sock || !isConnected) throw new Error('WhatsApp não conectado');
   if (!CONFIG.DEFAULT_GROUP_ID) throw new Error('WHATSAPP_GROUP_ID não configurado');
   const jid = await resolverJID(CONFIG.DEFAULT_GROUP_ID);
-  try {
-    await sendComTimeout(jid, { text: texto });
-    console.log(`📤 → ${jid}`);
-  } catch (err) {
-    if (ehErroCriptografia(err)) {
-      console.warn('⚠️  Erro de criptografia em enviarParaGrupo — limpando sessão e reconectando...');
-      isConnected = false;
-      limparSessao().then(() => setTimeout(conectarWhatsApp, 2000)).catch(() => setTimeout(conectarWhatsApp, 2000));
-    }
-    throw err;
-  }
+  await sock.sendMessage(jid, { text: texto });
+  console.log(`📤 → ${jid}`);
 }
 
 // ─────────────────────────────────────────────────────────────────────────────
@@ -1098,46 +1056,13 @@ async function conectarWhatsApp() {
     agendarSalvarSessao();
   });
 
-  // Detecta erros de descriptografia Signal que aparecem como logs de erro
-  // logo após reconexão (MessageCounterError / Bad MAC)
-  // O Baileys não emite evento específico — interceptamos via stderr do processo
-  const origConsoleError = console.error.bind(console);
-  const tempErrorHandler = (...args) => {
-    const msg = args.join(' ');
-    if (
-      msg.includes('MessageCounterError') ||
-      msg.includes('Bad MAC') ||
-      msg.includes('Key used already') ||
-      msg.includes('Failed to decrypt')
-    ) {
-      sessaoCorrompidaDetectada = true;
-    }
-    origConsoleError(...args);
-  };
-  // Sobrescreve console.error temporariamente por 5s após conectar
-  console.error = tempErrorHandler;
-  setTimeout(() => { console.error = origConsoleError; }, 5000);
-
   sock.ev.on('connection.update', async ({ connection, lastDisconnect, qr }) => {
     if (qr) { currentQR = qr; console.log(`\n🔗 QR: ${CONFIG.SELF_URL}/qr\n`); }
 
     if (connection === 'open') {
       isConnected = true; currentQR = null; reconnectAttempts = 0;
       console.log('✅ WhatsApp conectado!');
-
-      // Aguarda 3s para capturar erros de descriptografia que chegam logo após conectar
-      // (MessageCounterError aparece em connection=open, não em connection=close)
-      await new Promise(r => setTimeout(r, 3000));
-
-      // Se erros de criptografia foram detectados nos 3s após conectar → limpa sessão
-      if (sessaoCorrompidaDetectada) {
-        sessaoCorrompidaDetectada = false;
-        console.warn('🔑 Sessão corrompida detectada logo após conectar — limpando...');
-        await limparSessao();
-        setTimeout(conectarWhatsApp, 2000);
-        return;
-      }
-
+      // Salva sessão após conectar (sem debounce — é um evento único)
       await salvarSessao();
       iniciarSelfPing();
       iniciarCronDiario();
@@ -1146,17 +1071,7 @@ async function conectarWhatsApp() {
     if (connection === 'close') {
       isConnected = false;
       const code = lastDisconnect?.error?.output?.statusCode;
-      const errMsg = lastDisconnect?.error?.message || '';
       console.warn(`⚠️  Conexão encerrada — código: ${code}`);
-
-      // Erro de criptografia Signal (Bad MAC = chaves dessincronizadas com o servidor WA)
-      // → limpa TODA a sessão (local + Supabase) para forçar nova sincronização de chaves
-      // Sem isso, o bot fica em loop enviando mensagens criptografadas com chaves erradas
-      // (visível no WhatsApp como "Aguardando mensagem. Essa ação pode levar alguns instantes.")
-      if (errMsg.includes('Bad MAC') || errMsg.includes('MessageCounterError') || errMsg.includes('Key used already')) {
-        console.warn('🔑 Bad MAC detectado — limpando sessão completa (local + Supabase)...');
-        await limparSessao();
-      }
 
       if (code === DisconnectReason.loggedOut) {
         console.error('🚪 Logout! Limpando sessão...');

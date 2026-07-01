@@ -29,7 +29,7 @@ import {
   Pencil,
   Download
 } from 'lucide-react';
-import { obterDebitosDoJogador, obterMesReferenciaParaRenovacao } from '../utils/confirmationRules';
+import { obterDebitosDoJogador, obterMesReferenciaParaRenovacao, obterNumeroRecibo } from '../utils/confirmationRules';
 import { jsPDF } from 'jspdf';
 import {
   ResponsiveContainer,
@@ -2931,6 +2931,7 @@ export default function ControleCaixa({
                 <thead>
                   <tr className="border-b border-white/5 text-[10px] text-emerald-400 uppercase tracking-widest bg-black/10">
                     <th className="py-3 px-4 font-bold">Jogador / Atleta</th>
+                    <th className="py-3 px-4 font-bold">Nº Recibo</th>
                     <th className="py-3 px-4 font-bold">Tipo</th>
                     <th className="py-3 px-4 font-bold">Posição</th>
                     <th className="py-3 px-4 font-bold">Data do Pagamento</th>
@@ -2970,6 +2971,9 @@ export default function ControleCaixa({
                               <p className="text-[10px] text-emerald-400 font-mono">{jogador.email}</p>
                             </div>
                           </div>
+                        </td>
+                        <td className="py-3.5 px-4 font-mono text-[11px] text-teal-300 font-bold whitespace-nowrap">
+                          {obterNumeroRecibo(pagamento.id)}
                         </td>
                         <td className="py-3.5 px-4">
                           <span className={`inline-block px-2.5 py-0.5 rounded-full text-[10px] font-bold uppercase tracking-wider ${
@@ -3075,7 +3079,7 @@ export default function ControleCaixa({
                       </div>
                     </div>
 
-                    <div className="grid grid-cols-2 gap-2 pt-2 border-t border-white/5 text-[10px] text-emerald-300/80 font-mono">
+                    <div className="grid grid-cols-3 gap-2 pt-2 border-t border-white/5 text-[10px] text-emerald-300/80 font-mono">
                       <div>
                         <p className="text-emerald-500/60 uppercase font-black tracking-wider text-[8px]">Pago em</p>
                         <p className="text-white font-medium mt-0.5">
@@ -3098,6 +3102,12 @@ export default function ControleCaixa({
                               return `Diária ${pagamento.mesRef.split('-').reverse().join('/')}`;
                             }
                           })()}
+                        </p>
+                      </div>
+                      <div>
+                        <p className="text-emerald-500/60 uppercase font-black tracking-wider text-[8px]">Recibo</p>
+                        <p className="text-teal-300 font-black mt-0.5">
+                          {obterNumeroRecibo(pagamento.id)}
                         </p>
                       </div>
                     </div>
