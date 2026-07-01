@@ -177,12 +177,29 @@ export default function HistoricoJogos({
     }
   };
 
+  const hoje = useMemo(() => {
+    const d = new Date();
+    const y = d.getFullYear();
+    const m = String(d.getMonth() + 1).padStart(2, '0');
+    const dia = String(d.getDate()).padStart(2, '0');
+    return `${y}-${m}-${dia}`;
+  }, []);
+
   // Filtrar partidas do mês selecionado
   const partidasDoMes = partidas.filter((p) => p.data.startsWith(mesSelecionado));
 
+  // Partidas realizadas e não canceladas (partidas agendadas antes da data atual dentro do mês)
+  const partidasRealizadas = useMemo(() => {
+    return partidasDoMes.filter((p) => p.data < hoje && !p.cancelada);
+  }, [partidasDoMes, hoje]);
+
   // Ordenar as partidas - Mais antigas primeiro ou mais recentes primeiro?
-  // Mais recentes primeiro costuma ser melhor para histórico, mas vamos ordenar por data de jogo decrescente (ou crescente)
-  const partidasOrdenadas = [...partidasDoMes].sort((a, b) => b.data.localeCompare(a.data));
+  // Mostre somente os jogos passados, indicando os que aconteceram e os cancelados.
+  const partidasOrdenadas = useMemo(() => {
+    return [...partidasDoMes]
+      .filter((p) => p.data < hoje)
+      .sort((a, b) => b.data.localeCompare(a.data));
+  }, [partidasDoMes, hoje]);
 
   // Função auxiliar para extrair jogadores confirmados em uma partida e classificar por Mensalistas / Diaristas
   const obterParticipantes = (partida: Partida) => {
@@ -215,11 +232,11 @@ export default function HistoricoJogos({
     return preset || { color: '#047857', text: '⚪' };
   };
 
-  // Estatísticas de participação geral no mês selecionado
-  const todasPartidasConfirmados = partidasDoMes.flatMap((p) => p.confirmados || []);
+  // Estatísticas de participação geral no mês selecionado (com base em partidas que realmente aconteceram)
+  const todasPartidasConfirmados = partidasRealizadas.flatMap((p) => p.confirmados || []);
   const totalParticipacoesEmPartidas = todasPartidasConfirmados.length;
   
-  // Jogadores únicos que participaram de pelo menos 1 jogo no mês
+  // Jogadores únicos que participaram de pelo menos 1 jogo realizado no mês
   const jogadoresUnicosIds = Array.from(new Set(todasPartidasConfirmados));
   const jogadoresUnicosAtivos = jogadoresUnicosIds
     .map((id) => jogadores.find((j) => j.id === id))
@@ -271,16 +288,28 @@ export default function HistoricoJogos({
       </div>
 
       {/* Painel de Métricas do Mês */}
-      <div id="metricas-historico" className="grid grid-cols-1 sm:grid-cols-3 gap-4">
-        {/* Total de Jogos */}
+      <div id="metricas-historico" className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4">
+        {/* Jogos Realizados */}
         <div className="bg-emerald-950/40 border border-white/10 p-4 rounded-2xl flex items-center gap-3.5 shadow-md">
           <div className="w-10 h-10 rounded-xl bg-teal-950/60 border border-teal-500/25 text-teal-400 flex items-center justify-center font-mono font-bold">
             <CircleDot className="w-5 h-5 text-emerald-400" />
           </div>
           <div>
             <p className="text-[10px] text-emerald-300 uppercase font-sans font-bold tracking-widest leading-none">Jogos Realizados</p>
+            <h4 className="text-xl font-mono font-bold text-white mt-1">{partidasRealizadas.length}</h4>
+            <p className="text-[9px] text-emerald-400 mt-0.5">Partidas finalizadas e ativas</p>
+          </div>
+        </div>
+
+        {/* Jogos no Mês */}
+        <div className="bg-emerald-950/40 border border-white/10 p-4 rounded-2xl flex items-center gap-3.5 shadow-md">
+          <div className="w-10 h-10 rounded-xl bg-indigo-950/60 border border-indigo-500/25 text-indigo-400 flex items-center justify-center font-mono font-bold">
+            <Calendar className="w-5 h-5 text-indigo-400" />
+          </div>
+          <div>
+            <p className="text-[10px] text-emerald-300 uppercase font-sans font-bold tracking-widest leading-none">Jogos no Mês</p>
             <h4 className="text-xl font-mono font-bold text-white mt-1">{partidasDoMes.length}</h4>
-            <p className="text-[9px] text-emerald-400 mt-0.5">Partidas programadas no mês</p>
+            <p className="text-[9px] text-emerald-400 mt-0.5">Partidas marcadas no total</p>
           </div>
         </div>
 
@@ -555,20 +584,30 @@ export default function HistoricoJogos({
               <div
                 id={`historico-partida-${partida.id}`}
                 key={partida.id}
-                className="bg-emerald-950/40 border border-white/10 rounded-2xl p-5 space-y-4 hover:bg-emerald-950/60 transition-all shadow-lg"
+                className={`border rounded-2xl p-5 space-y-4 transition-all shadow-lg ${
+                  partida.cancelada
+                    ? 'bg-rose-950/10 border-rose-500/20 opacity-75 hover:bg-rose-950/15'
+                    : 'bg-emerald-950/40 border-white/10 hover:bg-emerald-950/60'
+                }`}
               >
                 {/* Informações Primárias do Jogo */}
                 <div className="flex flex-col sm:flex-row sm:items-start sm:justify-between border-b border-white/10 pb-4 gap-3">
                   <div className="space-y-1">
                     <div className="flex flex-wrap items-center gap-2">
-                      <span className="bg-emerald-500 text-black text-[9px] font-black uppercase tracking-wider px-2 py-0.5 rounded">
-                        CONVOCADOS REGISTRADOS
-                      </span>
+                      {partida.cancelada ? (
+                        <span className="bg-rose-500/20 text-rose-300 border border-rose-500/30 text-[9px] font-black uppercase tracking-wider px-2 py-0.5 rounded flex items-center gap-1">
+                          ❌ PARTIDA CANCELADA
+                        </span>
+                      ) : (
+                        <span className="bg-emerald-500 text-black text-[9px] font-black uppercase tracking-wider px-2 py-0.5 rounded flex items-center gap-1">
+                          ✅ REALIZADA & CONFIRMADA
+                        </span>
+                      )}
                       <span className="text-[10px] text-emerald-300 font-mono">
                         ID Evento: #{partida.id.substring(0, 8)}
                       </span>
                     </div>
-                    <h3 className="font-display font-extrabold text-white text-base leading-snug">
+                    <h3 className={`font-display font-extrabold text-white text-base leading-snug ${partida.cancelada ? 'line-through opacity-60' : ''}`}>
                       {partida.titulo}
                     </h3>
                   </div>
