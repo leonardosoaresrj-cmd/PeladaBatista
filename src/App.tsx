@@ -2152,6 +2152,7 @@ export default function App() {
                   valor5Sabados={valor5Sabados}
                   whatsappAutomacaoAtiva={whatsappAutomacaoAtiva}
                   onRegistrarLogAutomacao={handleRegistrarLogAutomacao}
+                  partidas={partidas}
                 />
               )}
 

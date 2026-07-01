@@ -29,7 +29,7 @@ import {
   Pencil,
   Download
 } from 'lucide-react';
-import { obterDebitosDoJogador } from '../utils/confirmationRules';
+import { obterDebitosDoJogador, obterMesReferenciaParaRenovacao } from '../utils/confirmationRules';
 import { jsPDF } from 'jspdf';
 import {
   ResponsiveContainer,
@@ -533,7 +533,11 @@ export default function ControleCaixa({
   const saldoLiquidoConsolidado = receitaTotalConsolidado - despesaTotalConsolidado;
 
   const mesesDisponiveis = useMemo(() => {
-    const mesLimit = obterMesAtual(); // ex: '2026-06'
+    let mesLimit = obterMesAtual(); // ex: '2026-06'
+    const mesRenovacao = obterMesReferenciaParaRenovacao(partidas);
+    if (mesRenovacao > mesLimit) {
+      mesLimit = mesRenovacao;
+    }
     const mesSet = new Set<string>();
     
     // So adicionar mesLimit se for >= startupMonth

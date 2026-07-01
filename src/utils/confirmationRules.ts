@@ -262,7 +262,11 @@ export function obterDebitosDoJogador(
       return `${y}-${m}`;
     };
 
-    const mesLimit = obterMesAtual(); // ex: '2026-06'
+    let mesLimit = obterMesAtual(); // ex: '2026-06'
+    const mesRenovacao = obterMesReferenciaParaRenovacao(partidas);
+    if (mesRenovacao > mesLimit) {
+      mesLimit = mesRenovacao;
+    }
     const mesSet = new Set<string>();
     mesSet.add(mesLimit);
 

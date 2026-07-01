@@ -20,7 +20,7 @@ import {
   RefreshCw,
   Mail
 } from 'lucide-react';
-import { isFechamentoMensalistas, obterDebitosDoJogador, obterNumeroRecibo } from '../utils/confirmationRules';
+import { isFechamentoMensalistas, obterDebitosDoJogador, obterNumeroRecibo, obterMesReferenciaParaRenovacao } from '../utils/confirmationRules';
 import CheckoutPixModal from './CheckoutPixModal';
 
 interface ControlePagamentosProps {
@@ -200,7 +200,11 @@ export default function ControlePagamentos({
 
   // Histórico de competências que o usuário pode visualizar (computado dinamicamente)
   const competencasDisponiveis = useMemo(() => {
-    const mesLimit = obterMesAtual(); // ex: '2026-06'
+    let mesLimit = obterMesAtual(); // ex: '2026-06'
+    const mesRenovacao = obterMesReferenciaParaRenovacao(partidas);
+    if (mesRenovacao > mesLimit) {
+      mesLimit = mesRenovacao;
+    }
     const mesSet = new Set<string>();
     
     if (mesLimit >= startupMonth) {

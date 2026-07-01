@@ -4,10 +4,10 @@
  */
 
 import React, { useState, useMemo, useEffect } from 'react';
-import { Jogador, Pagamento } from '../types';
+import { Jogador, Pagamento, Partida } from '../types';
 import { AVATAR_PRESETS } from '../data';
 import { Users, Search, UserCheck, Award, Star, Mail, Calendar } from 'lucide-react';
-import { obterJanelaRenovacaoParaMesRef, isFechamentoMensalistas } from '../utils/confirmationRules';
+import { obterJanelaRenovacaoParaMesRef, isFechamentoMensalistas, obterMesReferenciaParaRenovacao } from '../utils/confirmationRules';
 
 interface MensalistasMesProps {
   jogadores: Jogador[];
@@ -18,6 +18,7 @@ interface MensalistasMesProps {
   valor5Sabados: number;
   whatsappAutomacaoAtiva?: boolean;
   onRegistrarLogAutomacao?: (atleta: string, partida: string, msg: string) => void;
+  partidas?: Partida[];
 }
 
 export default function MensalistasMes({
@@ -28,7 +29,8 @@ export default function MensalistasMes({
   valor4Sabados,
   valor5Sabados,
   whatsappAutomacaoAtiva = false,
-  onRegistrarLogAutomacao
+  onRegistrarLogAutomacao,
+  partidas = []
 }: MensalistasMesProps) {
   const [filtroPesquisa, setFiltroPesquisa] = useState('');
   const [mesSelecionado, setMesSelecionado] = useState(() => {
@@ -84,7 +86,11 @@ export default function MensalistasMes({
   };
 
   const opcoesMeses = useMemo(() => {
-    const mesLimit = obterMesAtual(); // ex: '2026-06'
+    let mesLimit = obterMesAtual(); // ex: '2026-06'
+    const mesRenovacao = obterMesReferenciaParaRenovacao(partidas);
+    if (mesRenovacao > mesLimit) {
+      mesLimit = mesRenovacao;
+    }
     const mesSet = new Set<string>();
     
     if (mesLimit >= startupMonth) {
