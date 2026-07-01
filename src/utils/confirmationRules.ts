@@ -323,9 +323,19 @@ export function obterDebitosDoJogador(
       meses = [mesLimit];
     }
 
-    let mesCadastro = (jogadorCadastroData && jogadorCadastroData.length >= 7) 
-      ? jogadorCadastroData.substring(0, 7) 
-      : null;
+    let mesCadastro: string | null = null;
+    if (jogadorCadastroData) {
+      if (jogadorCadastroData.length >= 7) {
+        mesCadastro = jogadorCadastroData.substring(0, 7);
+      } else {
+        const d = new Date(jogadorCadastroData);
+        if (!isNaN(d.getTime())) {
+          const y = d.getUTCFullYear();
+          const m = String(d.getUTCMonth() + 1).padStart(2, '0');
+          mesCadastro = `${y}-${m}`;
+        }
+      }
+    }
 
     if (!mesCadastro) {
       let earliestMonth = mesLimit;

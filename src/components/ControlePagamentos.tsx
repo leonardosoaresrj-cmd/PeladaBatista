@@ -674,8 +674,29 @@ export default function ControlePagamentos({
               const isGoleiro = jogadorAtual.posicao.includes('Goleiro');
               const isDiarista = jogadorAtual.membroStatus === 'diarista';
               
+              let mesCadastro: string | null = null;
+              if (jogadorAtual.createdAt) {
+                if (jogadorAtual.createdAt.length >= 7 && jogadorAtual.createdAt.includes('-')) {
+                  mesCadastro = jogadorAtual.createdAt.substring(0, 7);
+                } else {
+                  const d = new Date(jogadorAtual.createdAt);
+                  if (!isNaN(d.getTime())) {
+                    const y = d.getUTCFullYear();
+                    const m = String(d.getUTCMonth() + 1).padStart(2, '0');
+                    mesCadastro = `${y}-${m}`;
+                  }
+                }
+              }
+              
+              const checkPgGeral = obterPagamentoDoJogador(comp.value);
+              const pagamentosDiaristaMes = pagamentos.filter(p => p.jogadorId === jogadorAtual.id && p.mesRef === comp.value && p.status !== 'cancelado' && p.partidaId);
+              
+              if (mesCadastro && comp.value < mesCadastro && !checkPgGeral && pagamentosDiaristaMes.length === 0) {
+                return null;
+              }
+              
               if (isDiarista) {
-                const pagamentosMes = pagamentos.filter(p => p.jogadorId === jogadorAtual.id && p.mesRef === comp.value && p.status !== 'cancelado' && p.partidaId);
+                const pagamentosMes = pagamentosDiaristaMes;
                 const valorTotalNoMes = pagamentosMes.reduce((sum, p) => sum + p.valor, 0);
                 const isAllPaid = pagamentosMes.length > 0 && pagamentosMes.every(p => p.status === 'pago');
                 const hasPendingValidation = pagamentosMes.some(p => p.status === 'pendente_confirmacao');

@@ -1034,7 +1034,7 @@ export default function App() {
     if (aprovar) {
       atualizados = jogadores.map(j => {
         if (j.id === id) {
-          modificado = { ...j, status: 'ativo' as const };
+          modificado = { ...j, status: 'ativo' as const, createdAt: new Date().toISOString() };
           return modificado;
         }
         return j;
