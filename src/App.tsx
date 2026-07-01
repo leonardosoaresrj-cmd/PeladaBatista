@@ -2178,6 +2178,9 @@ export default function App() {
                   onCancelarPartida={handleCancelarPartida}
                   onActualizarPresenca={handleActualizarPresenca}
                   onRegistrarPagamento={handleRegistrarPagamento}
+                  valorDiaria={valorDiaria}
+                  valor4Sabados={valor4Sabados}
+                  valor5Sabados={valor5Sabados}
                 />
               )}
 
@@ -2197,6 +2200,9 @@ export default function App() {
                   onRegistrarLogAutomacao={handleRegistrarLogAutomacao}
                   onCancelarPartida={handleCancelarPartida}
                   onRegistrarPagamento={handleRegistrarPagamento}
+                  valorDiaria={valorDiaria}
+                  valor4Sabados={valor4Sabados}
+                  valor5Sabados={valor5Sabados}
                 />
               )}
 
@@ -2212,6 +2218,9 @@ export default function App() {
                   onActualizarPresenca={handleActualizarPresenca}
                   whatsappAutomacaoAtiva={whatsappAutomacaoAtiva}
                   onCriarJogador={handleAdminCriarJogador}
+                  valorDiaria={valorDiaria}
+                  valor4Sabados={valor4Sabados}
+                  valor5Sabados={valor5Sabados}
                 />
               )}
 

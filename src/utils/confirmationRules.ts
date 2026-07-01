@@ -238,7 +238,7 @@ export function obterDebitosDoJogador(
   jogadorCadastroData?: string,
   mesSelecionado?: string
 ) {
-  if (posicao === 'Goleiro') return [];
+  if (posicao && posicao.includes('Goleiro')) return [];
 
   const hojeStr = new Date().toISOString().split('T')[0]; // ex: "2026-06-04"
 
@@ -323,8 +323,26 @@ export function obterDebitosDoJogador(
       meses = [mesLimit];
     }
 
-    if (jogadorCadastroData && jogadorCadastroData.length >= 7) {
-      const mesCadastro = jogadorCadastroData.substring(0, 7);
+    let mesCadastro = (jogadorCadastroData && jogadorCadastroData.length >= 7) 
+      ? jogadorCadastroData.substring(0, 7) 
+      : null;
+
+    if (!mesCadastro) {
+      let earliestMonth = mesLimit;
+      pagamentos.forEach(p => {
+        if (p.jogadorId === jogadorId && p.mesRef && p.mesRef < earliestMonth) {
+          earliestMonth = p.mesRef;
+        }
+      });
+      partidas.forEach(p => {
+        if (p.confirmados.includes(jogadorId) && p.data && p.data.substring(0, 7) < earliestMonth) {
+          earliestMonth = p.data.substring(0, 7);
+        }
+      });
+      mesCadastro = earliestMonth;
+    }
+
+    if (mesCadastro) {
       meses = meses.filter(m => m >= mesCadastro);
     }
 
@@ -355,7 +373,7 @@ export function obterDebitosDoJogador(
             status: 'pendente'
           });
         }
-      } else if (pag.status !== 'pago' && pag.status !== 'cancelado') {
+      } else if (pag.status !== 'pago' && pag.status !== 'cancelado' && mes <= mesLimit) {
         debitos.push({
           id: pag.id,
           tipo: 'mensalidade',

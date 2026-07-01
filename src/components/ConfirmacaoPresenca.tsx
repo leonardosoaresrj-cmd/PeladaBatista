@@ -25,6 +25,9 @@ interface ConfirmacaoPresencaProps {
   onRegistrarLogAutomacao?: (atletaNome: string, partidaTitulo: string, msg: string) => void;
   onCancelarPartida?: (partidaId: string, cancelar: boolean) => void;
   onRegistrarPagamento?: (jogadorId: string, mesRef: string, status: 'pago' | 'pendente' | 'pendente_confirmacao' | 'cancelado', dataPagamento: string | null, valor: number, partidaId?: string) => Promise<void>;
+  valorDiaria: number;
+  valor4Sabados: number;
+  valor5Sabados: number;
 }
 
 export default function ConfirmacaoPresenca({
@@ -42,6 +45,9 @@ export default function ConfirmacaoPresenca({
   onRegistrarLogAutomacao,
   onCancelarPartida,
   onRegistrarPagamento,
+  valorDiaria,
+  valor4Sabados,
+  valor5Sabados
 }: ConfirmacaoPresencaProps) {
   const [showShareModal, setShowShareModal] = useState(false);
   const [shareText, setShareText] = useState('');
@@ -242,9 +248,9 @@ export default function ConfirmacaoPresenca({
     }
 
     if (confirmado) {
-      const v4 = parseFloat(localStorage.getItem('racha_valor_4s') || '85');
-      const v5 = parseFloat(localStorage.getItem('racha_valor_5s') || '105');
-      const vDiaria = parseFloat(localStorage.getItem('racha_valor_diaria') || '30');
+      const v4 = valor4Sabados;
+      const v5 = valor5Sabados;
+      const vDiaria = valorDiaria;
 
       const targetPlayer = (jogadores && jogadores.find(j => j.id === id)) || jogadorAtual;
       const originalStatus = targetPlayer.membroStatusDb || targetPlayer.membroStatus;
@@ -719,9 +725,9 @@ export default function ConfirmacaoPresenca({
                   
                   let hasDebits = false;
                   if (isMensalista && !isAdmin) {
-                    const vD = parseFloat(localStorage.getItem('racha_valor_diaria') || '30');
-                    const v4 = parseFloat(localStorage.getItem('racha_valor_4s') || '85');
-                    const v5 = parseFloat(localStorage.getItem('racha_valor_5s') || '105');
+                    const vD = valorDiaria;
+                    const v4 = valor4Sabados;
+                    const v5 = valor5Sabados;
                     hasDebits = obterDebitosDoJogador(jogadorAtual.id, originalStatus, jogadorAtual.posicao, partidas, pagamentos, vD, v4, v5, jogadorAtual.createdAt).length > 0;
                   }
 

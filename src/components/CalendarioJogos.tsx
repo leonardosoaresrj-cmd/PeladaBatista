@@ -23,6 +23,9 @@ interface CalendarioJogosProps {
   onCancelarPartida?: (partidaId: string, cancelar: boolean) => void;
   onActualizarPresenca?: (partidaId: string, jogadorId: string, confirmado: boolean | null) => void;
   onRegistrarPagamento?: (jogadorId: string, mesRef: string, status: 'pago' | 'pendente' | 'pendente_confirmacao' | 'cancelado', dataPagamento: string | null, valor: number, partidaId?: string) => Promise<void>;
+  valorDiaria: number;
+  valor4Sabados: number;
+  valor5Sabados: number;
 }
 
 export default function CalendarioJogos({
@@ -38,6 +41,9 @@ export default function CalendarioJogos({
   onCancelarPartida,
   onActualizarPresenca,
   onRegistrarPagamento,
+  valorDiaria,
+  valor4Sabados,
+  valor5Sabados
 }: CalendarioJogosProps) {
   // Estado para armazenar o ID do jogo agendado atualmente exibido em pop-up detalhado
   const [partidaDetalhadaPopupId, setPartidaDetalhadaPopupId] = useState<string | null>(null);
@@ -630,9 +636,9 @@ export default function CalendarioJogos({
                 
                 let hasDebits = false;
                 if (!isAdmin && isMensalista) {
-                  const vD = parseFloat(localStorage.getItem('racha_valor_diaria') || '30');
-                  const v4 = parseFloat(localStorage.getItem('racha_valor_4s') || '85');
-                  const v5 = parseFloat(localStorage.getItem('racha_valor_5s') || '105');
+                  const vD = valorDiaria;
+                  const v4 = valor4Sabados;
+                  const v5 = valor5Sabados;
                   hasDebits = obterDebitosDoJogador(jogadorAtual.id, originalStatus, jogadorAtual.posicao, partidas, pagamentos, vD, v4, v5, jogadorAtual.createdAt).length > 0;
                 }
 
@@ -676,9 +682,9 @@ export default function CalendarioJogos({
                           return;
                         }
 
-                        const vD = parseFloat(localStorage.getItem('racha_valor_diaria') || '30');
-                        const v4 = parseFloat(localStorage.getItem('racha_valor_4s') || '85');
-                        const v5 = parseFloat(localStorage.getItem('racha_valor_5s') || '105');
+                        const vD = valorDiaria;
+                        const v4 = valor4Sabados;
+                        const v5 = valor5Sabados;
 
                         const debits = obterDebitosDoJogador(
                           jogadorAtual.id,

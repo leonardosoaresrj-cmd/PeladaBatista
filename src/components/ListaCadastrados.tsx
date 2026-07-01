@@ -20,6 +20,9 @@ interface ListaCadastradosProps {
   onActualizarPresenca?: (partidaId: string, jogadorId: string, confirmado: boolean | null) => void;
   whatsappAutomacaoAtiva?: boolean;
   onCriarJogador?: (novo: Omit<Jogador, 'id' | 'status' | 'role' | 'createdAt'>) => void;
+  valorDiaria: number;
+  valor4Sabados: number;
+  valor5Sabados: number;
 }
 
 export default function ListaCadastrados({
@@ -33,6 +36,9 @@ export default function ListaCadastrados({
   onActualizarPresenca,
   whatsappAutomacaoAtiva = true,
   onCriarJogador,
+  valorDiaria,
+  valor4Sabados,
+  valor5Sabados
 }: ListaCadastradosProps) {
   // Filtrar apenas jogadores "Ativo" (e "Suspenso" se for admin) para a área pública de cadastrados
   const jogadoresAtivos = jogadores.filter(j => j.status === 'ativo' || (jogadorAtual.role === 'admin' && j.status === 'suspenso'));
@@ -1070,9 +1076,9 @@ export default function ListaCadastrados({
       {jogadorExclusaoModal && (() => {
         const j = jogadorExclusaoModal;
         const originalStatus = j.membroStatusDb || j.membroStatus || 'diarista';
-        const vD = parseFloat(localStorage.getItem('racha_valor_diaria') || '30');
-        const v4 = parseFloat(localStorage.getItem('racha_valor_4s') || '85');
-        const v5 = parseFloat(localStorage.getItem('racha_valor_5s') || '105');
+        const vD = valorDiaria;
+        const v4 = valor4Sabados;
+        const v5 = valor5Sabados;
         const debits = obterDebitosDoJogador(
           j.id,
           originalStatus,

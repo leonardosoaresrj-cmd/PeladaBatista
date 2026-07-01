@@ -2558,7 +2558,7 @@ export default function ControleCaixa({
                         ? pagamentos.find(p => p.jogadorId === atl.id && p.mesRef === analiseJogoDetalhes.mesPartida && !p.partidaId)
                         : pagamentos.find(p => p.jogadorId === atl.id && p.partidaId === analiseJogoDetalhes.id);
                       const isPaid = statusPg?.status === 'pago';
-                      const isGoleiro = atl.posicao === 'Goleiro';
+                      const isGoleiro = atl.posicao && atl.posicao.includes('Goleiro');
 
                       return (
                         <div 

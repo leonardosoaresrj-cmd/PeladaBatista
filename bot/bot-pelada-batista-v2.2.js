@@ -245,7 +245,7 @@ app.get('/grupos', async (req, res) => {
           <div class="header">
             <div class="header-left">
               <h1>📋 Grupos do WhatsApp</h1>
-              <p>${lista.length} grupo(s) encontrado(s) para este número</p>
+              <p>$\{lista.length} grupo(s) encontrado(s) para este número</p>
             </div>
             <span class="badge">✅ Conectado</span>
           </div>
@@ -265,7 +265,7 @@ app.get('/grupos', async (req, res) => {
                 <th>Criado em</th>
               </tr>
             </thead>
-            <tbody>${linhas || '<tr><td colspan="4" style="padding:32px;text-align:center;color:#888">Nenhum grupo encontrado</td></tr>'}</tbody>
+            <tbody>$\{linhas || '<tr><td colspan="4" style="padding:32px;text-align:center;color:#888">Nenhum grupo encontrado</td></tr>'}</tbody>
           </table>
 
           <div class="footer">
@@ -278,7 +278,7 @@ app.get('/grupos', async (req, res) => {
     res.status(500).send(`
       <html><body style="font-family:sans-serif;padding:40px;text-align:center">
         <h2 style="color:#c00">Erro ao listar grupos</h2>
-        <p>${err.message}</p>
+        <p>$\{err.message}</p>
         <p><a href="/qr">← Voltar</a></p>
       </body></html>`);
   }
@@ -293,7 +293,7 @@ app.post('/teste', async (req, res) => {
   if (!isConnected) {
     return res.status(503).json({
       error: 'WhatsApp não conectado.',
-      qr_url: `${CONFIG.SELF_URL}/qr`
+      qr_url: \`$\{CONFIG.SELF_URL}/qr\`
     });
   }
   const { mensagem, grupo_id } = req.body;
@@ -305,7 +305,7 @@ app.post('/teste', async (req, res) => {
   try {
     const jid = await resolverJID(grupoAlvo);
     await sendComTimeout(jid, { text: mensagem });
-    console.log(`📤 [/teste] → ${jid} | ${mensagem.substring(0, 60).replace(/\n/g, ' ')}`);
+    console.log(\`📤 [/teste] → $\{jid} | $\{mensagem.substring(0, 60).replace(/\\n/g, ' ')}\`);
     await supabase.from('bot_logs').insert({
       evento: 'DIRETO', tabela: 'frontend',
       mensagem: mensagem.substring(0, 500), enviado_em: new Date().toISOString(),
@@ -336,7 +336,7 @@ app.post('/webhook', async (req, res) => {
     return res.status(503).json({ error: 'WhatsApp não conectado' });
 
   const { type, table, record, old_record } = req.body;
-  console.log(`📥 [/webhook] ${type} em "${table}"`);
+  console.log(\`📥 [/webhook] $\{type} em "$\{table}"\`);
 
   try {
     await processarEventoWebhook(type, table, record, old_record);
@@ -401,7 +401,7 @@ async function salvarSessao() {
       // Fallback: tenta salvar no Storage arquivo por arquivo
       await salvarSessaoStorage(sessaoObj);
     } else {
-      console.log(`💾 Sessão salva (${Object.keys(sessaoObj).length} arquivos → tabela bot_session)`);
+      console.log(\`💾 Sessão salva ($\{Object.keys(sessaoObj).length} arquivos → tabela bot_session)\`);
     }
   } catch (err) {
     console.error('❌ Erro ao salvar sessão:', err.message);
@@ -414,13 +414,13 @@ async function salvarSessaoStorage(sessaoObj) {
     try {
       const buf = Buffer.from(conteudo, 'utf8');
       await supabase.storage.from(CONFIG.SUPABASE_BUCKET)
-        .upload(`session/${nome}`, buf, { upsert: true });
+        .upload(\`session/$\{nome}\`, buf, { upsert: true });
       salvos++;
     } catch {
       // ignora arquivos que falharam individualmente
     }
   }
-  if (salvos > 0) console.log(`💾 Sessão salva no Storage (${salvos} arquivos)`);
+  if (salvos > 0) console.log(\`💾 Sessão salva no Storage ($\{salvos} arquivos)\`);
 }
 
 async function baixarSessao() {
@@ -445,7 +445,7 @@ async function baixarSessao() {
         for (const [nome, conteudo] of Object.entries(sessaoObj)) {
           fs.writeFileSync(path.join(CONFIG.SESSION_LOCAL_PATH, nome), conteudo, 'utf8');
         }
-        console.log(`✅ Sessão restaurada da tabela bot_session (${nomes.length} arquivos)`);
+        console.log(\`✅ Sessão restaurada da tabela bot_session ($\{nomes.length} arquivos)\`);
         return true;
       }
     }
@@ -473,7 +473,7 @@ async function baixarSessao() {
       try {
         const { data } = await supabase.storage
           .from(CONFIG.SUPABASE_BUCKET)
-          .download(`session/${arq.name}`);
+          .download(\`session/$\{arq.name}\`);
         if (data) {
           fs.writeFileSync(
             path.join(CONFIG.SESSION_LOCAL_PATH, arq.name),
@@ -485,7 +485,7 @@ async function baixarSessao() {
     }
 
     if (restaurados > 0) {
-      console.log(`✅ Sessão restaurada do Storage (${restaurados} arquivos)`);
+      console.log(\`✅ Sessão restaurada do Storage ($\{restaurados} arquivos)\`);
       // Migra para a tabela bot_session para próximas reinicializações
       await salvarSessao();
       return true;
@@ -516,7 +516,7 @@ async function limparSessao() {
         .from(CONFIG.SUPABASE_BUCKET).list('session/', { limit: 200, offset: pagina * 200 });
       if (!arqs?.length) break;
       await supabase.storage.from(CONFIG.SUPABASE_BUCKET)
-        .remove(arqs.map(f => `session/${f.name}`));
+        .remove(arqs.map(f => \`session/$\{f.name}\`));
       if (arqs.length < 200) break;
       pagina++;
     }
@@ -533,12 +533,19 @@ function iniciarCronDiario() {
   if (cronInterval) clearInterval(cronInterval);
   cronInterval = setInterval(async () => {
     const agora = new Date();
-    if (agora.getHours() !== 8) return;
-    if (ehPrimeiroDiaPosUltimoSabadoMesAnterior(agora)) {
+    const hora  = agora.getHours();
+
+    // ── 04h: limpeza seletiva de sessão (previne acumulação de arquivos Signal)
+    if (hora === 4 && agora.getMinutes() < 2) {
+      await limparSessaoSeletiva();
+    }
+
+    // ── 08h: REGRA 1 — abertura de renovação de mensalidade
+    if (hora === 8 && ehPrimeiroDiaPosUltimoSabadoMesAnterior(agora)) {
       console.log('📅 [CRON] REGRA 1 — disparando abertura de renovação...');
       await dispararAberturaMensalidade(agora);
     }
-  }, 60 * 60 * 1000);
+  }, 60 * 1000); // verifica a cada 1 minuto (antes era 1 hora — perdia a janela de 04h)
 
   // Verifica imediatamente no boot
   setTimeout(async () => {
@@ -549,7 +556,99 @@ function iniciarCronDiario() {
     }
   }, 5000);
 
-  console.log('📅 Cron diário ativo (verifica abertura de renovação às 08h)');
+  console.log('📅 Cron diário ativo (limpeza às 04h | renovação às 08h)');
+}
+
+
+// ─────────────────────────────────────────────────────────────────────────────
+// LIMPEZA SELETIVA DE SESSÃO — roda diariamente às 04h
+// Remove arquivos descartáveis (session-*, pre-keys-*, app-state-sync-version-*)
+// mantendo os essenciais (creds.json, app-state-sync-key-*, sender-key-mem-*)
+// Sem isso, o Storage acumula 500+ arquivos levando a corrupção do estado Signal
+// (signedKeyId reaproveitado → "mensagem enviada mas não recebida" no WhatsApp)
+// ─────────────────────────────────────────────────────────────────────────────
+function ehArquivoDescartavel(nome) {
+  return (
+    nome.startsWith('session-')              ||  // sessões Signal por contato
+    nome.startsWith('pre-keys-')             ||  // pre-keys já consumidas
+    nome.startsWith('app-state-sync-version-')   // versões de estado antigas
+  );
+}
+
+async function limparSessaoSeletiva() {
+  console.log('🧹 [CRON] Iniciando limpeza seletiva de sessão...');
+  try {
+    // 1. Coletar todos os arquivos (paginado para cobrir 500+ arquivos)
+    const todoArquivos = [];
+    let pagina = 0;
+    while (true) {
+      const { data } = await supabase.from('bot_session').select('session_data').eq('id', 'main').maybeSingle();
+      if (!data?.session_data) break;
+
+      const sessaoObj = JSON.parse(data.session_data);
+      const nomes = Object.keys(sessaoObj);
+      const essenciais = nomes.filter(n => !ehArquivoDescartavel(n));
+      const descartaveis = nomes.filter(n => ehArquivoDescartavel(n));
+
+      if (!descartaveis.length) {
+        console.log(\`🧹 [CRON] Sessão já limpa ($\{nomes.length} arquivos, nenhum descartável)\`);
+        break;
+      }
+
+      // 2. Criar novo objeto só com arquivos essenciais
+      const sessaoLimpa = {};
+      for (const nome of essenciais) {
+        sessaoLimpa[nome] = sessaoObj[nome];
+      }
+
+      // 3. Salvar sessão limpa de volta na tabela
+      await supabase.from('bot_session').upsert({
+        id: 'main',
+        session_data: JSON.stringify(sessaoLimpa),
+        updated_at: new Date().toISOString(),
+      }, { onConflict: 'id' });
+
+      // 4. Limpar também os arquivos locais descartáveis
+      if (fs.existsSync(CONFIG.SESSION_LOCAL_PATH)) {
+        for (const nome of descartaveis) {
+          try {
+            fs.unlinkSync(path.join(CONFIG.SESSION_LOCAL_PATH, nome));
+          } catch {}
+        }
+      }
+
+      console.log(
+        \`🧹 [CRON] Limpeza concluída: $\{nomes.length} → $\{essenciais.length} arquivos \` +
+        \`(removidos: $\{descartaveis.length} | mantidos: $\{essenciais.join(', ').substring(0, 80)}...)\`
+      );
+      break;
+    }
+
+    // 5. Limpar Storage também (fallback storage)
+    try {
+      let offset = 0;
+      while (true) {
+        const { data: arqs } = await supabase.storage
+          .from(CONFIG.SUPABASE_BUCKET)
+          .list('session/', { limit: 200, offset });
+        if (!arqs?.length) break;
+        const paraRemover = arqs
+          .filter(f => ehArquivoDescartavel(f.name))
+          .map(f => \`session/$\{f.name}\`);
+        if (paraRemover.length) {
+          await supabase.storage.from(CONFIG.SUPABASE_BUCKET).remove(paraRemover);
+          console.log(\`🧹 [CRON] Storage: removidos $\{paraRemover.length} arquivos descartáveis\`);
+        }
+        if (arqs.length < 200) break;
+        offset += 200;
+      }
+    } catch (e) {
+      console.warn('⚠️  Erro limpando Storage (não crítico):', e.message);
+    }
+
+  } catch (err) {
+    console.error('❌ Erro na limpeza seletiva de sessão:', err.message);
+  }
 }
 
 function ehPrimeiroDiaPosUltimoSabadoMesAnterior(hoje) {
@@ -589,13 +688,13 @@ function estaNoPeriodoRenovacao(hoje) {
 
 function getMesRefAtual() {
   const hoje = new Date();
-  return `${hoje.getFullYear()}-${String(hoje.getMonth() + 1).padStart(2, '0')}`;
+  return \`$\{hoje.getFullYear()}-$\{String(hoje.getMonth() + 1).padStart(2, '0')}\`;
 }
 
 async function dispararAberturaMensalidade(hoje) {
   try {
     if (!isConnected) { console.warn('⚠️  [REGRA1] WA não conectado'); return; }
-    const mesRef = `${hoje.getFullYear()}-${String(hoje.getMonth() + 1).padStart(2, '0')}`;
+    const mesRef = \`$\{hoje.getFullYear()}-$\{String(hoje.getMonth() + 1).padStart(2, '0')}\`;
     const { data: jogadores } = await supabase
       .from('jogadores').select('id,nome,sobrenome,membro_status,is_gold')
       .eq('status', 'ativo').eq('membro_status', 'mensalista').order('nome');
@@ -608,7 +707,7 @@ async function dispararAberturaMensalidade(hoje) {
       evento: 'CRON_REGRA1', tabela: 'pagamentos',
       mensagem: mensagem.substring(0, 500), enviado_em: new Date().toISOString(),
     });
-    console.log(`✅ [REGRA1] Abertura de renovação enviada para ${mesRef}`);
+    console.log(\`✅ [REGRA1] Abertura de renovação enviada para $\{mesRef}\`);
   } catch (err) {
     console.error('❌ [REGRA1]:', err.message);
   }
@@ -634,7 +733,7 @@ async function processarEventoWebhook(tipo, tabela, rec, recAntigo) {
       supabase.from('partidas').select('titulo,data,horario,local').eq('id', rec.partida_id).maybeSingle(),
     ]);
     if (jogRes.data && parRes.data) {
-      const nome = `${jogRes.data.nome} ${jogRes.data.sobrenome}`;
+      const nome = \`$\{jogRes.data.nome} $\{jogRes.data.sobrenome}\`;
       if (rec.confirmado === true) {
         mensagem = msgConfirmacaoPresenca(nome, parRes.data);
         setTimeout(async () => {
@@ -697,13 +796,13 @@ async function processarEventoWebhook(tipo, tabela, rec, recAntigo) {
 
   // Notificação extra para o Administrador: Novo Jogador cadastrado aguardando aprovação
   if (tabela === 'jogadores' && tipo === 'INSERT' && rec.status === 'pendente_aprovacao') {
-    const msgCadastroAdmin = `👤 *NOVO CADASTRO AGUARDANDO APROVAÇÃO* 👤\n\n` +
-               `Um novo jogador se cadastrou no portal e aguarda a sua aprovação:\n\n` +
-               `🏷️ Nome: *${rec.nome} ${rec.sobrenome || ''}*\n` +
-               `📞 WhatsApp: *${rec.whatsapp || 'Não informado'}*\n` +
-               `⚽ Posição: *${rec.posicao || 'Não informada'}*\n` +
-               `⭐ Mensalista/Diarista: *${rec.membro_status || 'diarista'}*\n\n` +
-               `👉 Acesse o painel do administrador para aprovar:\nhttps://peladabatista.onrender.com`;
+    const msgCadastroAdmin = \`👤 *NOVO CADASTRO AGUARDANDO APROVAÇÃO* 👤\\n\\n\` +
+               \`Um novo jogador se cadastrou no portal e aguarda a sua aprovação:\\n\\n\` +
+               \`🏷️ Nome: *$\{rec.nome} $\{rec.sobrenome || ''}*\\n\` +
+               \`📞 WhatsApp: *$\{rec.whatsapp || 'Não informado'}*\\n\` +
+               \`⚽ Posição: *$\{rec.posicao || 'Não informada'}*\\n\` +
+               \`⭐ Mensalista/Diarista: *$\{rec.membro_status || 'diarista'}*\\n\\n\` +
+               \`👉 Acesse o painel do administrador para aprovar:\\nhttps://peladabatista.onrender.com\`;
                
     setTimeout(async () => {
       try {
@@ -713,7 +812,7 @@ async function processarEventoWebhook(tipo, tabela, rec, recAntigo) {
           evento: 'PENDENTE_APROVACAO_ADMIN', tabela: 'jogadores',
           mensagem: msgCadastroAdmin.substring(0, 500), enviado_em: new Date().toISOString(),
         });
-        console.log(`✅ [NOTIFICAÇÃO ADMIN] Novo cadastro de ${rec.nome} enviado para o administrador.`);
+        console.log(\`✅ [NOTIFICAÇÃO ADMIN] Novo cadastro de $\{rec.nome} enviado para o administrador.\`);
       } catch (err) {
         console.error('❌ Erro ao notificar admin sobre novo jogador:', err.message);
       }
@@ -728,17 +827,17 @@ async function processarEventoWebhook(tipo, tabela, rec, recAntigo) {
         try {
           const { data: jog } = await supabase
             .from('jogadores').select('nome,sobrenome').eq('id', rec.jogador_id).maybeSingle();
-          const nomeAtleta = jog ? `${jog.nome} ${jog.sobrenome}` : 'Atleta';
+          const nomeAtleta = jog ? \`$\{jog.nome} $\{jog.sobrenome}\` : 'Atleta';
           const descReferencia = rec.partida_id 
-            ? `Partida avulsa`
-            : `Mensalidade ref. ${rec.mes_ref.split('-').reverse().join('/')}`;
+            ? \`Partida avulsa\`
+            : \`Mensalidade ref. $\{rec.mes_ref.split('-').reverse().join('/')}\`;
 
-          const msgPagamentoAdmin = `💰 *NOVO PAGAMENTO DECLARADO* 💰\n\n` +
-                     `Um pagamento manual foi informado e aguarda sua validação no portal:\n\n` +
-                     `👤 Atleta: *${nomeAtleta}*\n` +
-                     `💵 Valor: *R$ ${Number(rec.valor).toFixed(2).replace('.', ',')}*\n` +
-                     `📝 Referência: *${descReferencia}*\n\n` +
-                     `👉 Acesse o portal para conferir o comprovante e aprovar:\nhttps://peladabatista.onrender.com`;
+          const msgPagamentoAdmin = \`💰 *NOVO PAGAMENTO DECLARADO* 💰\\n\\n\` +
+                     \`Um pagamento manual foi informado e aguarda sua validação no portal:\\n\\n\` +
+                     \`👤 Atleta: *$\{nomeAtleta}*\\n\` +
+                     \`💵 Valor: *R$ $\{Number(rec.valor).toFixed(2).replace('.', ',')}*\\n\` +
+                     \`📝 Referência: *$\{descReferencia}*\\n\\n\` +
+                     \`👉 Acesse o portal para conferir o comprovante e aprovar:\\nhttps://peladabatista.onrender.com\`;
                      
           const jidAdmin = await resolverJID('admin');
           await sendComTimeout(jidAdmin, { text: msgPagamentoAdmin });
@@ -746,7 +845,7 @@ async function processarEventoWebhook(tipo, tabela, rec, recAntigo) {
             evento: 'PAGAMENTO_DECLARADO_ADMIN', tabela: 'pagamentos',
             mensagem: msgPagamentoAdmin.substring(0, 500), enviado_em: new Date().toISOString(),
           });
-          console.log(`✅ [NOTIFICAÇÃO ADMIN] Pagamento de ${nomeAtleta} enviado para o administrador.`);
+          console.log(\`✅ [NOTIFICAÇÃO ADMIN] Pagamento de $\{nomeAtleta} enviado para o administrador.\`);
         } catch (err) {
           console.error('❌ Erro ao notificar admin sobre pagamento:', err.message);
         }
@@ -765,34 +864,34 @@ async function processarEventoWebhook(tipo, tabela, rec, recAntigo) {
 
 // ─── Message Templates ────────────────────────────────────────────────────────
 function formatarDataJogo(dataStr, horario) {
-  const d = new Date(`${dataStr}T12:00:00`);
+  const d = new Date(\`$\{dataStr}T12:00:00\`);
   const sem = d.toLocaleDateString('pt-BR', { weekday: 'long' });
   const semFmt = sem.charAt(0).toUpperCase() + sem.slice(1);
   const data = d.toLocaleDateString('pt-BR', { day: '2-digit', month: '2-digit', year: 'numeric' });
   const hor = (horario || '').split(' ')[0];
-  return `${semFmt}, ${data} às ${hor}`;
+  return \`$\{semFmt}, $\{data} às $\{hor}\`;
 }
 
 function buildListaMensalistas(mesRef, jogadores, pagamentos) {
   if (!jogadores.length) return '_Nenhum mensalista cadastrado_';
   const pagouIds = new Set((pagamentos || []).map(p => p.jogador_id));
   return jogadores.map((j, i) =>
-    `${i + 1}. *${j.nome} ${j.sobrenome}*${j.is_gold ? ' 🏅' : ''}${pagouIds.has(j.id) ? ' 💰' : ''}`
-  ).join('\n');
+    \`$\{i + 1}. *$\{j.nome} $\{j.sobrenome}*$\{j.is_gold ? ' 🏅' : ''}$\{pagouIds.has(j.id) ? ' 💰' : ''}\`
+  ).join('\\n');
 }
 
 function msgAberturaMensalidade(mesRef, jogadores, pagamentos) {
   const mesFormatado = mesRef.split('-').reverse().join('/');
   return (
-    `⚽ *PELADA BATISTA SÁBADO* ⚽\n` +
-    `🔄 *ABERTURA DE RENOVAÇÃO DE MENSALIDADE* 🔄\n` +
-    `📅 *Referência: ${mesFormatado}*\n\n` +
-    `Galera, está aberta a janela de renovação de mensalidade!\n` +
-    `Situação atual dos mensalistas:\n\n` +
-    `${buildListaMensalistas(mesRef, jogadores, pagamentos)}\n\n` +
-    `----------------------------------------\n` +
-    `💰 Pague sua mensalidade pelo portal e garanta sua vaga!\n` +
-    `📲 ${CONFIG.PORTAL_URL}`
+    \`⚽ *PELADA BATISTA SÁBADO* ⚽\\n\` +
+    \`🔄 *ABERTURA DE RENOVAÇÃO DE MENSALIDADE* 🔄\\n\` +
+    \`📅 *Referência: $\{mesFormatado}*\\n\\n\` +
+    \`Galera, está aberta a janela de renovação de mensalidade!\\n\` +
+    \`Situação atual dos mensalistas:\\n\\n\` +
+    \`$\{buildListaMensalistas(mesRef, jogadores, pagamentos)}\\n\\n\` +
+    \`----------------------------------------\\n\` +
+    \`💰 Pague sua mensalidade pelo portal e garanta sua vaga!\\n\` +
+    \`📲 $\{CONFIG.PORTAL_URL}\`
   );
 }
 
@@ -801,74 +900,74 @@ function msgListaMensalidadeAtualizada(mesRef, jogadores, pagamentos) {
   const totalPago = (pagamentos || []).length;
   const total = jogadores.length;
   return (
-    `⚽ *PELADA BATISTA SÁBADO* ⚽\n` +
-    `💰 *MENSALIDADE ATUALIZADA — ${mesFormatado}* 💰\n\n` +
-    `Situação atual dos mensalistas:\n\n` +
-    `${buildListaMensalistas(mesRef, jogadores, pagamentos)}\n\n` +
-    `📊 *${totalPago} de ${total} mensalistas quitados*\n` +
-    `----------------------------------------\n` +
-    `📲 Acesse o portal para quitar sua mensalidade:\n${CONFIG.PORTAL_URL}`
+    \`⚽ *PELADA BATISTA SÁBADO* ⚽\\n\` +
+    \`💰 *MENSALIDADE ATUALIZADA — $\{mesFormatado}* 💰\\n\\n\` +
+    \`Situação atual dos mensalistas:\\n\\n\` +
+    \`$\{buildListaMensalistas(mesRef, jogadores, pagamentos)}\\n\\n\` +
+    \`📊 *$\{totalPago} de $\{total} mensalistas quitados*\\n\` +
+    \`----------------------------------------\\n\` +
+    \`📲 Acesse o portal para quitar sua mensalidade:\\n$\{CONFIG.PORTAL_URL}\`
   );
 }
 
 function msgNovaPartida(p) {
   return (
-    `⚽ *PELADA BATISTA SÁBADO* ⚽\n` +
-    `🏆 *NOVO JOGO AGENDADO!* 🏆\n\n` +
-    `📋 *${p.titulo}*\n` +
-    `🗓️ Data: *${formatarDataJogo(p.data, p.horario)}*\n` +
-    `📍 Local: *${p.local}*\n\n` +
-    `⏰ *Janela de confirmação:*\n` +
-    `🗓️ Terça-feira às 00:00 até Sexta-feira às 23:59\n\n` +
-    `📲 Confirme sua presença:\n${CONFIG.PORTAL_URL}`
+    \`⚽ *PELADA BATISTA SÁBADO* ⚽\\n\` +
+    \`🏆 *NOVO JOGO AGENDADO!* 🏆\\n\\n\` +
+    \`📋 *$\{p.titulo}*\\n\` +
+    \`🗓️ Data: *$\{formatarDataJogo(p.data, p.horario)}*\\n\` +
+    \`📍 Local: *$\{p.local}*\\n\\n\` +
+    \`⏰ *Janela de confirmação:*\\n\` +
+    \`🗓️ Terça-feira às 00:00 até Sexta-feira às 23:59\\n\\n\` +
+    \`📲 Confirme sua presença:\\n$\{CONFIG.PORTAL_URL}\`
   );
 }
 
 function msgPartidaCancelada(p) {
-  const d = new Date(`${p.data}T12:00:00`);
+  const d = new Date(\`$\{p.data}T12:00:00\`);
   const dataFmt = d.toLocaleDateString('pt-BR', { weekday: 'long', day: '2-digit', month: '2-digit', year: 'numeric' });
   const dataFmtCap = dataFmt.charAt(0).toUpperCase() + dataFmt.slice(1);
   const hor = (p.horario || '').split(' ')[0];
   return (
-    `⚽ *PELADA BATISTA SÁBADO* ⚽\n` +
-    `❌ *JOGO CANCELADO!* ❌\n\n` +
-    `📋 *${p.titulo}*\n` +
-    `🗓️ Data: *${dataFmtCap} às ${hor}*\n` +
-    `📍 Local: *${p.local}*\n\n` +
-    `📲 Acesse nosso portal:\n${CONFIG.PORTAL_URL}`
+    \`⚽ *PELADA BATISTA SÁBADO* ⚽\\n\` +
+    \`❌ *JOGO CANCELADO!* ❌\\n\\n\` +
+    \`📋 *$\{p.titulo}*\\n\` +
+    \`🗓️ Data: *$\{dataFmtCap} às $\{hor}*\\n\` +
+    \`📍 Local: *$\{p.local}*\\n\\n\` +
+    \`📲 Acesse nosso portal:\\n$\{CONFIG.PORTAL_URL}\`
   );
 }
 
 // ─── Partida Reativada ────────────────────────────────────────────────────────
 function msgPartidaReativada(p) {
   return (
-    `⚽ *PELADA BATISTA SÁBADO* ⚽\n` +
-    `🟢 *JOGO REATIVADO!* 🟢\n\n` +
-    `A partida *${p.titulo}* foi reativada e acontecerá normalmente!\n` +
-    `🗓️ Data: *${formatarDataJogo(p.data, p.horario)}*\n` +
-    `📍 Local: *${p.local}*\n\n` +
-    `📲 Confirme sua presença:\n${CONFIG.PORTAL_URL}`
+    \`⚽ *PELADA BATISTA SÁBADO* ⚽\\n\` +
+    \`🟢 *JOGO REATIVADO!* 🟢\\n\\n\` +
+    \`A partida *$\{p.titulo}* foi reativada e acontecerá normalmente!\\n\` +
+    \`🗓️ Data: *$\{formatarDataJogo(p.data, p.horario)}*\\n\` +
+    \`📍 Local: *$\{p.local}*\\n\\n\` +
+    \`📲 Confirme sua presença:\\n$\{CONFIG.PORTAL_URL}\`
   );
 }
 
 function msgConfirmacaoPresenca(nome, p) {
   return (
-    `⚽ *CONFIRMAÇÃO DE PELADA - FC* ⚽\n\n` +
-    `Fala galera! O atleta *${nome}* confirmou presença para a partida:\n\n` +
-    `🏆 *${p.titulo}*\n` +
-    `📅 Data: *${formatarDataJogo(p.data, p.horario)}*\n` +
-    `📍 Local: *${p.local}*\n\n` +
-    `_Bora pro jogo tirar aquela onda!_ 💪🏃‍♂️💨`
+    \`⚽ *CONFIRMAÇÃO DE PELADA - FC* ⚽\\n\\n\` +
+    \`Fala galera! O atleta *$\{nome}* confirmou presença para a partida:\\n\\n\` +
+    \`🏆 *$\{p.titulo}*\\n\` +
+    \`📅 Data: *$\{formatarDataJogo(p.data, p.horario)}*\\n\` +
+    \`📍 Local: *$\{p.local}*\\n\\n\` +
+    \`_Bora pro jogo tirar aquela onda!_ 💪🏃‍♂️💨\`
   );
 }
 
 function msgRecusaPresenca(nome, p) {
   return (
-    `⚽ *PELADA BATISTA SÁBADO* ⚽\n\n` +
-    `Informamos que o atleta *${nome}* registrou *ausência* na partida:\n\n` +
-    `🏆 *${p.titulo}*\n` +
-    `📅 Data: *${formatarDataJogo(p.data, p.horario)}*\n\n` +
-    `_Lista de presença atualizada no portal._ 📲\n${CONFIG.PORTAL_URL}`
+    \`⚽ *PELADA BATISTA SÁBADO* ⚽\\n\\n\` +
+    \`Informamos que o atleta *$\{nome}* registrou *ausência* na partida:\\n\\n\` +
+    \`🏆 *$\{p.titulo}*\\n\` +
+    \`📅 Data: *$\{formatarDataJogo(p.data, p.horario)}*\\n\\n\` +
+    \`_Lista de presença atualizada no portal._ 📲\\n$\{CONFIG.PORTAL_URL}\`
   );
 }
 
@@ -876,26 +975,26 @@ function msgQuitacaoMensalidade(jog, mesRef, valor, totalQuitados) {
   const medalha = jog.is_gold ? ' 🏅' : '';
   const mesFormatado = mesRef.split('-').reverse().join('/');
   return (
-    `💰 *QUITAÇÃO DE MENSALIDADE - PELADA BATISTA SÁBADO* 💰\n\n` +
-    `Atleta: *${jog.nome} ${jog.sobrenome}* (${jog.posicao})${medalha}\n` +
-    `Referência: *${mesFormatado}*\n` +
-    `Valor Quitado: *R$ ${Number(valor).toFixed(2)}*\n` +
-    `Status: *PAGO & CONFIRMADO* ✅\n\n` +
-    `📊 *Informativo Financeiro:*\n` +
-    `- Total de mensalistas quitados: *${totalQuitados}* (Limite: 25 mensalistas)\n\n` +
-    `Muito obrigado pelo compromisso em manter o futebol rodando! 🤝⚽`
+    \`💰 *QUITAÇÃO DE MENSALIDADE - PELADA BATISTA SÁBADO* 💰\\n\\n\` +
+    \`Atleta: *$\{jog.nome} $\{jog.sobrenome}* ($\{jog.posicao})$\{medalha}\\n\` +
+    \`Referência: *$\{mesFormatado}*\\n\` +
+    \`Valor Quitado: *R$ $\{Number(valor).toFixed(2)}*\\n\` +
+    \`Status: *PAGO & CONFIRMADO* ✅\\n\\n\` +
+    \`📊 *Informativo Financeiro:*\\n\` +
+    \`- Total de mensalistas quitados: *$\{totalQuitados}* (Limite: 25 mensalistas)\\n\\n\` +
+    \`Muito obrigado pelo compromisso em manter o futebol rodando! 🤝⚽\`
   );
 }
 
 function msgNovoJogadorAprovado(j) {
   return (
-    `⚽ *PELADA BATISTA SÁBADO* ⚽\n` +
-    `🎉 *NOVO ATLETA APROVADO!* 🎉\n\n` +
-    `Bem-vindo ao elenco, *${j.nome} ${j.sobrenome}*!\n` +
-    `📋 Posição: *${j.posicao}*\n` +
-    `👤 Categoria: *${j.membro_status}*\n\n` +
-    `_Boas-vindas e bora pro jogo!_ ⚽🏃‍♂️💨\n\n` +
-    `📲 ${CONFIG.PORTAL_URL}`
+    \`⚽ *PELADA BATISTA SÁBADO* ⚽\\n\` +
+    \`🎉 *NOVO ATLETA APROVADO!* 🎉\\n\\n\` +
+    \`Bem-vindo ao elenco, *$\{j.nome} $\{j.sobrenome}*!\\n\` +
+    \`📋 Posição: *$\{j.posicao}*\\n\` +
+    \`👤 Categoria: *$\{j.membro_status}*\\n\\n\` +
+    \`_Boas-vindas e bora pro jogo!_ ⚽🏃‍♂️💨\\n\\n\` +
+    \`📲 $\{CONFIG.PORTAL_URL}\`
   );
 }
 
@@ -935,34 +1034,34 @@ async function gerarListaCompletaPartida(partidaId) {
     const diar = finalConf.filter(j => j.posicao !== 'Goleiro' && j.membro_status !== 'mensalista');
     const gols = finalConf.filter(j => j.posicao === 'Goleiro');
 
-    const fmt  = (j, i) => `${i + 1}. *${j.nome} ${j.sobrenome}* - ${j.posicao}${j.is_gold ? ' 🏅' : ''}`;
-    const fmtG = (j, i) => `${i + 1}. *${j.nome} ${j.sobrenome}*${j.is_gold ? ' 🏅' : ''}`;
+    const fmt  = (j, i) => \`$\{i + 1}. *$\{j.nome} $\{j.sobrenome}* - $\{j.posicao}$\{j.is_gold ? ' 🏅' : ''}\`;
+    const fmtG = (j, i) => \`$\{i + 1}. *$\{j.nome} $\{j.sobrenome}*$\{j.is_gold ? ' 🏅' : ''}\`;
 
-    const strM = mens.length ? mens.map(fmt).join('\n') : '_Nenhum mensalista confirmado ainda_';
-    const strD = diar.length ? diar.map(fmt).join('\n') : '_Nenhum diarista confirmado ainda_';
-    const strG = gols.length ? gols.map(fmtG).join('\n') : '_Nenhum goleiro confirmado ainda_';
-    const strA = recusados.length ? recusados.map(fmt).join('\n') : '_Nenhuma ausência registrada_';
-    const strE = waitList.length ? waitList.map(fmt).join('\n') : '_Nenhum jogador em lista de espera_';
+    const strM = mens.length ? mens.map(fmt).join('\\n') : '_Nenhum mensalista confirmado ainda_';
+    const strD = diar.length ? diar.map(fmt).join('\\n') : '_Nenhum diarista confirmado ainda_';
+    const strG = gols.length ? gols.map(fmtG).join('\\n') : '_Nenhum goleiro confirmado ainda_';
+    const strA = recusados.length ? recusados.map(fmt).join('\\n') : '_Nenhuma ausência registrada_';
+    const strE = waitList.length ? waitList.map(fmt).join('\\n') : '_Nenhum jogador em lista de espera_';
 
-    const d = new Date(`${partida.data}T12:00:00`);
+    const d = new Date(\`$\{partida.data}T12:00:00\`);
     const diaSem = d.toLocaleDateString('pt-BR', { weekday: 'long' });
     const diaSemFmt = diaSem.charAt(0).toUpperCase() + diaSem.slice(1);
     const diaNum = d.toLocaleDateString('pt-BR', { day: 'numeric', month: 'long' });
     const hor = (partida.horario || '').split(' ')[0];
 
     return (
-      `⚽ *PELADA BATISTA SÁBADO* ⚽\n` +
-      `🏆 *CONVOCAÇÃO & PRESENÇA ATUALIZADA* 🏆\n\n` +
-      `📅 Jogo: *${partida.titulo}*\n` +
-      `🗓️ Data: *${diaSemFmt}, ${diaNum}* às *${hor}*\n` +
-      `📍 Local: *${partida.local}*\n\n` +
-      `*A - MENSALISTAS:*\n${strM}\n\n` +
-      `*B - DIARISTAS:*\n${strD}\n\n` +
-      `*C - GOLEIROS:*\n${strG}\n\n` +
-      `*D - JOGADORES AUSENTES:*\n${strA}\n\n` +
-      `*E - LISTA DE ESPERA:*\n${strE}\n\n` +
-      `----------------------------------------\n` +
-      `📲 Acesse o portal oficial para confirmar ou alterar sua presença:\nhttps://peladabatista.onrender.com`
+      \`⚽ *PELADA BATISTA SÁBADO* ⚽\\n\` +
+      \`🏆 *CONVOCAÇÃO & PRESENÇA ATUALIZADA* 🏆\\n\\n\` +
+      \`📅 Jogo: *$\{partida.titulo}*\\n\` +
+      \`🗓️ Data: *$\{diaSemFmt}, $\{diaNum}* às *$\{hor}*\\n\` +
+      \`📍 Local: *$\{partida.local}*\\n\\n\` +
+      \`*A - MENSALISTAS:*\\n$\{strM}\\n\\n\` +
+      \`*B - DIARISTAS:*\\n$\{strD}\\n\\n\` +
+      \`*C - GOLEIROS:*\\n$\{strG}\\n\\n\` +
+      \`*D - JOGADORES AUSENTES:*\\n$\{strA}\\n\\n\` +
+      \`*E - LISTA DE ESPERA:*\\n$\{strE}\\n\\n\` +
+      \`----------------------------------------\\n\` +
+      \`📲 Acesse o portal oficial para confirmar ou alterar sua presença:\\nhttps://peladabatista.onrender.com\`
     );
   } catch (err) {
     console.error('❌ gerarListaCompleta:', err.message);
@@ -976,7 +1075,7 @@ async function resolverJID(grupoId) {
   if (grupoId === 'admin') {
     if (sock && sock.user && sock.user.id) {
       const cleanJid = sock.user.id.split(':')[0] + '@s.whatsapp.net';
-      console.log(`🎯 Envio para Administrador (Self): ${cleanJid}`);
+      console.log(\`🎯 Envio para Administrador (Self): $\{cleanJid}\`);
       return cleanJid;
     }
     throw new Error('Não foi possível obter o JID do administrador conectado.');
@@ -988,16 +1087,16 @@ async function resolverJID(grupoId) {
   } else if (grupoId.includes('chat.whatsapp.com/')) {
     const codigo = grupoId.split('chat.whatsapp.com/').pop().split('?')[0].trim();
     try { const meta = await sock.groupGetInviteInfo(codigo); jid = meta.id; }
-    catch (err) { throw new Error(`Link inválido: ${err.message}`); }
+    catch (err) { throw new Error(\`Link inválido: $\{err.message}\`); }
   } else if (grupoId.includes('@g.us')) {
     jid = grupoId;
   } else {
     // Preserva o hífen do ID do grupo (ex: 5521996134821-1396914476)
-    const idLimpo = grupoId.replace(/[^0-9\-]/g, '').replace(/-+/g, '-').replace(/^-|-$/g, '');
-    jid = `${idLimpo}@g.us`;
+    const idLimpo = grupoId.replace(/[^0-9\\-]/g, '').replace(/-+/g, '-').replace(/^-|-$/g, '');
+    jid = \`$\{idLimpo}@g.us\`;
   }
   jidCache.set(grupoId, jid);
-  console.log(`✅ JID: ${grupoId} → ${jid}`);
+  console.log(\`✅ JID: $\{grupoId} → $\{jid}\`);
   return jid;
 }
 
@@ -1029,7 +1128,7 @@ async function enviarParaGrupo(texto) {
   const jid = await resolverJID(CONFIG.DEFAULT_GROUP_ID);
   try {
     await sendComTimeout(jid, { text: texto });
-    console.log(`📤 → ${jid}`);
+    console.log(\`📤 → $\{jid}\`);
   } catch (err) {
     if (ehErroCriptografia(err) && !limpandoSessao) {
       limpandoSessao = true;
@@ -1049,11 +1148,11 @@ function iniciarSelfPing() {
   pingInterval = setInterval(async () => {
     try {
       const fetch = (await import('node-fetch')).default;
-      await fetch(`${CONFIG.SELF_URL}/`);
+      await fetch(\`$\{CONFIG.SELF_URL}/\`);
       console.log('🏓 Self-ping OK');
     } catch { console.warn('⚠️  Self-ping falhou'); }
   }, CONFIG.PING_INTERVAL_MS);
-  console.log(`🏓 Self-ping ativo (a cada ${CONFIG.PING_INTERVAL_MS / 1000}s)`);
+  console.log(\`🏓 Self-ping ativo (a cada $\{CONFIG.PING_INTERVAL_MS / 1000}s)\`);
 }
 
 // ─── Baileys Connection ───────────────────────────────────────────────────────
@@ -1108,7 +1207,7 @@ async function conectarWhatsApp() {
   setTimeout(() => { console.error = origConsoleError; }, 5000);
 
   sock.ev.on('connection.update', async ({ connection, lastDisconnect, qr }) => {
-    if (qr) { currentQR = qr; console.log(`\n🔗 QR: ${CONFIG.SELF_URL}/qr\n`); }
+    if (qr) { currentQR = qr; console.log(\`\\n🔗 QR: $\{CONFIG.SELF_URL}/qr\\n\`); }
 
     if (connection === 'open') {
       isConnected = true; currentQR = null; reconnectAttempts = 0;
@@ -1133,7 +1232,7 @@ async function conectarWhatsApp() {
       isConnected = false;
       const code = lastDisconnect?.error?.output?.statusCode;
       const errMsg = lastDisconnect?.error?.message || '';
-      console.warn(`⚠️  Conexão encerrada — código: ${code}`);
+      console.warn(\`⚠️  Conexão encerrada — código: $\{code}\`);
 
       if (errMsg.includes('Bad MAC') || errMsg.includes('MessageCounterError') || errMsg.includes('Key used already')) {
         console.warn('🔑 Bad MAC detectado — limpando sessão completa (local + Supabase)...');
@@ -1151,7 +1250,7 @@ async function conectarWhatsApp() {
         CONFIG.RECONNECT_BASE_MS * Math.pow(2, reconnectAttempts - 1),
         CONFIG.RECONNECT_MAX_MS
       );
-      console.log(`🔄 Reconectando em ${delay / 1000}s (#${reconnectAttempts})...`);
+      console.log(\`🔄 Reconectando em $\{delay / 1000}s (#$\{reconnectAttempts})...\`);
       setTimeout(conectarWhatsApp, delay);
     }
   });
@@ -1160,13 +1259,13 @@ async function conectarWhatsApp() {
 // ─── Boot ────────────────────────────────────────────────────────────────────
 async function iniciar() {
   console.log('🚀 Robô Pelada Batista v2.2 — iniciando...');
-  console.log(`📡 URL: ${CONFIG.SELF_URL}`);
-  console.log(`🔐 Secret: ${CONFIG.WEBHOOK_SECRET ? '✅' : '❌ NÃO configurado!'}`);
+  console.log(\`📡 URL: $\{CONFIG.SELF_URL}\`);
+  console.log(\`🔐 Secret: $\{CONFIG.WEBHOOK_SECRET ? '✅' : '❌ NÃO configurado!'}\`);
   console.log('📋 Regras: REGRA1(cron+webhook) | REGRA2(webhook) | REGRA3(webhook)');
 
   app.listen(CONFIG.PORT, () => {
-    console.log(`🌐 Servidor na porta ${CONFIG.PORT}`);
-    console.log(`📱 QR Code em: ${CONFIG.SELF_URL}/qr`);
+    console.log(\`🌐 Servidor na porta $\{CONFIG.PORT}\`);
+    console.log(\`📱 QR Code em: $\{CONFIG.SELF_URL}/qr\`);
   });
 
   await baixarSessao();

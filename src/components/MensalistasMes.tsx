@@ -166,7 +166,10 @@ export default function MensalistasMes({
   }, [jogadores]);
 
   const mensalistasComStatusDoMes = useMemo(() => {
-    return mensalistasAtivos.map(jogador => {
+    // Excluir goleiros da lista de pagamentos pois são isentos
+    return mensalistasAtivos
+      .filter(jogador => !jogador.posicao.includes('Goleiro'))
+      .map(jogador => {
       const pag = pagamentos.find(
         (p) => p.jogadorId === jogador.id && p.mesRef === mesSelecionado && !p.partidaId
       );
