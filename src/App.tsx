@@ -3,7 +3,7 @@
  * SPDX-License-Identifier: Apache-2.0
  */
 
-import React, { useState, useEffect, useMemo } from 'react';
+import React, { useState, useEffect, useMemo, useRef } from 'react';
 import { Jogador, Partida, Pagamento, PosicaoJogador, MembroStatus, LancamentoAvulso, BotLog } from './types';
 import {
   getSavedJogadores,
@@ -120,6 +120,21 @@ export default function App() {
   const [whatsappLogs, setWhatsappLogs] = useState<any[]>(() => {
     return getSavedWhatsappLogs();
   });
+
+  // Mapa de notificações enviadas recentemente para evitar duplicidade por cliques rápidos ou re-renderizações (deduplicação robusta)
+  const notificacoesEnviadasRef = useRef<Map<string, number>>(new Map());
+
+  // Helper para verificar e registrar um disparo, garantindo que o mesmo evento não seja disparado novamente em menos de 10 segundos
+  const verificarDisparoUnico = (chave: string, cooldownMs = 10000): boolean => {
+    const agora = Date.now();
+    const ultimoDisparo = notificacoesEnviadasRef.current.get(chave);
+    if (ultimoDisparo && (agora - ultimoDisparo) < cooldownMs) {
+      console.warn(`[DEDUPLICADOR] Bloqueado disparo duplicado para chave: ${chave}`);
+      return false;
+    }
+    notificacoesEnviadasRef.current.set(chave, agora);
+    return true;
+  };
 
   const handleUpdateWhatsappConfig = (link: string, ativa: boolean, webhookUrl: string = '', token: string = '') => {
     setWhatsappGrupoLink(link);
@@ -314,6 +329,12 @@ export default function App() {
   };
 
   const handleRegistrarLogAutomacao = async (atletaNome: string, partidaTitulo: string, msg: string, grupoIdOverride?: string) => {
+    // Evitar disparos duplicados idênticos de WhatsApp (mesmo conteúdo/evento) dentro de 10 segundos
+    const chaveMsg = `whatsapp-msg-${(partidaTitulo || 'geral')}-${msg.trim().substring(0, 300)}`;
+    if (!verificarDisparoUnico(chaveMsg, 10000)) {
+      return;
+    }
+
     // Insere o evento de teste inicial com ID local temporário
     const logId = `log-${Date.now()}-${Math.random().toString(36).substr(2, 4)}`;
     const novoLog: BotLog = {
@@ -1338,20 +1359,23 @@ export default function App() {
             ? `Partida avulsa`
             : `Mensalidade ref. ${mesRef.split('-').reverse().join('/')}`;
 
-          try {
-            fetch('/api/send-receipt-email', {
-              method: 'POST',
-              headers: { 'Content-Type': 'application/json' },
-              body: JSON.stringify({
-                email: atleta.email,
-                nome: `${atleta.nome} ${atleta.sobrenome || ''}`.trim(),
-                valor: valor,
-                referencia: descReferencia,
-                dataPagamento: dataPagamento
-              })
-            });
-          } catch (err) {
-            console.error("Erro ao enviar e-mail de recibo:", err);
+          const chaveEmail = `email-recibo-${jogadorId}-${mesRef}-${partidaId || 'mensalidade'}`;
+          if (verificarDisparoUnico(chaveEmail, 10000)) {
+            try {
+              fetch('/api/send-receipt-email', {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify({
+                  email: atleta.email,
+                  nome: `${atleta.nome} ${atleta.sobrenome || ''}`.trim(),
+                  valor: valor,
+                  referencia: descReferencia,
+                  dataPagamento: dataPagamento
+                })
+              });
+            } catch (err) {
+              console.error("Erro ao enviar e-mail de recibo:", err);
+            }
           }
         }
       }
@@ -1376,51 +1400,54 @@ export default function App() {
           ? `Partida avulsa`
           : `Mensalidade ref. ${mesRef.split('-').reverse().join('/')}`;
 
-        const msgPagamentoAdmin = `💰 *NOVO PAGAMENTO DECLARADO* 💰\n\n` +
-          `Um pagamento manual foi informado e aguarda sua validação no portal:\n\n` +
-          `👤 Atleta: *${atletaNome}*\n` +
-          `💵 Valor: *R$ ${Number(valor).toFixed(2).replace('.', ',')}*\n` +
-          `📝 Referência: *${descReferencia}*\n\n` +
-          `👉 Acesse o portal para conferir o comprovante e aprovar:\n${window.location.origin}`;
+        const chaveNovoPag = `pag-pendente-${jogadorId}-${mesRef}-${partidaId || 'mensalidade'}`;
+        if (verificarDisparoUnico(chaveNovoPag, 10000)) {
+          const msgPagamentoAdmin = `💰 *NOVO PAGAMENTO DECLARADO* 💰\n\n` +
+            `Um pagamento manual foi informado e aguarda sua validação no portal:\n\n` +
+            `👤 Atleta: *${atletaNome}*\n` +
+            `💵 Valor: *R$ ${Number(valor).toFixed(2).replace('.', ',')}*\n` +
+            `📝 Referência: *${descReferencia}*\n\n` +
+            `👉 Acesse o portal para conferir o comprovante e aprovar:\n${window.location.origin}`;
 
-        setTimeout(async () => {
-          try {
-            await fetch('/api/bot-proxy', {
-              method: 'POST',
-              headers: {
-                'Content-Type': 'application/json'
-              },
-              body: JSON.stringify({
-                url: whatsappWebhookUrl,
-                secret: whatsappWebhookToken,
-                payload: {
-                  mensagem: msgPagamentoAdmin,
-                  grupo_id: 'admin'
-                }
-              })
-            });
+          setTimeout(async () => {
+            try {
+              await fetch('/api/bot-proxy', {
+                method: 'POST',
+                headers: {
+                  'Content-Type': 'application/json'
+                },
+                body: JSON.stringify({
+                  url: whatsappWebhookUrl,
+                  secret: whatsappWebhookToken,
+                  payload: {
+                    mensagem: msgPagamentoAdmin,
+                    grupo_id: 'admin'
+                  }
+                })
+              });
 
-            const logSucesso: BotLog = {
-              id: `log-${Date.now()}-${Math.random().toString(36).substr(2, 4)}`,
-              tabela: atletaNome,
-              evento: 'PAGAMENTO_DECLARADO_ADMIN',
-              mensagem: `Notificação de pagamento pendente enviada ao Administrador: "${atletaNome} - R$ ${Number(valor).toFixed(2).replace('.', ',')}"`,
-              enviado_em: new Date().toISOString()
-            };
+              const logSucesso: BotLog = {
+                id: `log-${Date.now()}-${Math.random().toString(36).substr(2, 4)}`,
+                tabela: atletaNome,
+                evento: 'PAGAMENTO_DECLARADO_ADMIN',
+                mensagem: `Notificação de pagamento pendente enviada ao Administrador: "${atletaNome} - R$ ${Number(valor).toFixed(2).replace('.', ',')}"`,
+                enviado_em: new Date().toISOString()
+              };
 
-            setWhatsappLogs(currentLogs => {
-              const updated = [logSucesso, ...currentLogs].slice(0, 50);
-              saveWhatsappLogs(updated);
-              return updated;
-            });
+              setWhatsappLogs(currentLogs => {
+                const updated = [logSucesso, ...currentLogs].slice(0, 50);
+                saveWhatsappLogs(updated);
+                return updated;
+              });
 
-            if (getSupabase()) {
-              salvarBotLogNoSupabase(logSucesso);
+              if (getSupabase()) {
+                salvarBotLogNoSupabase(logSucesso);
+              }
+            } catch (e: any) {
+              console.warn('Erro ao notificar administrador sobre pagamento manual:', e);
             }
-          } catch (e: any) {
-            console.warn('Erro ao notificar administrador sobre pagamento manual:', e);
-          }
-        }, 200);
+          }, 200);
+        }
       }
     }
   };
@@ -1509,20 +1536,23 @@ export default function App() {
             ? `Partida avulsa`
             : `Mensalidade ref. ${pag.mesRef.split('-').reverse().join('/')}`;
 
-          try {
-            fetch('/api/send-receipt-email', {
-              method: 'POST',
-              headers: { 'Content-Type': 'application/json' },
-              body: JSON.stringify({
-                email: atleta.email,
-                nome: `${atleta.nome} ${atleta.sobrenome || ''}`.trim(),
-                valor: pag.valor,
-                referencia: descReferencia,
-                dataPagamento: pag.dataPagamento
-              })
-            });
-          } catch (err) {
-            console.error("Erro ao enviar e-mail de recibo em lote:", err);
+          const chaveEmail = `email-recibo-${jogadorId}-${pag.mesRef}-${pag.partidaId || 'mensalidade'}`;
+          if (verificarDisparoUnico(chaveEmail, 10000)) {
+            try {
+              fetch('/api/send-receipt-email', {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify({
+                  email: atleta.email,
+                  nome: `${atleta.nome} ${atleta.sobrenome || ''}`.trim(),
+                  valor: pag.valor,
+                  referencia: descReferencia,
+                  dataPagamento: pag.dataPagamento
+                })
+              });
+            } catch (err) {
+              console.error("Erro ao enviar e-mail de recibo em lote:", err);
+            }
           }
         }
       }
@@ -1535,51 +1565,54 @@ export default function App() {
           ? `Partida avulsa`
           : `Mensalidade ref. ${pag.mesRef.split('-').reverse().join('/')}`;
 
-        const msgPagamentoAdmin = `💰 *NOVO PAGAMENTO DECLARADO* 💰\n\n` +
-          `Um pagamento manual foi informado e aguarda sua validação no portal:\n\n` +
-          `👤 Atleta: *${atletaNome}*\n` +
-          `💵 Valor: *R$ ${Number(pag.valor).toFixed(2).replace('.', ',')}*\n` +
-          `📝 Referência: *${descReferencia}*\n\n` +
-          `👉 Acesse o portal para conferir o comprovante e aprovar:\n${window.location.origin}`;
+        const chaveNovoPag = `pag-pendente-${jogadorId}-${pag.mesRef}-${pag.partidaId || 'mensalidade'}`;
+        if (verificarDisparoUnico(chaveNovoPag, 10000)) {
+          const msgPagamentoAdmin = `💰 *NOVO PAGAMENTO DECLARADO* 💰\n\n` +
+            `Um pagamento manual foi informado e aguarda sua validação no portal:\n\n` +
+            `👤 Atleta: *${atletaNome}*\n` +
+            `💵 Valor: *R$ ${Number(pag.valor).toFixed(2).replace('.', ',')}*\n` +
+            `📝 Referência: *${descReferencia}*\n\n` +
+            `👉 Acesse o portal para conferir o comprovante e aprovar:\n${window.location.origin}`;
 
-        setTimeout(async () => {
-          try {
-            await fetch('/api/bot-proxy', {
-              method: 'POST',
-              headers: {
-                'Content-Type': 'application/json'
-              },
-              body: JSON.stringify({
-                url: whatsappWebhookUrl,
-                secret: whatsappWebhookToken,
-                payload: {
-                  mensagem: msgPagamentoAdmin,
-                  grupo_id: 'admin'
-                }
-              })
-            });
+          setTimeout(async () => {
+            try {
+              await fetch('/api/bot-proxy', {
+                method: 'POST',
+                headers: {
+                  'Content-Type': 'application/json'
+                },
+                body: JSON.stringify({
+                  url: whatsappWebhookUrl,
+                  secret: whatsappWebhookToken,
+                  payload: {
+                    mensagem: msgPagamentoAdmin,
+                    grupo_id: 'admin'
+                  }
+                })
+              });
 
-            const logSucesso: BotLog = {
-              id: `log-${Date.now()}-${Math.random().toString(36).substr(2, 4)}`,
-              tabela: atletaNome,
-              evento: 'PAGAMENTO_DECLARADO_ADMIN',
-              mensagem: `Notificação de pagamento pendente enviada ao Administrador: "${atletaNome} - R$ ${Number(pag.valor).toFixed(2).replace('.', ',')}"`,
-              enviado_em: new Date().toISOString()
-            };
+              const logSucesso: BotLog = {
+                id: `log-${Date.now()}-${Math.random().toString(36).substr(2, 4)}`,
+                tabela: atletaNome,
+                evento: 'PAGAMENTO_DECLARADO_ADMIN',
+                mensagem: `Notificação de pagamento pendente enviada ao Administrador: "${atletaNome} - R$ ${Number(pag.valor).toFixed(2).replace('.', ',')}"`,
+                enviado_em: new Date().toISOString()
+              };
 
-            setWhatsappLogs(currentLogs => {
-              const updated = [logSucesso, ...currentLogs].slice(0, 50);
-              saveWhatsappLogs(updated);
-              return updated;
-            });
+              setWhatsappLogs(currentLogs => {
+                const updated = [logSucesso, ...currentLogs].slice(0, 50);
+                saveWhatsappLogs(updated);
+                return updated;
+              });
 
-            if (getSupabase()) {
-              salvarBotLogNoSupabase(logSucesso);
+              if (getSupabase()) {
+                salvarBotLogNoSupabase(logSucesso);
+              }
+            } catch (e: any) {
+              console.warn('Erro ao notificar administrador sobre pagamento manual:', e);
             }
-          } catch (e: any) {
-            console.warn('Erro ao notificar administrador sobre pagamento manual:', e);
-          }
-        }, 200);
+          }, 200);
+        }
       }
     }
   };
