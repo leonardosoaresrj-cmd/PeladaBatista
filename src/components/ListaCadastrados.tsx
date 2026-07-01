@@ -98,10 +98,16 @@ export default function ListaCadastrados({
         quitado = true;
         detalhesStatus = 'Isento';
       } else if (j.membroStatus === 'mensalista') {
-        // Encontrar pagamento mensal (onde partidaId está ausente)
+        // Encontrar pagamento de mensalidade (onde partidaId está ausente), incluindo cancelados
+        const pagMensalCancelado = pagamentos.find((p) => p.jogadorId === j.id && p.mesRef === mes && !p.partidaId && p.status === 'cancelado');
         const pagMensal = pagamentosDoMes.find((p) => !p.partidaId);
 
-        if (pagMensal?.status === 'pago') {
+        if (pagMensalCancelado) {
+          situacao = 'Mensalista';
+          quitado = true;
+          detalhesStatus = 'Cobrança Cancelada 🚫';
+          rebaixadoTemporario = false;
+        } else if (pagMensal?.status === 'pago') {
           situacao = 'Mensalista';
           quitado = true;
           detalhesStatus = 'Quitado (Mensalidade)';
@@ -130,22 +136,29 @@ export default function ListaCadastrados({
           quitado = true;
           detalhesStatus = 'Nenhuma Pelada Confirmada';
         } else {
-          // Verificar se todos os pagamentos de diária foram realizados
-          const todasPagas = partidasConfirmadas.every((ptId) => {
-            const pgEncontrado = pagamentosDoMes.find((p) => p.partidaId === ptId.id);
-            return pgEncontrado?.status === 'pago';
+          // Verificar se todos os pagamentos de diária foram realizados ou cancelados
+          const todasPagasOuCanceladas = partidasConfirmadas.every((ptId) => {
+            const pgEncontrado = pagamentos.find((p) => p.jogadorId === j.id && p.partidaId === ptId.id);
+            return pgEncontrado?.status === 'pago' || pgEncontrado?.status === 'cancelado';
           });
 
-          quitado = todasPagas;
+          quitado = todasPagasOuCanceladas;
 
           const nPagas = partidasConfirmadas.filter((ptId) => {
-            const pgEncontrado = pagamentosDoMes.find((p) => p.partidaId === ptId.id);
+            const pgEncontrado = pagamentos.find((p) => p.jogadorId === j.id && p.partidaId === ptId.id);
             return pgEncontrado?.status === 'pago';
           }).length;
 
-          detalhesStatus = todasPagas
-            ? 'Quitado'
-            : `${nPagas} de ${partidasConfirmadas.length} Jogos Pagos`;
+          const nCanceladas = partidasConfirmadas.filter((ptId) => {
+            const pgEncontrado = pagamentos.find((p) => p.jogadorId === j.id && p.partidaId === ptId.id);
+            return pgEncontrado?.status === 'cancelado';
+          }).length;
+
+          if (todasPagasOuCanceladas) {
+            detalhesStatus = nCanceladas === partidasConfirmadas.length ? 'Isento/Cancelado 🚫' : 'Quitado';
+          } else {
+            detalhesStatus = `${nPagas} de ${partidasConfirmadas.length} Jogos Pagos`;
+          }
         }
       }
 
@@ -288,7 +301,7 @@ export default function ListaCadastrados({
           
           {/* Jersey / Visual Avatar */}
           <div 
-            className="w-14 h-14 rounded-full flex flex-col items-center justify-center shrink-0 border border-white/10 relative shadow-inner overflow-hidden cursor-zoom-in hover:scale-105 active:scale-97 transition-all duration-200"
+            className="w-16 h-16 rounded-full flex flex-col items-center justify-center shrink-0 border border-white/10 relative shadow-inner overflow-hidden cursor-zoom-in hover:scale-105 active:scale-97 transition-all duration-200"
             style={{ backgroundColor: jersey.color }}
             onClick={() => {
               if (j.foto && (j.foto.startsWith('http') || j.foto.startsWith('data:'))) {
@@ -485,7 +498,7 @@ export default function ListaCadastrados({
               </span>
             </div>
             
-            <div className="flex items-center justify-between gap-1 mt-1">
+            <div className="flex flex-wrap items-center justify-between gap-2 mt-1">
               <div className="flex items-center gap-1.5 text-xs font-semibold">
                 {proximaPartida.confirmados.includes(j.id) ? (
                   <span className="inline-flex items-center gap-1 text-emerald-400 bg-emerald-500/10 px-2 py-0.5 rounded-md border border-emerald-500/20 text-[10px] font-bold">
@@ -541,14 +554,14 @@ export default function ListaCadastrados({
 
         {/* Área de Ações (Admin ou Próprio Jogador) */}
         {(jogadorAtual.role === 'admin' || jogadorAtual.id === j.id) && (
-          <div className="p-3 bg-emerald-950/40 border-t border-white/10 flex items-center justify-end gap-2 shrink-0">
+          <div className="p-3 bg-emerald-950/40 border-t border-white/10 grid grid-cols-2 gap-2 shrink-0">
             {isEditing ? (
               <>
                 <button
                   id={`btn-salvar-edicao-${j.id}`}
                   type="button"
                   onClick={() => handleSalvarEdicao(j.id)}
-                  className="bg-white hover:bg-emerald-50 text-black text-[11px] font-bold px-3 py-1.5 rounded-lg transition-colors flex items-center gap-1"
+                  className="bg-white hover:bg-emerald-50 text-black text-[11px] font-bold px-3 py-1.5 rounded-lg transition-colors flex items-center justify-center gap-1 w-full"
                 >
                   <Check className="w-3.5 h-3.5" />
                   Salvar
@@ -557,7 +570,7 @@ export default function ListaCadastrados({
                   id={`btn-cancelar-edicao-${j.id}`}
                   type="button"
                   onClick={() => setJogadorEditandoId(null)}
-                  className="bg-emerald-950 border border-white/10 text-emerald-300 hover:text-white text-[11px] font-bold px-3 py-1.5 rounded-lg transition-colors"
+                  className="bg-emerald-950 border border-white/10 text-emerald-300 hover:text-white text-[11px] font-bold px-3 py-1.5 rounded-lg transition-colors flex items-center justify-center w-full"
                 >
                   Cancelar
                 </button>
@@ -569,7 +582,7 @@ export default function ListaCadastrados({
                     id={`btn-historico-atleta-${j.id}`}
                     type="button"
                     onClick={() => setJogadorHistoricoSelecionado(j)}
-                    className="text-[11px] font-bold text-teal-300 hover:text-white hover:bg-teal-950/40 bg-teal-950/20 border border-teal-500/20 px-3 py-1.5 rounded-lg transition-colors flex items-center gap-1 cursor-pointer"
+                    className="text-[11px] font-bold text-teal-300 hover:text-white hover:bg-teal-950/40 bg-teal-950/20 border border-teal-500/20 px-3 py-1.5 rounded-lg transition-colors flex items-center justify-center gap-1 cursor-pointer w-full"
                     title="Visualizar histórico mensal do atleta"
                   >
                     <History className="w-3.5 h-3.5 text-teal-400" />
@@ -581,7 +594,7 @@ export default function ListaCadastrados({
                   id={`btn-editar-atleta-${j.id}`}
                   type="button"
                   onClick={() => iniciarEdicao(j)}
-                  className="text-[11px] font-bold text-white hover:bg-white/10 bg-white/5 border border-white/5 px-3 py-1.5 rounded-lg transition-colors flex items-center gap-1"
+                  className="text-[11px] font-bold text-white hover:bg-white/10 bg-white/5 border border-white/5 px-3 py-1.5 rounded-lg transition-colors flex items-center justify-center gap-1 w-full"
                   title="Editar cadastro do atleta"
                 >
                   <Edit2 className="w-3 h-3 text-emerald-450" />
@@ -597,7 +610,7 @@ export default function ListaCadastrados({
                         onEditarJogador(j.id, { status: 'ativo' });
                       }
                     }}
-                    className="text-[11px] font-bold text-emerald-300 hover:bg-emerald-950/30 hover:text-white bg-emerald-950/15 border border-emerald-500/15 px-3 py-1.5 rounded-lg transition-colors flex items-center gap-1"
+                    className="text-[11px] font-bold text-emerald-300 hover:bg-emerald-950/30 hover:text-white bg-emerald-950/15 border border-emerald-500/15 px-3 py-1.5 rounded-lg transition-colors flex items-center justify-center gap-1 w-full"
                     title="Reativar a conta deste jogador"
                   >
                     <Check className="w-3 h-3" />
@@ -614,7 +627,7 @@ export default function ListaCadastrados({
                         onEditarJogador(j.id, { status: 'suspenso' });
                       }
                     }}
-                    className="text-[11px] font-bold text-rose-350 hover:bg-rose-950/30 hover:text-white bg-rose-950/15 border border-rose-500/15 px-3 py-1.5 rounded-lg transition-colors flex items-center gap-1"
+                    className="text-[11px] font-bold text-rose-350 hover:bg-rose-950/30 hover:text-white bg-rose-950/15 border border-rose-500/15 px-3 py-1.5 rounded-lg transition-colors flex items-center justify-center gap-1 w-full"
                     title="Suspender a conta deste jogador"
                   >
                     <ShieldAlert className="w-3 h-3" />
@@ -633,11 +646,11 @@ export default function ListaCadastrados({
                       } else {
                         const msg = `Tem certeza que deseja excluir as informações de ${j.nome} ${j.sobrenome} definitivamente?`;
                         if (confirm(msg)) {
-                          onExcluirJogador(j.id);
+                           onExcluirJogador(j.id);
                         }
                       }
                     }}
-                    className="text-[11px] font-bold text-rose-350 hover:bg-rose-950/30 hover:text-white bg-rose-950/15 border border-rose-500/15 px-3 py-1.5 rounded-lg transition-colors flex items-center gap-1"
+                    className="text-[11px] font-bold text-rose-350 hover:bg-rose-950/30 hover:text-white bg-rose-950/15 border border-rose-500/15 px-3 py-1.5 rounded-lg transition-colors flex items-center justify-center gap-1 w-full"
                     title={j.id === jogadorAtual.id ? "Excluir minha conta do portal" : "Remover atleta do portal"}
                   >
                     <Trash2 className="w-3 h-3" />
@@ -756,9 +769,9 @@ export default function ListaCadastrados({
       {showConfirmacaoCadastrados && (
         <div 
           id="confirmacao-sucesso-cadastrados-popup"
-          className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/80 backdrop-blur-md"
+          className="fixed inset-0 z-50 flex items-center justify-center p-4 overflow-y-auto bg-black/80 backdrop-blur-md"
         >
-          <div className="bg-emerald-900 border border-emerald-500/35 rounded-2xl max-w-sm w-full p-6 text-center shadow-2xl relative">
+          <div className="bg-emerald-900 border border-emerald-500/35 rounded-2xl max-w-sm w-full max-h-[72vh] md:max-h-[85vh] overflow-y-auto p-6 text-center shadow-2xl relative">
             <div className="w-16 h-16 bg-emerald-500/10 border-2 border-emerald-500 text-teal-400 rounded-full flex items-center justify-center mx-auto mb-4">
               <Check className="w-8 h-8" />
             </div>
@@ -780,8 +793,8 @@ export default function ListaCadastrados({
 
       {/* MODAL DE COMPARTILHAMENTO WHATSAPP (Abertura Manual para Admin se automação desativada) */}
       {showShareModal && (
-        <div className="fixed inset-0 bg-black/85 backdrop-blur-sm flex items-center justify-center p-4 z-50 animate-fade-in">
-          <div className="bg-emerald-950 border border-white/20 rounded-2xl w-full max-w-lg p-6 shadow-2xl space-y-4">
+        <div className="fixed inset-0 bg-black/85 backdrop-blur-sm flex items-center justify-center p-4 z-50 overflow-y-auto animate-fade-in">
+          <div className="bg-emerald-950 border border-white/20 rounded-2xl w-full max-w-lg max-h-[72vh] md:max-h-[85vh] overflow-y-auto p-6 shadow-2xl space-y-4">
             <div className="flex items-center justify-between border-b border-white/10 pb-3">
               <h3 className="font-display font-bold text-base text-white flex items-center gap-2">
                 <Share2 className="w-5 h-5 text-emerald-400" />
@@ -860,14 +873,14 @@ export default function ListaCadastrados({
         const jersey = AVATAR_PRESETS.find(p => p.id === j.foto) || AVATAR_PRESETS[0];
 
         return (
-          <div id="modal-historico-atleta" className="fixed inset-0 bg-black/80 backdrop-blur-md z-50 flex items-center justify-center p-4">
-            <div className="bg-emerald-950 border border-emerald-500/20 rounded-3xl w-full max-w-lg shadow-2xl flex flex-col overflow-hidden animate-slide-in text-sans">
+          <div id="modal-historico-atleta" className="fixed inset-0 bg-black/80 backdrop-blur-md z-50 flex items-center justify-center p-4 overflow-y-auto">
+            <div className="bg-emerald-950 border border-emerald-500/20 rounded-3xl w-full max-w-lg max-h-[72vh] md:max-h-[85vh] overflow-y-auto shadow-2xl flex flex-col overflow-hidden animate-slide-in text-sans">
               
               {/* Cabeçalho */}
               <div className="p-5 border-b border-white/10 bg-emerald-900/40 flex items-center justify-between">
                 <div className="flex items-center gap-3">
                   <div 
-                    className="w-12 h-12 rounded-full flex items-center justify-center shrink-0 shadow-lg border border-white/10 overflow-hidden relative" 
+                    className="w-14 h-14 rounded-full flex items-center justify-center shrink-0 shadow-lg border border-white/10 overflow-hidden relative" 
                     style={{ backgroundColor: jersey.color }}
                   >
                     {j.foto && (j.foto.startsWith('http') || j.foto.startsWith('data:')) ? (
@@ -1044,8 +1057,8 @@ export default function ListaCadastrados({
         };
 
         return (
-          <div className="fixed inset-0 bg-black/85 backdrop-blur-md z-50 flex items-center justify-center p-4">
-            <div className="bg-neutral-900 border border-white/10 w-full max-w-md rounded-2xl overflow-hidden shadow-2xl animate-in fade-in zoom-in duration-200">
+          <div className="fixed inset-0 bg-black/85 backdrop-blur-md z-50 flex items-center justify-center p-4 overflow-y-auto">
+            <div className="bg-neutral-900 border border-white/10 w-full max-w-md max-h-[72vh] md:max-h-[85vh] overflow-y-auto rounded-2xl overflow-hidden shadow-2xl animate-in fade-in zoom-in duration-200">
               <div className="p-4 bg-zinc-900/60 border-b border-white/10 flex items-center justify-between">
                 <div>
                   <h3 className="font-display font-semibold text-sm text-white uppercase tracking-wider">Solicitar Exclusão de Perfil</h3>
@@ -1164,7 +1177,7 @@ export default function ListaCadastrados({
 
       {/* AUTO TOAST NOTIFICATION FOR ROBOT/AUTOMATION STATUS */}
       {showAutoToast && (
-        <div className="fixed bottom-6 right-6 bg-teal-500 text-emerald-950 font-extrabold px-5 py-4 rounded-2xl shadow-2xl border border-teal-300 z-50 flex items-center gap-3 animate-bounce max-w-sm sm:max-w-md">
+        <div className="fixed bottom-24 md:bottom-6 right-4 sm:right-6 bg-teal-500 text-emerald-950 font-extrabold px-5 py-4 rounded-2xl shadow-2xl border border-teal-300 z-50 flex items-center gap-3 animate-bounce max-w-sm sm:max-w-md">
           <span className="text-xl">🤖</span>
           <div className="text-left font-sans">
             <h5 className="text-[10px] font-black uppercase tracking-wider text-emerald-950">Bot de Automação Pelada</h5>

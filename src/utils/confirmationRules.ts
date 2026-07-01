@@ -5,6 +5,19 @@
 
 import { Partida, Pagamento, Jogador } from '../types';
 
+export function obterNumeroRecibo(pagamentoId: string): string {
+  if (!pagamentoId) return '#000000';
+  let hash = 0;
+  for (let i = 0; i < pagamentoId.length; i++) {
+    const char = pagamentoId.charCodeAt(i);
+    hash = (hash << 5) - hash + char;
+    hash = hash & hash;
+  }
+  const positiveHash = Math.abs(hash);
+  const num = 100000 + (positiveHash % 900000);
+  return `#${num}`;
+}
+
 /**
  * Retorna as datas de início (Terça-feira 00:00) e fim (Sexta-feira 23:59)
  * da janela de confirmação para uma partida de acordo com a data do jogo.
@@ -222,7 +235,8 @@ export function obterDebitosDoJogador(
   valorDiaria: number,
   valor4Sabados: number,
   valor5Sabados: number,
-  jogadorCadastroData?: string
+  jogadorCadastroData?: string,
+  mesSelecionado?: string
 ) {
   if (posicao === 'Goleiro') return [];
 
@@ -249,14 +263,20 @@ export function obterDebitosDoJogador(
       return `${y}-${m}`;
     };
 
-    const mesLimit = obterMesAtual(); // ex: '2026-06'
+    let mesLimit = mesSelecionado || obterMesAtual(); // ex: '2026-06'
+    if (!mesSelecionado) {
+      const mesRenovacao = obterMesReferenciaParaRenovacao(partidas);
+      if (mesRenovacao > mesLimit) {
+        mesLimit = mesRenovacao;
+      }
+    }
     const mesSet = new Set<string>();
     mesSet.add(mesLimit);
 
     partidas.forEach(p => {
       if (p.data && p.data.length >= 7) {
         const m = p.data.substring(0, 7);
-        if (m <= mesLimit) {
+        if (!mesSelecionado || m <= mesLimit) {
           mesSet.add(m);
         }
       }
@@ -264,11 +284,22 @@ export function obterDebitosDoJogador(
 
     pagamentos.forEach(p => {
       if (p.mesRef && p.mesRef.length >= 7) {
-        if (p.mesRef <= mesLimit) {
-          mesSet.add(p.mesRef);
+        const m = p.mesRef;
+        if (!mesSelecionado || m <= mesLimit) {
+          mesSet.add(m);
         }
       }
     });
+
+    // Atualizar o mesLimit para ser o maior mês presente em mesSet
+    mesSet.forEach(m => {
+      if (m > mesLimit) {
+        mesLimit = m;
+      }
+    });
+
+    // Garantir que mesLimit está em mesSet
+    mesSet.add(mesLimit);
 
     const listaMeses = Array.from(mesSet).sort();
     let meses: string[] = [];
@@ -312,7 +343,7 @@ export function obterDebitosDoJogador(
       }
       const valorMensalidade = count === 5 ? valor5Sabados : valor4Sabados;
 
-      const pag = pagamentos.find(p => p.jogadorId === jogadorId && p.mesRef === mes);
+      const pag = pagamentos.find(p => p.jogadorId === jogadorId && p.mesRef === mes && !p.partidaId);
       if (!pag) {
         debitos.push({
           id: `mensalidade-${mes}`,
@@ -594,5 +625,57 @@ export function obterStatusMembroEfetivo(jogador: Jogador, pagamentos: Pagamento
 // Função auxiliar simples de id
 function r_j_id(idStr: any): string {
   return String(idStr);
+}
+
+/**
+ * Determina o mês de referência correto para o período de renovação de mensalidade.
+ * Sempre condizente ao mês correto de renovação (sempre mês do próximo jogo a ser realizado no período de renovação).
+ */
+export function obterMesReferenciaParaRenovacao(partidas: Partida[]): string {
+  const agora = new Date();
+  const ano = agora.getFullYear();
+  const mes = agora.getMonth(); // 0-indexed
+
+  // 1. Verificar se estamos atualmente em algum período de renovação ativo
+  const janelaAtual = obterJanelaRenovacaoParaMesRef(ano, mes);
+  const janelaProximo = obterJanelaRenovacaoParaMesRef(ano, mes + 1);
+
+  if (agora >= janelaAtual.inicio && agora <= janelaAtual.fim) {
+    return `${ano}-${String(mes + 1).padStart(2, '0')}`;
+  }
+
+  if (agora >= janelaProximo.inicio && agora <= janelaProximo.fim) {
+    const dataProximoMes = new Date(ano, mes + 1, 1);
+    const refAno = dataProximoMes.getFullYear();
+    const refMesString = String(dataProximoMes.getMonth() + 1).padStart(2, '0');
+    return `${refAno}-${refMesString}`;
+  }
+
+  // 2. Caso contrário (ou se não estivermos formalmente na janela), buscar o mês da próxima partida ativa futura ou de hoje
+  const hojeStr = agora.toISOString().split('T')[0];
+  const partidasAtivas = partidas.filter(p => !p.cancelada);
+  const proxima = partidasAtivas
+    .map(p => ({ ...p, dateObj: new Date(`${p.data}T12:00:00`) }))
+    .filter(p => p.dateObj >= new Date(ano, mes, agora.getDate()))
+    .sort((a, b) => a.dateObj.getTime() - b.dateObj.getTime())[0];
+
+  if (proxima) {
+    return proxima.data.substring(0, 7); // Retorna YYYY-MM
+  }
+
+  // 3. Fallback absoluto: próximo mês se todos os jogos deste mês já acabaram ou mês atual
+  if (partidasAtivas.length > 0) {
+    const sorted = [...partidasAtivas].sort((a, b) => a.data.localeCompare(b.data));
+    const ultimaPartida = sorted[sorted.length - 1];
+    if (ultimaPartida.data < hojeStr) {
+      // Todos os jogos já passaram, então a renovação deve ser para o mês seguinte ao da última partida
+      const [uAno, uMes] = ultimaPartida.data.split('-').map(Number);
+      const proxM = new Date(uAno, uMes, 1); // uMes é 1-indexed, então Date(uAno, uMes, 1) é o mês seguinte!
+      return `${proxM.getFullYear()}-${String(proxM.getMonth() + 1).padStart(2, '0')}`;
+    }
+  }
+
+  // Fallback padrão se não houver nenhuma partida
+  return `${ano}-${String(mes + 1).padStart(2, '0')}`;
 }
 

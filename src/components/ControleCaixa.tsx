@@ -29,7 +29,7 @@ import {
   Pencil,
   Download
 } from 'lucide-react';
-import { obterDebitosDoJogador } from '../utils/confirmationRules';
+import { obterDebitosDoJogador, obterMesReferenciaParaRenovacao, obterNumeroRecibo } from '../utils/confirmationRules';
 import { jsPDF } from 'jspdf';
 import {
   ResponsiveContainer,
@@ -266,6 +266,7 @@ export default function ControleCaixa({
 
     for (const jogador of jogadores) {
       if (jogador.posicao === 'Goleiro') continue;
+      if (jogador.status !== 'ativo') continue;
       
       const debits = obterDebitosDoJogador(
         jogador.id,
@@ -276,7 +277,8 @@ export default function ControleCaixa({
         valorDiaria,
         valor4Sabados,
         valor5Sabados,
-        jogador.createdAt
+        jogador.createdAt,
+        mesSelecionado
       );
 
       for (const deb of debits) {
@@ -301,7 +303,23 @@ export default function ControleCaixa({
     }
 
     return list;
-  }, [jogadores, partidas, pagamentos, valorDiaria, valor4Sabados, valor5Sabados]);
+  }, [jogadores, partidas, pagamentos, valorDiaria, valor4Sabados, valor5Sabados, mesSelecionado]);
+
+  // Filtrar débitos pendentes com base no escopo e mês filtrado para evitar pendências de meses futuros
+  const debitosPendentesFiltrados = useMemo(() => {
+    return todosDebitosPendentes.filter(deb => {
+      if (visaoEscopo === 'mensal') {
+        // Apenas as pendências de não pagamento do mês filtrado (ciclo mensal)
+        return deb.mesRef === mesSelecionado;
+      } else if (visaoEscopo === 'anual') {
+        // No mês filtrado e meses anteriores no ano corrente (ciclo anual)
+        return deb.mesRef <= mesSelecionado && deb.mesRef.startsWith(anoSelecionado);
+      } else {
+        // No mês filtrado e meses anteriores desde o início do sistema (consolidado)
+        return deb.mesRef <= mesSelecionado;
+      }
+    });
+  }, [todosDebitosPendentes, visaoEscopo, mesSelecionado, anoSelecionado]);
 
   // Separar receita de mensalistas e diaristas do Mês
   const receitaMensalistas = useMemo(() => {
@@ -533,7 +551,11 @@ export default function ControleCaixa({
   const saldoLiquidoConsolidado = receitaTotalConsolidado - despesaTotalConsolidado;
 
   const mesesDisponiveis = useMemo(() => {
-    const mesLimit = obterMesAtual(); // ex: '2026-06'
+    let mesLimit = obterMesAtual(); // ex: '2026-06'
+    const mesRenovacao = obterMesReferenciaParaRenovacao(partidas);
+    if (mesRenovacao > mesLimit) {
+      mesLimit = mesRenovacao;
+    }
     const mesSet = new Set<string>();
     
     // So adicionar mesLimit se for >= startupMonth
@@ -772,12 +794,12 @@ export default function ControleCaixa({
 
     // Calcular receita gerada ou arrecadada no jogo:
     const receitaEstProjDiaristas = diaristasConfirmados.reduce((sum, d) => {
-      const pag = pagamentos.find(p => p.jogadorId === d.id && p.mesRef === mesPartida && p.status === 'pago');
+      const pag = pagamentos.find(p => p.jogadorId === d.id && p.partidaId === partidaAtiva.id && p.status === 'pago');
       return sum + (pag ? pag.valor : 0);
     }, 0);
 
     const receitaEstProjMensalistasFraction = mensalistasConfirmados.reduce((sum, m) => {
-      const pag = pagamentos.find(p => p.jogadorId === m.id && p.mesRef === mesPartida && p.status === 'pago');
+      const pag = pagamentos.find(p => p.jogadorId === m.id && p.mesRef === mesPartida && !p.partidaId && p.status === 'pago');
       if (pag) {
         return sum + (pag.valor / (numSabadosPartida || 4));
       }
@@ -793,6 +815,8 @@ export default function ControleCaixa({
       .reduce((sum, l) => sum + l.valor, 0);
 
     return {
+      id: partidaAtiva.id,
+      mesPartida: mesPartida,
       totalConfirmados: confirmadosAtletas.length,
       mensalistas: mensalistasConfirmados.length,
       diaristas: diaristasConfirmados.length,
@@ -1028,12 +1052,12 @@ export default function ControleCaixa({
         const mensalistas = atletasDoJogo.filter(j => j.membroStatus === 'mensalista');
         
         const recDiaristas = diaristas.reduce((sum, d) => {
-          const pag = pagamentos.find(p => p.jogadorId === d.id && p.mesRef === mesPartida && p.status === 'pago');
+          const pag = pagamentos.find(p => p.jogadorId === d.id && p.partidaId === game.id && p.status === 'pago');
           return sum + (pag ? pag.valor : 0);
         }, 0);
         
         const recMensalistas = mensalistas.reduce((sum, m) => {
-          const pag = pagamentos.find(p => p.jogadorId === m.id && p.mesRef === mesPartida && p.status === 'pago');
+          const pag = pagamentos.find(p => p.jogadorId === m.id && p.mesRef === mesPartida && !p.partidaId && p.status === 'pago');
           if (pag) {
             return sum + (pag.valor / (numSabados || 4));
           }
@@ -1991,9 +2015,9 @@ export default function ControleCaixa({
 
       {/* POPUP DE LANÇAMENTO AVULSO */}
       {showFormAvulso && (
-        <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/85 backdrop-blur-md animate-fade-in text-white font-sans">
+        <div className="fixed inset-0 z-50 flex items-center justify-center p-4 overflow-y-auto bg-black/85 backdrop-blur-md animate-fade-in text-white font-sans">
           <div 
-            className="w-full max-w-md border border-white/10 rounded-2xl p-6 shadow-2xl flex flex-col justify-between overflow-hidden relative"
+            className="w-full max-w-md max-h-[72vh] md:max-h-[85vh] overflow-y-auto border border-white/10 rounded-2xl p-6 shadow-2xl flex flex-col justify-between overflow-hidden relative"
             style={{ backgroundColor: '#021a14' }}
             onClick={(e) => e.stopPropagation()}
           >
@@ -2468,7 +2492,9 @@ export default function ControleCaixa({
                   <div className="max-h-72 overflow-y-auto pr-1 space-y-1 font-sans">
                     {analiseJogoDetalhes.listaAtletas.map((atl, index) => {
                       const avatar = AVATAR_PRESETS.find(p => p.id === atl.foto) || AVATAR_PRESETS[0];
-                      const statusPg = pagamentos.find(p => p.jogadorId === atl.id && p.mesRef === analiseJogoDetalhes.mesPartida);
+                      const statusPg = atl.membroStatus === 'mensalista'
+                        ? pagamentos.find(p => p.jogadorId === atl.id && p.mesRef === analiseJogoDetalhes.mesPartida && !p.partidaId)
+                        : pagamentos.find(p => p.jogadorId === atl.id && p.partidaId === analiseJogoDetalhes.id);
                       const isPaid = statusPg?.status === 'pago';
                       const isGoleiro = atl.posicao === 'Goleiro';
 
@@ -2479,7 +2505,7 @@ export default function ControleCaixa({
                         >
                           <div className="flex items-center gap-2 overflow-hidden">
                             <div 
-                              className="w-7 h-7 rounded-full flex items-center justify-center text-[10.5px] font-bold shrink-0 border border-white/10 cursor-zoom-in hover:scale-110 active:scale-95 transition-all duration-200 overflow-hidden"
+                              className="w-11 h-11 rounded-full flex items-center justify-center text-[13px] font-bold shrink-0 border border-white/10 cursor-zoom-in hover:scale-110 active:scale-95 transition-all duration-200 overflow-hidden"
                               style={{ backgroundColor: avatar.color }}
                               onClick={() => {
                                 if (atl.foto && (atl.foto.startsWith('http') || atl.foto.startsWith('data:'))) {
@@ -2658,7 +2684,7 @@ export default function ControleCaixa({
                 >
                   <div className="flex items-center gap-3">
                     <div 
-                      className="w-10 h-10 rounded-full flex items-center justify-center text-sm font-bold shrink-0 border border-white/15 cursor-zoom-in hover:scale-110 active:scale-95 transition-all duration-200 overflow-hidden"
+                      className="w-12 h-12 rounded-full flex items-center justify-center text-sm font-bold shrink-0 border border-white/15 cursor-zoom-in hover:scale-110 active:scale-95 transition-all duration-200 overflow-hidden"
                       style={{ backgroundColor: avatar.color }}
                       onClick={() => {
                         if (jogador.foto && (jogador.foto.startsWith('http') || jogador.foto.startsWith('data:'))) {
@@ -2751,21 +2777,21 @@ export default function ControleCaixa({
           </div>
           <div className="flex flex-wrap items-center gap-1.5 sm:gap-2">
             <span className="text-[10px] sm:text-xs font-mono font-bold bg-rose-500/10 border border-rose-500/20 text-rose-300 px-2.5 py-0.5 sm:px-3 sm:py-1 rounded-full whitespace-nowrap">
-              {todosDebitosPendentes.length} Pendências Ativas
+              {debitosPendentesFiltrados.length} Pendências Ativas
             </span>
             <span className="text-[10px] sm:text-xs font-mono font-bold bg-white/5 border border-white/10 text-white px-2.5 py-0.5 sm:px-3 sm:py-1 rounded-full whitespace-nowrap">
-              Total Devido: R$ {todosDebitosPendentes.reduce((sum, d) => sum + d.valor, 0).toFixed(2)}
+              Total Devido: R$ {debitosPendentesFiltrados.reduce((sum, d) => sum + d.valor, 0).toFixed(2)}
             </span>
           </div>
         </div>
 
-        {todosDebitosPendentes.length === 0 ? (
+        {debitosPendentesFiltrados.length === 0 ? (
           <div className="text-center py-8 bg-emerald-950/10 border border-dashed border-white/5 rounded-2xl">
             <p className="text-xs font-sans italic text-emerald-500/50">Excelente! Não há nenhum débito pendente registrado para os jogadores ativos.</p>
           </div>
         ) : (
           <div className="space-y-3 font-sans">
-            {todosDebitosPendentes.map((deb, index) => {
+            {debitosPendentesFiltrados.map((deb, index) => {
               const avatar = AVATAR_PRESETS.find(p => p.id === deb.jogadorFoto) || AVATAR_PRESETS[0];
               const isPendenteConfirmacao = deb.status === 'pendente_confirmacao';
               
@@ -2905,6 +2931,7 @@ export default function ControleCaixa({
                 <thead>
                   <tr className="border-b border-white/5 text-[10px] text-emerald-400 uppercase tracking-widest bg-black/10">
                     <th className="py-3 px-4 font-bold">Jogador / Atleta</th>
+                    <th className="py-3 px-4 font-bold">Nº Recibo</th>
                     <th className="py-3 px-4 font-bold">Tipo</th>
                     <th className="py-3 px-4 font-bold">Posição</th>
                     <th className="py-3 px-4 font-bold">Data do Pagamento</th>
@@ -2924,7 +2951,7 @@ export default function ControleCaixa({
                         <td className="py-3.5 px-4">
                           <div className="flex items-center gap-2.5">
                             <div 
-                              className="w-8 h-8 rounded-full flex items-center justify-center text-xs font-bold shrink-0 border border-white/10 cursor-zoom-in hover:scale-110 active:scale-95 transition-all duration-200 overflow-hidden"
+                              className="w-11 h-11 rounded-full flex items-center justify-center text-[13px] font-bold shrink-0 border border-white/10 cursor-zoom-in hover:scale-110 active:scale-95 transition-all duration-200 overflow-hidden"
                               style={{ backgroundColor: avatar.color }}
                               onClick={() => {
                                 if (jogador.foto && (jogador.foto.startsWith('http') || jogador.foto.startsWith('data:'))) {
@@ -2944,6 +2971,9 @@ export default function ControleCaixa({
                               <p className="text-[10px] text-emerald-400 font-mono">{jogador.email}</p>
                             </div>
                           </div>
+                        </td>
+                        <td className="py-3.5 px-4 font-mono text-[11px] text-teal-300 font-bold whitespace-nowrap">
+                          {obterNumeroRecibo(pagamento.id)}
                         </td>
                         <td className="py-3.5 px-4">
                           <span className={`inline-block px-2.5 py-0.5 rounded-full text-[10px] font-bold uppercase tracking-wider ${
@@ -3017,7 +3047,7 @@ export default function ControleCaixa({
                     <div className="flex items-start justify-between gap-2.5">
                       <div className="flex items-center gap-2.5">
                         <div 
-                          className="w-9 h-9 rounded-full flex items-center justify-center text-xs font-bold shrink-0 border border-white/10 overflow-hidden"
+                          className="w-12 h-12 rounded-full flex items-center justify-center text-sm font-bold shrink-0 border border-white/10 overflow-hidden"
                           style={{ backgroundColor: avatar.color }}
                           onClick={() => {
                             if (jogador.foto && (jogador.foto.startsWith('http') || jogador.foto.startsWith('data:'))) {
@@ -3049,7 +3079,7 @@ export default function ControleCaixa({
                       </div>
                     </div>
 
-                    <div className="grid grid-cols-2 gap-2 pt-2 border-t border-white/5 text-[10px] text-emerald-300/80 font-mono">
+                    <div className="grid grid-cols-3 gap-2 pt-2 border-t border-white/5 text-[10px] text-emerald-300/80 font-mono">
                       <div>
                         <p className="text-emerald-500/60 uppercase font-black tracking-wider text-[8px]">Pago em</p>
                         <p className="text-white font-medium mt-0.5">
@@ -3072,6 +3102,12 @@ export default function ControleCaixa({
                               return `Diária ${pagamento.mesRef.split('-').reverse().join('/')}`;
                             }
                           })()}
+                        </p>
+                      </div>
+                      <div>
+                        <p className="text-emerald-500/60 uppercase font-black tracking-wider text-[8px]">Recibo</p>
+                        <p className="text-teal-300 font-black mt-0.5">
+                          {obterNumeroRecibo(pagamento.id)}
                         </p>
                       </div>
                     </div>
@@ -3104,9 +3140,9 @@ export default function ControleCaixa({
 
       {/* POPUP DE DETALHAMENTO FINANCEIRO DO MÊS */}
       {detalhesMesModal && statsModal && (
-        <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/80 backdrop-blur-md animate-fade-in text-white">
+        <div className="fixed inset-0 z-50 flex items-center justify-center p-4 overflow-y-auto bg-black/80 backdrop-blur-md animate-fade-in text-white">
           <div 
-            className="w-full max-w-4xl max-h-[90vh] border border-white/10 rounded-2xl p-6 shadow-2xl flex flex-col justify-between overflow-hidden relative font-sans"
+            className="w-full max-w-4xl max-h-[72vh] md:max-h-[85vh] border border-white/10 rounded-2xl p-6 shadow-2xl flex flex-col justify-between overflow-hidden relative font-sans"
             onClick={(e) => e.stopPropagation()}
             style={{ backgroundColor: '#021a14' }}
           >
@@ -3222,10 +3258,10 @@ export default function ControleCaixa({
                       {statsModal.pagantesM.map((p, idx) => {
                         const avatar = AVATAR_PRESETS.find(pr => pr.id === p.jogador.foto) || AVATAR_PRESETS[0];
                         return (
-                          <div key={p.pagamento.id || idx} className="flex items-center justify-between p-2 bg-emerald-955/10 rounded-lg border border-white/5 h-12">
+                          <div key={p.pagamento.id || idx} className="flex items-center justify-between p-2 bg-emerald-955/10 rounded-lg border border-white/5 min-h-[48px] py-1.5">
                             <div className="flex items-center gap-2 overflow-hidden">
                               <div 
-                                className="w-6.5 h-6.5 rounded-full flex items-center justify-center text-[10px] font-bold shrink-0 border border-white/5 text-white overflow-hidden cursor-zoom-in hover:scale-110 active:scale-95 transition-all duration-200" 
+                                className="w-10 h-10 rounded-full flex items-center justify-center text-[12px] font-bold shrink-0 border border-white/5 text-white overflow-hidden cursor-zoom-in hover:scale-110 active:scale-95 transition-all duration-200" 
                                 style={{ backgroundColor: avatar.color }}
                                 onClick={() => {
                                   if (p.jogador.foto && (p.jogador.foto.startsWith('http') || p.jogador.foto.startsWith('data:'))) {
@@ -3275,10 +3311,10 @@ export default function ControleCaixa({
                         const avatar = AVATAR_PRESETS.find(pr => pr.id === at.foto) || AVATAR_PRESETS[0];
                         const jaPago = pagamentos.some(p => p.jogadorId === at.id && p.mesRef === detalhesMesModal && p.status === 'pago');
                         return (
-                          <div key={at.id || idx} className="flex items-center justify-between p-2 bg-emerald-955/10 rounded-lg border border-white/5 h-12">
+                          <div key={at.id || idx} className="flex items-center justify-between p-2 bg-emerald-955/10 rounded-lg border border-white/5 min-h-[48px] py-1.5">
                             <div className="flex items-center gap-2 overflow-hidden">
                               <div 
-                                className="w-6.5 h-6.5 rounded-full flex items-center justify-center text-[10px] font-bold shrink-0 border border-white/5 text-white overflow-hidden cursor-zoom-in hover:scale-110 active:scale-95 transition-all duration-200" 
+                                className="w-10 h-10 rounded-full flex items-center justify-center text-[12px] font-bold shrink-0 border border-white/5 text-white overflow-hidden cursor-zoom-in hover:scale-110 active:scale-95 transition-all duration-200"
                                 style={{ backgroundColor: avatar.color }}
                                 onClick={() => {
                                   if (at.foto && (at.foto.startsWith('http') || at.foto.startsWith('data:'))) {
@@ -3338,7 +3374,7 @@ export default function ControleCaixa({
                           <div key={deb.id || idx} className="flex items-center justify-between p-2.5 bg-rose-955/15 hover:bg-rose-955/25 transition-all rounded-lg border border-rose-500/10">
                             <div className="flex items-center gap-2 overflow-hidden">
                               <div 
-                                className="w-7 h-7 rounded-full flex items-center justify-center text-[10px] font-bold shrink-0 border border-white/5 text-white overflow-hidden cursor-zoom-in hover:scale-110 active:scale-95 transition-all duration-200" 
+                                className="w-10 h-10 rounded-full flex items-center justify-center text-[12px] font-bold shrink-0 border border-white/5 text-white overflow-hidden cursor-zoom-in hover:scale-110 active:scale-95 transition-all duration-200" 
                                 style={{ backgroundColor: avatar.color }}
                                 onClick={() => {
                                   if (deb.jogadorFoto && (deb.jogadorFoto.startsWith('http') || deb.jogadorFoto.startsWith('data:'))) {

@@ -1,103 +1,87 @@
 import express from "express";
 import path from "path";
 import { createServer as createViteServer } from "vite";
-import nodemailer from "nodemailer";
-import dns from "dns";
 
-// Forçar uso do IPv4 por padrão devido a bloqueios de IPv6 via porta de email (Render/GCP)
-dns.setDefaultResultOrder("ipv4first");
+const SUPABASE_SEND_EMAIL_URL =
+  "https://gqasacnaubkhokqyrpwc.supabase.co/functions/v1/send-email";
+
+// Anon key publica do Supabase (segura para uso no servidor)
+const SUPABASE_ANON_KEY = "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6ImdxYXNhY25hdWJraG9rcXlycHdjIiwicm9sZSI6ImFub24iLCJpYXQiOjE3ODA0OTIzOTAsImV4cCI6MjA5NjA2ODM5MH0.rRgF_yoLeVRVg9eK_VSKSnBUkf7MXaY1yJAlvWBEfzQ";
+
+async function enviarEmailGmail(
+  to: string,
+  subject: string,
+  html: string
+): Promise<void> {
+  const resp = await fetch(SUPABASE_SEND_EMAIL_URL, {
+    method:  "POST",
+    headers: {
+      "Content-Type":  "application/json",
+      "Authorization": `Bearer ${SUPABASE_ANON_KEY}`,
+      "apikey":        SUPABASE_ANON_KEY,
+    },
+    body: JSON.stringify({ to, subject, html }),
+  });
+  if (!resp.ok) {
+    const err = await resp.json().catch(() => ({}));
+    throw new Error(`[send-email] erro ${resp.status}: ${JSON.stringify(err)}`);
+  }
+}
 
 async function startServer() {
   const app = express();
-  const PORT = 3000;
-
-  // Usa middleware JSON para APIs criadas aqui
+  const PORT = process.env.PORT ? parseInt(process.env.PORT) : 3000;
   app.use(express.json());
 
-  // Rota de recuperação de senha via E-mail
   app.post("/api/recover-password", async (req, res) => {
     try {
       const { email, nome, senha } = req.body;
-
-      if (!email || !nome || !senha) {
-        return res.status(400).json({ error: "Dados incompletos para envio de e-mail." });
-      }
-
-      // Verifica se as configurações de SMTP estão preenchidas
-      if (!process.env.SMTP_USER || !process.env.SMTP_PASS) {
-        return res.status(500).json({ 
-          error: "Servidor de e-mail não configurado. Por favor, adicione SMTP_USER e SMTP_PASS nas variáveis de ambiente." 
-        });
-      }
-
-      // Configuração do Nodemailer com forçamento de IPv4 (Render block workaround)
-      const resolveIpv4 = (host: string): Promise<string> => {
-        return new Promise((resolve, reject) => {
-          dns.lookup(host, { family: 4 }, (err, address) => {
-            if (err) reject(err);
-            else resolve(address);
-          });
-        });
-      };
-
-      let smtpHost = 'smtp.gmail.com';
-      try {
-        smtpHost = await resolveIpv4('smtp.gmail.com');
-      } catch(e) {
-        console.warn('Fallback: não foi possível resolver o IP de smtp.gmail.com');
-      }
-
-      const transporter = nodemailer.createTransport({
-        host: smtpHost,
-        port: 465,
-        secure: true,
-        auth: {
-          user: process.env.SMTP_USER,
-          pass: process.env.SMTP_PASS, // Senha de App do Gmail
-        },
-        tls: {
-          servername: 'smtp.gmail.com', // Necessário para validação de certificado TLS
-        }
-      });
-
-      const mailOptions = {
-        from: `"Pelada Batista" <${process.env.SMTP_USER}>`,
-        to: email,
-        subject: "Recuperação de Acesso (PIN) - Pelada Batista",
-        html: `
-          <div style="font-family: Arial, sans-serif; background-color: #f4f4f4; padding: 20px;">
-            <div style="max-w: 500px; margin: 0 auto; background-color: #ffffff; padding: 30px; border-radius: 8px; box-shadow: 0 4px 6px rgba(0,0,0,0.1);">
-              <h2 style="color: #064e3b; text-align: center; font-size: 24px; margin-bottom: 20px;">Pelada Batista</h2>
-              <p style="color: #333333; font-size: 16px;">Olá <b>${nome}</b>,</p>
-              <p style="color: #333333; font-size: 16px;">Você solicitou a recuperação do seu PIN de acesso ao portal do nosso racha.</p>
-              
-              <div style="background-color: #ecfdf5; border: 1px dashed #10b981; padding: 15px; text-align: center; margin: 25px 0;">
-                <p style="color: #064e3b; font-size: 14px; margin: 0 0 5px 0; text-transform: uppercase; letter-spacing: 1px;">Sua Senha / PIN é:</p>
-                <p style="color: #047857; font-size: 32px; font-weight: bold; font-family: monospace; letter-spacing: 5px; margin: 0;">${senha}</p>
-              </div>
-              
-              <p style="color: #666666; font-size: 14px;">Se você não solicitou esta recuperação, por favor ignore este e-mail.</p>
-              <br/>
-              <p style="color: #666666; font-size: 14px;">Um abraço,<br/>Equipe Pelada Batista</p>
-            </div>
-          </div>
-        `,
-      };
-
-      await transporter.sendMail(mailOptions);
-
+      if (!email || !nome || !senha) return res.status(400).json({ error: "Dados incompletos." });
+      await enviarEmailGmail(email, "Recuperacao de Acesso (PIN) - Pelada Batista",
+        `<div style="font-family:Arial,sans-serif;padding:20px"><h2>Pelada Batista</h2><p>Ola <b>${nome}</b>,</p><p>Seu PIN de acesso e:</p><div style="background:#ecfdf5;padding:15px;text-align:center;margin:20px 0"><p style="font-size:32px;font-weight:bold;font-family:monospace;color:#047857">${senha}</p></div><p>Se nao solicitou, ignore este e-mail.</p><p>Equipe Pelada Batista</p></div>`
+      );
+      console.log("[RECOVERY EMAIL OK]", email);
       return res.status(200).json({ success: true, message: "E-mail enviado com sucesso" });
-
     } catch (error: any) {
-      console.error("[RECOVERY EMAIL ERROR]", error);
-      return res.status(500).json({ 
-        error: "Falha ao enviar o e-mail",
-        details: error.message 
-      });
+      console.error("[RECOVERY EMAIL ERROR]", error.message);
+      return res.status(500).json({ error: "Falha ao enviar o e-mail", details: error.message });
     }
   });
 
-  // Rota de Proxy: Front-end -> Nosso Servidor -> Robô do Render
+  app.post("/api/send-welcome-email", async (req, res) => {
+    try {
+      const { email, nome } = req.body;
+      if (!email || !nome) return res.status(400).json({ error: "Dados incompletos." });
+      await enviarEmailGmail(email, "Bem-vindo ao Pelada Batista! Conta Aprovada",
+        `<div style="font-family:Arial,sans-serif;padding:20px"><h2>Pelada Batista</h2><p>Ola, <b>${nome}</b>!</p><p>Seu cadastro foi <b>aprovado pelo administrador</b>!</p><p>Acesse o portal: <a href="https://peladabatista.onrender.com">peladabatista.onrender.com</a></p><p>Nos vemos em campo!<br/>Equipe Pelada Batista</p></div>`
+      );
+      console.log("[WELCOME EMAIL OK]", email);
+      return res.status(200).json({ success: true, message: "E-mail de boas-vindas enviado com sucesso." });
+    } catch (error: any) {
+      console.error("[WELCOME EMAIL ERROR]", error.message);
+      return res.status(500).json({ error: "Falha ao enviar o e-mail de boas-vindas", details: error.message });
+    }
+  });
+
+  app.post("/api/send-receipt-email", async (req, res) => {
+    try {
+      const { email, nome, valor, referencia, dataPagamento, numRecibo: numReciboBody } = req.body;
+      if (!email || !nome || !valor || !referencia) return res.status(400).json({ error: "Dados incompletos." });
+      const valorFormatado = Number(valor).toFixed(2).replace(".", ",");
+      const dataFormatada = dataPagamento ? new Date(dataPagamento).toLocaleDateString("pt-BR") : new Date().toLocaleDateString("pt-BR");
+      const numRecibo = numReciboBody || Math.floor(100000 + Math.random() * 900000);
+      await enviarEmailGmail(email, `Recibo de Pagamento - Pelada Batista (No ${numRecibo})`,
+        `<div style="font-family:Arial,sans-serif;padding:20px"><h2>Pelada Batista - Recibo #${numRecibo}</h2><p>Ola, <b>${nome}</b>,</p><p>Seu pagamento foi <b>aprovado pelo administrador</b>!</p><table style="width:100%;border-collapse:collapse;margin:20px 0"><tr><td style="padding:8px;border-bottom:1px solid #eee"><b>Pagador:</b></td><td style="padding:8px;border-bottom:1px solid #eee;text-align:right">${nome}</td></tr><tr><td style="padding:8px;border-bottom:1px solid #eee"><b>Referencia:</b></td><td style="padding:8px;border-bottom:1px solid #eee;text-align:right">${referencia}</td></tr><tr><td style="padding:8px;border-bottom:1px solid #eee"><b>Data:</b></td><td style="padding:8px;border-bottom:1px solid #eee;text-align:right">${dataFormatada}</td></tr><tr><td style="padding:8px"><b>Valor:</b></td><td style="padding:8px;text-align:right;font-size:18px;font-weight:bold;color:#115e59">R$ ${valorFormatado}</td></tr></table><p>Agradecemos!<br/>Equipe Pelada Batista</p></div>`
+      );
+      console.log("[RECEIPT EMAIL OK]", email);
+      return res.status(200).json({ success: true, message: "Recibo enviado com sucesso." });
+    } catch (error: any) {
+      console.error("[RECEIPT EMAIL ERROR]", error.message);
+      return res.status(500).json({ error: "Falha ao enviar o recibo de pagamento", details: error.message });
+    }
+  });
+
+    // Rota de Proxy: Front-end -> Nosso Servidor -> Robô do Render
   // Isso resolve os problemas de CORS quando o site roda do nosso lado
   app.post("/api/bot-proxy", async (req, res) => {
     try {
@@ -110,25 +94,41 @@ async function startServer() {
       console.log(`[PROXY] Enviando POST para ${url}`);
 
       const headers: Record<string, string> = {
-        "Content-Type": "application/json"
+        "Content-Type": "application/json",
+        // User-Agent explícito: requisições server-to-server sem User-Agent
+        // padrão de navegador podem ser bloqueadas com 429 pela proteção
+        // anti-bot do Render em serviços do plano gratuito.
+        "User-Agent": "PeladaBatista-Proxy/1.0 (+https://peladabatista.onrender.com)"
       };
 
       if (secret) {
         headers["x-webhook-secret"] = secret;
       }
 
-      // Faz a requisição para o bot real
-      const respostaRender = await fetch(url, {
-        method: "POST",
-        headers,
-        body: JSON.stringify(payload)
-      });
+      // Faz a requisição para o bot real, com retry em caso de 429
+      let respostaRender: Response;
+      let responseText = "";
+      const MAX_TENTATIVAS = 3;
 
-      const responseText = await respostaRender.text();
+      for (let tentativa = 1; tentativa <= MAX_TENTATIVAS; tentativa++) {
+        respostaRender = await fetch(url, {
+          method: "POST",
+          headers,
+          body: JSON.stringify(payload)
+        });
+        responseText = await respostaRender.text();
 
-      if (!respostaRender.ok) {
-        console.error(`[PROXY ERROR] Status ${respostaRender.status}: ${responseText}`);
-        return res.status(respostaRender.status).json({ 
+        if (respostaRender.status !== 429) break;
+
+        console.warn(`[PROXY] 429 recebido (tentativa ${tentativa}/${MAX_TENTATIVAS}) — aguardando antes de tentar novamente`);
+        if (tentativa < MAX_TENTATIVAS) {
+          await new Promise(r => setTimeout(r, tentativa * 1500)); // 1.5s, 3s
+        }
+      }
+
+      if (!respostaRender!.ok) {
+        console.error(`[PROXY ERROR] Status ${respostaRender!.status}: ${responseText}`);
+        return res.status(respostaRender!.status).json({ 
           error: "Erro no bot", 
           details: responseText 
         });
@@ -152,7 +152,7 @@ async function startServer() {
     }
   });
 
-  // Vite middleware for development
+    // Vite middleware for development
   if (process.env.NODE_ENV !== "production") {
     const vite = await createViteServer({
       server: { middlewareMode: true },
@@ -161,9 +161,24 @@ async function startServer() {
     app.use(vite.middlewares);
   } else {
     const distPath = path.join(process.cwd(), 'dist');
-    app.use(express.static(distPath));
+    app.use(express.static(distPath, {
+      setHeaders: (res, filePath) => {
+        // Se for o index.html ou qualquer arquivo .html servido estaticamente, desativar cache completamente
+        if (filePath.endsWith('.html') || path.basename(filePath) === 'index.html') {
+          res.setHeader('Cache-Control', 'no-store, no-cache, must-revalidate, proxy-revalidate, max-age=0');
+          res.setHeader('Pragma', 'no-cache');
+          res.setHeader('Expires', '0');
+        } else if (filePath.match(/\.(js|css|woff2?|eot|ttf|otf|png|gif|jpe?g|svg|ico|webp)$/)) {
+          // Arquivos estáticos compilados com hash pelo Vite podem ter cache agressivo de 1 ano
+          res.setHeader('Cache-Control', 'public, max-age=31536000, immutable');
+        }
+      }
+    }));
     // Fallback para SPA em produção, express 4 é get('*')
     app.get('*', (req, res) => {
+      res.setHeader('Cache-Control', 'no-store, no-cache, must-revalidate, proxy-revalidate, max-age=0');
+      res.setHeader('Pragma', 'no-cache');
+      res.setHeader('Expires', '0');
       res.sendFile(path.join(distPath, 'index.html'));
     });
   }

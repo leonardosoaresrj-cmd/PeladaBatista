@@ -4,10 +4,10 @@
  */
 
 import React, { useState, useMemo, useEffect } from 'react';
-import { Jogador, Pagamento } from '../types';
+import { Jogador, Pagamento, Partida } from '../types';
 import { AVATAR_PRESETS } from '../data';
 import { Users, Search, UserCheck, Award, Star, Mail, Calendar } from 'lucide-react';
-import { obterJanelaRenovacaoParaMesRef, isFechamentoMensalistas } from '../utils/confirmationRules';
+import { obterJanelaRenovacaoParaMesRef, isFechamentoMensalistas, obterMesReferenciaParaRenovacao } from '../utils/confirmationRules';
 
 interface MensalistasMesProps {
   jogadores: Jogador[];
@@ -18,6 +18,7 @@ interface MensalistasMesProps {
   valor5Sabados: number;
   whatsappAutomacaoAtiva?: boolean;
   onRegistrarLogAutomacao?: (atleta: string, partida: string, msg: string) => void;
+  partidas?: Partida[];
 }
 
 export default function MensalistasMes({
@@ -28,7 +29,8 @@ export default function MensalistasMes({
   valor4Sabados,
   valor5Sabados,
   whatsappAutomacaoAtiva = false,
-  onRegistrarLogAutomacao
+  onRegistrarLogAutomacao,
+  partidas = []
 }: MensalistasMesProps) {
   const [filtroPesquisa, setFiltroPesquisa] = useState('');
   const [mesSelecionado, setMesSelecionado] = useState(() => {
@@ -84,7 +86,11 @@ export default function MensalistasMes({
   };
 
   const opcoesMeses = useMemo(() => {
-    const mesLimit = obterMesAtual(); // ex: '2026-06'
+    let mesLimit = obterMesAtual(); // ex: '2026-06'
+    const mesRenovacao = obterMesReferenciaParaRenovacao(partidas);
+    if (mesRenovacao > mesLimit) {
+      mesLimit = mesRenovacao;
+    }
     const mesSet = new Set<string>();
     
     if (mesLimit >= startupMonth) {
@@ -333,7 +339,7 @@ export default function MensalistasMes({
               >
                 <div className="flex items-center gap-3 min-w-0">
                   <div 
-                    className="w-9 h-9 rounded-full flex items-center justify-center text-xs font-bold shrink-0 border border-white/10 cursor-zoom-in hover:scale-110 active:scale-95 transition-all duration-200"
+                    className="w-12 h-12 rounded-full flex items-center justify-center text-sm font-bold shrink-0 border border-white/10 cursor-zoom-in hover:scale-110 active:scale-95 transition-all duration-200"
                     style={{ backgroundColor: avatar.color }}
                     onClick={() => {
                       if (jogador.foto && (jogador.foto.startsWith('http') || jogador.foto.startsWith('data:'))) {

@@ -15,11 +15,17 @@ const SUPABASE_URL_PADRAO  = 'https://gqasacnaubkhokqyrpwc.supabase.co';
 const SUPABASE_ANON_KEY    = 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6ImdxYXNhY25hdWJraG9rcXlycHdjIiwicm9sZSI6ImFub24iLCJpYXQiOjE3ODA0OTIzOTAsImV4cCI6MjA5NjA2ODM5MH0.rRgF_yoLeVRVg9eK_VSKSnBUkf7MXaY1yJAlvWBEfzQ';
 
 export function obterCredenciaisSupabase() {
-  // Prioriza localStorage (configuração manual do admin), fallback nas credenciais padrão
-  const url      = localStorage.getItem('supabase_url_config') || SUPABASE_URL_PADRAO;
-  const key      = localStorage.getItem('supabase_key_config') || SUPABASE_ANON_KEY;
-  const isCustom = !!localStorage.getItem('supabase_key_config');
-  return { url, key, isCustom };
+  const customUrl = localStorage.getItem('supabase_url_config');
+  const customKey = localStorage.getItem('supabase_key_config');
+  
+  const isUrlValid = customUrl && customUrl.trim() !== '' && customUrl.trim() !== 'null' && customUrl.trim() !== 'undefined' && !customUrl.includes('your-supabase-url');
+  const isKeyValid = customKey && customKey.trim() !== '' && customKey.trim() !== 'null' && customKey.trim() !== 'undefined' && !customKey.includes('your-anon-key') && !customKey.includes('COLE_SUA_ANON_KEY_AQUI');
+
+  if (isUrlValid && isKeyValid) {
+    return { url: customUrl!.trim(), key: customKey!.trim(), isCustom: true };
+  }
+  
+  return { url: SUPABASE_URL_PADRAO, key: SUPABASE_ANON_KEY, isCustom: false };
 }
 
 export function salvarCredenciaisSupabase(url: string, key: string) {
@@ -37,8 +43,10 @@ let supabaseInstanceUrl: string | null = null;
 
 export function getSupabase(): SupabaseClient | null {
   const { url, key } = obterCredenciaisSupabase();
-  // Bloqueia apenas se não houver credenciais ou se for placeholder
-  if (!url || !key || key === 'COLE_SUA_ANON_KEY_AQUI' || key.includes('your-anon-key')) {
+  const isUrlValid = url && url.trim() !== '' && url.trim() !== 'null' && url.trim() !== 'undefined' && !url.includes('your-supabase-url');
+  const isKeyValid = key && key.trim() !== '' && key.trim() !== 'null' && key.trim() !== 'undefined' && !key.includes('your-anon-key') && !key.includes('COLE_SUA_ANON_KEY_AQUI');
+
+  if (!isUrlValid || !isKeyValid) {
     return null;
   }
 
@@ -115,7 +123,7 @@ export async function salvarJogadorNoSupabase(jogador: Jogador): Promise<boolean
     }
     return true;
   } catch (error) {
-    console.error('Erro ao sincronizar jogador no Supabase:', error);
+    console.warn('Erro ao sincronizar jogador no Supabase:', error);
     return false;
   }
 }
@@ -153,7 +161,7 @@ export async function carregarJogadoresDoSupabase(): Promise<Jogador[] | null> {
       isGold: d.is_gold
     }));
   } catch (error) {
-    console.error('Erro ao buscar jogadores do Supabase:', error);
+    console.warn('Erro ao buscar jogadores do Supabase:', error);
     return null;
   }
 }
@@ -204,7 +212,7 @@ export async function salvarPartidaNoSupabase(partida: Partida): Promise<boolean
     // }
     return true;
   } catch (error) {
-    console.error('Erro ao salvar partida no Supabase:', error);
+    console.warn('Erro ao salvar partida no Supabase:', error);
     return false;
   }
 }
@@ -234,7 +242,7 @@ export async function atualizarStatusPresencaUsuario(partidaId: string, jogadorI
         });
     }
   } catch (err) {
-    console.error('Erro ao atualizar presenca individual:', err);
+    console.warn('Erro ao atualizar presenca individual:', err);
   }
 }
 
@@ -268,7 +276,7 @@ async function sincronizarPresencasNoSupabase(partidaId: string, jogadoresIds: s
       }
     }
   } catch (err) {
-    console.error('Erro em sincronizarPresencasNoSupabase:', err);
+    console.warn('Erro em sincronizarPresencasNoSupabase:', err);
   }
 }
 
@@ -317,7 +325,7 @@ export async function carregarPartidasDoSupabase(): Promise<Partida[] | null> {
     });
 
   } catch (error) {
-    console.error('Erro ao buscar partidas do Supabase:', error);
+    console.warn('Erro ao buscar partidas do Supabase:', error);
     return null;
   }
 }
@@ -335,7 +343,7 @@ export async function salvarPagamentoNoSupabase(pagamento: Pagamento): Promise<b
       return false;
     }
 
-    const record = {
+    const record: any = {
       ...(pagamento.id && !pagamento.id.startsWith('pag-') ? { id: pagamento.id } : {}),
       jogador_id: pagamento.jogadorId,
       mes_ref: pagamento.mesRef,
@@ -343,6 +351,10 @@ export async function salvarPagamentoNoSupabase(pagamento: Pagamento): Promise<b
       data_pagamento: pagamento.dataPagamento ? `${pagamento.dataPagamento}T12:00:00Z` : null,
       valor: pagamento.valor,
     };
+
+    if (pagamento.partidaId) {
+      record.partida_id = pagamento.partidaId;
+    }
 
     const { error } = await supabase
       .from('pagamentos')
@@ -353,7 +365,7 @@ export async function salvarPagamentoNoSupabase(pagamento: Pagamento): Promise<b
     if (error) throw error;
     return true;
   } catch (error) {
-    console.error('Erro ao salvar pagamento no Supabase:', error);
+    console.warn('Erro ao salvar pagamento no Supabase:', error);
     return false;
   }
 }
@@ -376,10 +388,11 @@ export async function carregarPagamentosDoSupabase(): Promise<Pagamento[] | null
       mesRef: d.mes_ref,
       status: d.status,
       dataPagamento: d.data_pagamento ? d.data_pagamento.substring(0, 10) : null,
-      valor: Number(d.valor)
+      valor: Number(d.valor),
+      partidaId: d.partida_id || undefined
     }));
   } catch (error) {
-    console.error('Erro ao buscar pagamentos do Supabase:', error);
+    console.warn('Erro ao buscar pagamentos do Supabase:', error);
     return null;
   }
 }
@@ -400,7 +413,7 @@ export async function deletarPartidaNoSupabase(id: string): Promise<boolean> {
     if (error) throw error;
     return true;
   } catch (error) {
-    console.error('Erro ao excluir partida no Supabase:', error);
+    console.warn('Erro ao excluir partida no Supabase:', error);
     return false;
   }
 }
@@ -422,7 +435,7 @@ export async function obterConfiguracaoDoSupabase(chave: string): Promise<string
     if (error) throw error;
     return data ? data.valor : null;
   } catch (error) {
-    console.error(`Erro ao obter config ${chave} do Supabase:`, error);
+    console.warn(`Erro ao obter config ${chave} do Supabase:`, error);
     return null;
   }
 }
@@ -442,13 +455,13 @@ export async function salvarConfiguracaoNoSupabase(chave: string, valor: string)
     if (error) throw error;
     return true;
   } catch (error) {
-    console.error(`Erro ao salvar config ${chave} no Supabase:`, error);
+    console.warn(`Erro ao salvar config ${chave} no Supabase:`, error);
     return false;
   }
 }
 
 /**
- * Carregar Logs do Bot de WhatsApp da tabela bot_logs
+ * Carregar Logs do Bot de WhatsApp da tabela bot_logs (com fallback para whatsapp_logs)
  */
 export async function carregarBotLogsDoSupabase(): Promise<BotLog[] | null> {
   const supabase = getSupabase();
@@ -461,16 +474,68 @@ export async function carregarBotLogsDoSupabase(): Promise<BotLog[] | null> {
       .order('enviado_em', { ascending: false })
       .limit(50);
 
-    if (error) throw error;
+    if (error) {
+      if (error.code === '42P01') { // A tabela bot_logs não existe
+        const { data: wData, error: wError } = await supabase
+          .from('whatsapp_logs')
+          .select('*')
+          .order('data', { ascending: false })
+          .limit(50);
+
+        if (wError) throw wError;
+        if (!wData) return [];
+
+        return wData.map((d: any) => ({
+          id: d.id,
+          evento: d.partida || 'WhatsApp',
+          tabela: d.atleta || '',
+          mensagem: d.mensagem,
+          enviado_em: d.data
+        }));
+      }
+      throw error;
+    }
     return data;
   } catch (err) {
-    console.error('Erro ao carregar bot_logs do Supabase:', err);
+    console.warn('Erro ao carregar bot_logs do Supabase:', err);
     return null;
   }
 }
 
 /**
- * Deletar todos os logs da tabela bot_logs
+ * Salvar um log na tabela bot_logs (com fallback para whatsapp_logs)
+ */
+export async function salvarBotLogNoSupabase(log: BotLog): Promise<boolean> {
+  const supabase = getSupabase();
+  if (!supabase) return false;
+
+  try {
+    const { id, ...supabaseLogPayload } = log;
+    const { error } = await supabase.from('bot_logs').insert(supabaseLogPayload);
+
+    if (error) {
+      if (error.code === '42P01') { // A tabela bot_logs não existe
+        const { error: wError } = await supabase.from('whatsapp_logs').insert({
+          atleta: log.tabela || 'WhatsApp',
+          partida: log.evento || '',
+          mensagem: log.mensagem,
+          status: log.evento?.includes('FALHA') ? 'falha' : 'sucesso',
+          data: log.enviado_em || new Date().toISOString()
+        });
+        if (wError) throw wError;
+        return true;
+      }
+      throw error;
+    }
+    return true;
+  } catch (err) {
+    console.warn('Erro ao salvar bot_log no Supabase:', err);
+    return false;
+  }
+}
+
+/**
+ * Deletar todos os logs da tabela bot_logs (com fallback para whatsapp_logs)
  */
 export async function limparBotLogsDoSupabase(): Promise<boolean> {
   const supabase = getSupabase();
@@ -482,10 +547,20 @@ export async function limparBotLogsDoSupabase(): Promise<boolean> {
       .delete()
       .neq('id', 'dummy'); // Deleta todos
 
-    if (error) throw error;
+    if (error) {
+      if (error.code === '42P01') { // A tabela bot_logs não existe
+        const { error: wError } = await supabase
+          .from('whatsapp_logs')
+          .delete()
+          .neq('id', 'dummy');
+        if (wError) throw wError;
+        return true;
+      }
+      throw error;
+    }
     return true;
   } catch (err) {
-    console.error('Erro ao limpar bot_logs:', err);
+    console.warn('Erro ao limpar bot_logs:', err);
     return false;
   }
 }

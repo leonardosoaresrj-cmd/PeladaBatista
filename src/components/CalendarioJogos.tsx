@@ -147,10 +147,10 @@ export default function CalendarioJogos({
       .filter((j): j is Jogador => !!j);
 
     const detilhados = confirmados.map((jogador) => {
-      // Procurar pagamento do jogador para o mês daquela partida
-      const pagamento = pagamentos.find(
-        (p) => p.jogadorId === jogador.id && p.mesRef === mesReferencia
-      );
+      // Procurar pagamento do jogador para o mês ou partida correspondente
+      const pagamento = jogador.membroStatus === 'mensalista'
+        ? pagamentos.find((p) => p.jogadorId === jogador.id && p.mesRef === mesReferencia && !p.partidaId)
+        : pagamentos.find((p) => p.jogadorId === jogador.id && p.partidaId === partida.id);
 
       return {
         jogador,
@@ -444,7 +444,7 @@ export default function CalendarioJogos({
                             >
                               <div className="flex items-center gap-2 overflow-hidden">
                                 <div
-                                  className="w-7 h-7 rounded-full flex items-center justify-center text-[10px] font-black shrink-0 overflow-hidden border border-white/5 cursor-zoom-in hover:scale-110 active:scale-95 transition-all duration-200"
+                                  className="w-11 h-11 rounded-full flex items-center justify-center text-[13px] font-black shrink-0 overflow-hidden border border-white/5 cursor-zoom-in hover:scale-110 active:scale-95 transition-all duration-200"
                                   style={{ backgroundColor: av.color }}
                                   onClick={() => {
                                     if (jogador.foto && (jogador.foto.startsWith('http') || jogador.foto.startsWith('data:'))) {
@@ -543,8 +543,8 @@ export default function CalendarioJogos({
         const isFutureMatch = activePartidaPopup.data >= '2026-05-31';
 
         return (
-          <div id="modal-detalhes-jogo-agendado" className="fixed inset-0 bg-black/85 backdrop-blur-md z-50 flex items-center justify-center p-4 animate-fade-in font-sans text-white">
-            <div className="bg-emerald-950 border border-white/10 rounded-2xl p-6 max-w-lg w-full space-y-5 shadow-2xl relative">
+          <div id="modal-detalhes-jogo-agendado" className="fixed inset-0 bg-black/85 backdrop-blur-md z-50 flex items-center justify-center p-4 overflow-y-auto animate-fade-in font-sans text-white">
+            <div className="bg-emerald-950 border border-white/10 rounded-2xl p-6 max-w-lg w-full max-h-[72vh] md:max-h-[85vh] overflow-y-auto space-y-5 shadow-2xl relative">
               <button
                 id="btn-close-modal-detalhes"
                 onClick={() => {
@@ -702,6 +702,7 @@ export default function CalendarioJogos({
                         const jaPagoMensalidade = pagamentos.some(
                           p => p.jogadorId === jogadorAtual.id && 
                                p.mesRef === matchMesRef && 
+                               !p.partidaId &&
                                p.status === 'pago'
                         );
 
@@ -714,6 +715,7 @@ export default function CalendarioJogos({
                         const jaInformouMensalidade = pagamentos.some(
                           p => p.jogadorId === jogadorAtual.id && 
                                p.mesRef === matchMesRef && 
+                               !p.partidaId &&
                                p.status === 'pendente_confirmacao'
                         );
 
@@ -922,8 +924,8 @@ export default function CalendarioJogos({
           MODAL DE CADASTRO DE NOVO JOGO (Abertura Pop-Up por clique de data)
           ========================================================================= */}
       {showSchedulerModal && (
-        <div className="fixed inset-0 bg-black/85 backdrop-blur-md z-50 flex items-center justify-center p-4 animate-fade-in font-sans">
-          <div className="bg-emerald-950 border border-white/10 rounded-2xl p-6 max-w-md w-full space-y-4 shadow-2xl relative">
+        <div className="fixed inset-0 bg-black/85 backdrop-blur-md z-50 flex items-center justify-center p-4 overflow-y-auto animate-fade-in font-sans">
+          <div className="bg-emerald-950 border border-white/10 rounded-2xl p-6 max-w-md w-full max-h-[72vh] md:max-h-[85vh] overflow-y-auto space-y-4 shadow-2xl relative">
             <button
               onClick={() => setShowSchedulerModal(false)}
               className="absolute top-4 right-4 text-emerald-400 hover:text-white transition-colors text-lg"
@@ -1050,7 +1052,7 @@ export default function CalendarioJogos({
       {/* MODAL DE FORA DO PERÍODO DE CONFIRMAÇÃO */}
       {showForaPeriodoModal && foraPeriodoInfo && (
         <div id="modal-fora-periodo-calendario" className="fixed inset-0 bg-black/85 backdrop-blur-sm flex items-center justify-center p-4 z-50 animate-fade-in overflow-y-auto">
-          <div className="bg-emerald-950 border border-amber-500/30 rounded-2xl w-full max-w-md p-6 shadow-2xl space-y-5 backdrop-blur-md">
+          <div className="bg-emerald-950 border border-amber-500/30 rounded-2xl w-full max-w-md max-h-[72vh] md:max-h-[85vh] overflow-y-auto p-6 shadow-2xl space-y-5 backdrop-blur-md">
             <div className="flex items-center gap-3 border-b border-amber-500/25 pb-3">
               <div className="w-10 h-10 rounded-full bg-amber-500/10 border border-amber-500/30 flex items-center justify-center text-amber-400">
                 <AlertTriangle className="w-6 h-6 animate-pulse" />
@@ -1130,8 +1132,8 @@ export default function CalendarioJogos({
       )}
 
       {showAguardandoAdminModal && (
-        <div id="modal-aguardando-admin" className="fixed inset-0 bg-black/95 backdrop-blur-md flex items-center justify-center p-4 z-50 animate-fade-in">
-          <div className="bg-emerald-950 border border-amber-500/30 rounded-2xl w-full max-w-sm p-6 shadow-2xl space-y-5 text-center relative overflow-hidden">
+        <div id="modal-aguardando-admin" className="fixed inset-0 bg-black/95 backdrop-blur-md flex items-center justify-center p-4 z-50 overflow-y-auto animate-fade-in">
+          <div className="bg-emerald-950 border border-amber-500/30 rounded-2xl w-full max-w-sm max-h-[72vh] md:max-h-[85vh] overflow-y-auto p-6 shadow-2xl space-y-5 text-center relative overflow-hidden">
             <div className="absolute top-0 left-0 right-0 h-1 bg-gradient-to-r from-amber-500/30 via-amber-500 to-amber-500/30 animate-pulse" />
             
             <div className="mx-auto w-14 h-14 rounded-full bg-amber-500/10 border border-amber-500/35 flex items-center justify-center text-amber-400 animate-pulse">
@@ -1166,7 +1168,7 @@ export default function CalendarioJogos({
 
       {showInadimplenteModal && (
         <div id="modal-alerta-inadimplencia" className="fixed inset-0 bg-black/85 backdrop-blur-sm flex items-center justify-center p-4 z-50 animate-fade-in overflow-y-auto">
-          <div className="bg-emerald-950 border border-rose-500/30 rounded-2xl w-full max-w-md p-6 shadow-2xl space-y-5 backdrop-blur-md">
+          <div className="bg-emerald-950 border border-rose-500/30 rounded-2xl w-full max-w-md max-h-[72vh] md:max-h-[85vh] overflow-y-auto p-6 shadow-2xl space-y-5 backdrop-blur-md">
             <div className="flex items-center gap-3 border-b border-rose-500/20 pb-3">
               <div className="w-10 h-10 rounded-full bg-rose-500/10 border border-rose-500/30 flex items-center justify-center text-rose-400">
                 <ShieldAlert className="w-6 h-6 animate-pulse" />

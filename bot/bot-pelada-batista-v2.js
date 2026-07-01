@@ -677,6 +677,65 @@ async function processarEventoWebhook(tipo, tabela, rec, recAntigo) {
     }
   }
 
+  // Notificação extra para o Administrador: Novo Jogador cadastrado aguardando aprovação
+  if (tabela === 'jogadores' && tipo === 'INSERT' && rec.status === 'pendente_aprovacao') {
+    const msgCadastroAdmin = `👤 *NOVO CADASTRO AGUARDANDO APROVAÇÃO* 👤\n\n` +
+               `Um novo jogador se cadastrou no portal e aguarda a sua aprovação:\n\n` +
+               `🏷️ Nome: *${rec.nome} ${rec.sobrenome || ''}*\n` +
+               `📞 WhatsApp: *${rec.whatsapp || 'Não informado'}*\n` +
+               `⚽ Posição: *${rec.posicao || 'Não informada'}*\n` +
+               `⭐ Mensalista/Diarista: *${rec.membro_status || 'diarista'}*\n\n` +
+               `👉 Acesse o painel do administrador para aprovar:\nhttps://peladabatista.onrender.com`;
+               
+    setTimeout(async () => {
+      try {
+        const jidAdmin = await resolverJID('admin');
+        await sock.sendMessage(jidAdmin, { text: msgCadastroAdmin });
+        await supabase.from('bot_logs').insert({
+          evento: 'PENDENTE_APROVACAO_ADMIN', tabela: 'jogadores',
+          mensagem: msgCadastroAdmin.substring(0, 500), enviado_em: new Date().toISOString(),
+        });
+        console.log(`✅ [NOTIFICAÇÃO ADMIN] Novo cadastro de ${rec.nome} enviado para o administrador.`);
+      } catch (err) {
+        console.error('❌ Erro ao notificar admin sobre novo jogador:', err.message);
+      }
+    }, 1000);
+  }
+
+  // Notificação extra para o Administrador: Novo Pagamento manual aguardando aprovação
+  if (tabela === 'pagamentos') {
+    const ficouPendenteConfirmacao = rec.status === 'pendente_confirmacao' && recAntigo?.status !== 'pendente_confirmacao';
+    if ((tipo === 'INSERT' && rec.status === 'pendente_confirmacao') || (tipo === 'UPDATE' && ficouPendenteConfirmacao)) {
+      setTimeout(async () => {
+        try {
+          const { data: jog } = await supabase
+            .from('jogadores').select('nome,sobrenome').eq('id', rec.jogador_id).maybeSingle();
+          const nomeAtleta = jog ? `${jog.nome} ${jog.sobrenome}` : 'Atleta';
+          const descReferencia = rec.partida_id 
+            ? `Partida avulsa`
+            : `Mensalidade ref. ${rec.mes_ref.split('-').reverse().join('/')}`;
+
+          const msgPagamentoAdmin = `💰 *NOVO PAGAMENTO DECLARADO* 💰\n\n` +
+                     `Um pagamento manual foi informado e aguarda sua validação no portal:\n\n` +
+                     `👤 Atleta: *${nomeAtleta}*\n` +
+                     `💵 Valor: *R$ ${Number(rec.valor).toFixed(2).replace('.', ',')}*\n` +
+                     `📝 Referência: *${descReferencia}*\n\n` +
+                     `👉 Acesse o portal para conferir o comprovante e aprovar:\nhttps://peladabatista.onrender.com`;
+                     
+          const jidAdmin = await resolverJID('admin');
+          await sock.sendMessage(jidAdmin, { text: msgPagamentoAdmin });
+          await supabase.from('bot_logs').insert({
+            evento: 'PAGAMENTO_DECLARADO_ADMIN', tabela: 'pagamentos',
+            mensagem: msgPagamentoAdmin.substring(0, 500), enviado_em: new Date().toISOString(),
+          });
+          console.log(`✅ [NOTIFICAÇÃO ADMIN] Pagamento de ${nomeAtleta} enviado para o administrador.`);
+        } catch (err) {
+          console.error('❌ Erro ao notificar admin sobre pagamento:', err.message);
+        }
+      }, 1000);
+    }
+  }
+
   if (mensagem) {
     await enviarParaGrupo(mensagem);
     await supabase.from('bot_logs').insert({
@@ -900,9 +959,19 @@ async function gerarListaCompletaPartida(partidaId) {
 // ─────────────────────────────────────────────────────────────────────────────
 async function resolverJID(grupoId) {
   if (!grupoId) throw new Error('grupo_id vazio');
+  if (grupoId === 'admin') {
+    if (sock && sock.user && sock.user.id) {
+      const cleanJid = sock.user.id.split(':')[0] + '@s.whatsapp.net';
+      console.log(`🎯 Envio para Administrador (Self): ${cleanJid}`);
+      return cleanJid;
+    }
+    throw new Error('Não foi possível obter o JID do administrador conectado.');
+  }
   if (jidCache.has(grupoId)) return jidCache.get(grupoId);
   let jid;
-  if (grupoId.includes('chat.whatsapp.com/')) {
+  if (grupoId.includes('@s.whatsapp.net')) {
+    jid = grupoId;
+  } else if (grupoId.includes('chat.whatsapp.com/')) {
     const codigo = grupoId.split('chat.whatsapp.com/').pop().split('?')[0].trim();
     try { const meta = await sock.groupGetInviteInfo(codigo); jid = meta.id; }
     catch (err) { throw new Error(`Link inválido: ${err.message}`); }
@@ -943,6 +1012,22 @@ function iniciarSelfPing() {
 // BAILEYS
 // ─────────────────────────────────────────────────────────────────────────────
 async function conectarWhatsApp() {
+  // ── FIX MEMÓRIA: destrói o socket anterior antes de criar um novo ──────
+  // Sem isso, cada reconexão deixa o socket antigo (com seus listeners,
+  // WebSocket e cache de mensagens) preso na memória, pois o GC do Node
+  // não libera objetos com listeners pendentes. Em instâncias instáveis
+  // com reconexões frequentes, isso causa crescimento de memória até OOM.
+  if (sock) {
+    try {
+      sock.ev.removeAllListeners();
+      sock.ws?.close();
+    } catch (e) {
+      console.warn('⚠️  Erro ao limpar socket anterior (ignorado):', e.message);
+    }
+    sock = null;
+  }
+  if (global.gc) global.gc(); // libera memória imediatamente se --expose-gc estiver ativo
+
   if (!fs.existsSync(CONFIG.SESSION_LOCAL_PATH))
     fs.mkdirSync(CONFIG.SESSION_LOCAL_PATH, { recursive: true });
 
@@ -955,6 +1040,14 @@ async function conectarWhatsApp() {
     printQRInTerminal: false, markOnlineOnConnect: false,
     connectTimeoutMs: 60000, defaultQueryTimeoutMs: 60000,
     keepAliveIntervalMs: 30000, retryRequestDelayMs: 3000,
+    // ── FIX MEMÓRIA: bot não usa histórico de mensagens (só envia avisos) ──
+    // Sem isso, o Baileys baixa e processa TODO o histórico de TODOS os
+    // chats/grupos na primeira conexão — maior consumidor de RAM conhecido
+    // em bots Baileys, e causa direta de OOM em instâncias de 512MB.
+    syncFullHistory: false,
+    shouldSyncHistoryMessage: () => false,
+    // Evita cache ilimitado de metadados de grupo (cresce a cada grupo visto)
+    cachedGroupMetadata: async () => undefined,
   });
 
   // FIX: usa agendarSalvarSessao (debounced) em vez de salvarSessao direto
