@@ -3,7 +3,7 @@
  * SPDX-License-Identifier: Apache-2.0
  */
 
-import React, { useState, useEffect, useMemo, useRef } from 'react';
+import React, { useState, useEffect, useMemo } from 'react';
 import { Jogador, Partida, Pagamento, PosicaoJogador, MembroStatus, LancamentoAvulso, BotLog } from './types';
 import {
   getSavedJogadores,
@@ -33,7 +33,6 @@ import {
   salvarConfiguracaoNoSupabase,
   carregarBotLogsDoSupabase,
   limparBotLogsDoSupabase,
-  salvarBotLogNoSupabase,
   atualizarStatusPresencaUsuario
 } from './supabaseClient';
 import LoginCadastro from './components/LoginCadastro';
@@ -48,7 +47,7 @@ import MensalistasMes from './components/MensalistasMes';
 import HistoricoJogos from './components/HistoricoJogos';
 import { mesclarPartidasAutomáticas } from './utils/partidaHelper';
 import { isJogadorFuncionalmenteGold } from './utils/goldRules';
-import { obterTextoListaCompletaPartida, obterTextoListaRenovacao, obterStatusMembroEfetivo, obterDebitosDoJogador, obterTextoPartidaCancelada, obterJanelaRenovacaoParaMesRef, isFechamentoMensalistas, getJanelaConfirmacao, obterMesReferenciaParaRenovacao } from './utils/confirmationRules';
+import { obterTextoListaCompletaPartida, obterTextoListaRenovacao, obterStatusMembroEfetivo, obterDebitosDoJogador, obterTextoPartidaCancelada, obterJanelaRenovacaoParaMesRef, isFechamentoMensalistas, getJanelaConfirmacao } from './utils/confirmationRules';
 import logoPelada from './assets/images/logo_pelada.svg';
 import { Calendar, Users, DollarSign, ShieldAlert, LogOut, Database, Award, User, Settings, UserCheck, History, CheckSquare, Check, X, Lock, Cake, TrendingUp, UserPlus, AlertCircle, Trash2 } from 'lucide-react';
 
@@ -71,28 +70,7 @@ export default function App() {
   const [partidasDeletadas, setPartidasDeletadas] = useState<string[]>([]);
   const partidasMescladas = useMemo(() => {
     const list = mesclarPartidasAutomáticas(partidas);
-    const filtradas = list.filter(p => !partidasDeletadas.includes(p.id));
-    
-    // Deduplicar partidas pela data para evitar repetições no calendário e contagens do mês
-    const porData = new Map<string, Partida>();
-    filtradas.forEach(p => {
-      const existente = porData.get(p.data);
-      if (!existente) {
-        porData.set(p.data, p);
-      } else {
-        const existenteAuto = existente.criadoPor === 'sistema' || existente.id.startsWith('sat-');
-        const novaAuto = p.criadoPor === 'sistema' || p.id.startsWith('sat-');
-        if (existenteAuto && !novaAuto) {
-          porData.set(p.data, p);
-        } else if (!existenteAuto && !novaAuto) {
-          if (existente.cancelada && !p.cancelada) {
-            porData.set(p.data, p);
-          }
-        }
-      }
-    });
-    
-    return Array.from(porData.values()).sort((a, b) => a.data.localeCompare(b.data));
+    return list.filter(p => !partidasDeletadas.includes(p.id));
   }, [partidas, partidasDeletadas]);
 
   const proximaPartida = useMemo(() => {
@@ -142,38 +120,15 @@ export default function App() {
     return getSavedWhatsappLogs();
   });
 
-  // Mapa de notificações enviadas recentemente para evitar duplicidade por cliques rápidos ou re-renderizações (deduplicação robusta)
-  const notificacoesEnviadasRef = useRef<Map<string, number>>(new Map());
-
-  // Helper para verificar e registrar um disparo, garantindo que o mesmo evento não seja disparado novamente em menos de 10 segundos
-  const verificarDisparoUnico = (chave: string, cooldownMs = 10000): boolean => {
-    const agora = Date.now();
-    const ultimoDisparo = notificacoesEnviadasRef.current.get(chave);
-    if (ultimoDisparo && (agora - ultimoDisparo) < cooldownMs) {
-      console.warn(`[DEDUPLICADOR] Bloqueado disparo duplicado para chave: ${chave}`);
-      return false;
-    }
-    notificacoesEnviadasRef.current.set(chave, agora);
-    return true;
-  };
-
   const handleUpdateWhatsappConfig = (link: string, ativa: boolean, webhookUrl: string = '', token: string = '') => {
     setWhatsappGrupoLink(link);
     setWhatsappAutomacaoAtiva(ativa);
     setWhatsappWebhookUrl(webhookUrl);
     setWhatsappWebhookToken(token);
-
-    // Salvar no localStorage (imediato, offline)
     localStorage.setItem('racha_whatsapp_grupo_link', link);
     localStorage.setItem('racha_whatsapp_automacao_ativa', ativa.toString());
     localStorage.setItem('racha_whatsapp_webhook_url', webhookUrl);
     localStorage.setItem('racha_whatsapp_webhook_token', token);
-
-    // Salvar no Supabase com as mesmas chaves do localStorage
-    salvarConfiguracaoNoSupabase('racha_whatsapp_grupo_link',        link);
-    salvarConfiguracaoNoSupabase('racha_whatsapp_automacao_ativa',   ativa.toString());
-    salvarConfiguracaoNoSupabase('racha_whatsapp_webhook_url',       webhookUrl);
-    salvarConfiguracaoNoSupabase('racha_whatsapp_webhook_token',     token);
   };
 
   // Estados de Controle de Caixa e Lançamentos
@@ -287,28 +242,43 @@ export default function App() {
   };
 
   const handleResetDatabase = async (startingMonth: string) => {
-    // 1. Limpar apenas partidas e histórico de agenda
+    // 1. Limpar partidas, pagamentos, despesas avulsas
     setPartidas([]);
     savePartidas([]);
+
+    setPagamentos([]);
+    savePagamentos([]);
+
+    setLancamentos([]);
+    saveLancamentos([]);
 
     setPartidasDeletadas([]);
     localStorage.setItem('futebol_partidas_deletadas', JSON.stringify([]));
 
-    // 2. Atualizar configurações de início de recebimento
-    localStorage.setItem('futebol_startup_month', startingMonth);
-    salvarConfiguracaoNoSupabase('futebol_startup_month', startingMonth);
+    // 2. Limpar cadastros de jogadores mantendo o administrador Leonardo Soares ativo
+    const adminEmail = 'leonardo.soares.rj@gmail.com';
+    const list = getSavedJogadores();
+    const adminOriginal = list.filter(j => j.email.toLowerCase().trim() === adminEmail);
+    setJogadores(adminOriginal);
+    saveJogadores(adminOriginal);
 
-    // 3. Limpar apenas as partidas do Supabase se estiver conectado (a tabela 'presencas' possui cascade delete e será limpa automaticamente)
+    // 3. Atualizar configurações de início de recebimento
+    localStorage.setItem('futebol_startup_month', startingMonth);
+
+    // 4. Limpar do Supabase se estiver conectado
     const supabase = getSupabase();
     if (supabase) {
       try {
         await supabase.from('partidas').delete().neq('id', 'placeholder-doesnotexist');
+        await supabase.from('pagamentos').delete().neq('id', 'placeholder-doesnotexist');
+        await supabase.from('lancamentos').delete().neq('id', 'placeholder-doesnotexist');
+        await supabase.from('jogadores').delete().neq('email', adminEmail);
       } catch (e) {
-        console.error('Erro ao limpar partidas no Supabase:', e);
+        console.error('Erro ao limpar tabelas no Supabase:', e);
       }
     }
 
-    // 4. Recarregar dados para garantir sincronismo de todo o resto intacto
+    // 5. Recarregar dados para garantir sincronismo
     fetchTodoDados();
   };
 
@@ -342,20 +312,12 @@ export default function App() {
     }
 
     localStorage.setItem('futebol_aluguel_mensal_map', JSON.stringify(map));
-    salvarConfiguracaoNoSupabase('futebol_aluguel_campo_base', valor.toString());
-    salvarConfiguracaoNoSupabase('futebol_aluguel_mensal_map', JSON.stringify(map));
 
     setAluguelCampoBase(valor);
     saveAluguelCampo(valor);
   };
 
-  const handleRegistrarLogAutomacao = async (atletaNome: string, partidaTitulo: string, msg: string, grupoIdOverride?: string) => {
-    // Evitar disparos duplicados idênticos de WhatsApp (mesmo conteúdo/evento) dentro de 10 segundos
-    const chaveMsg = `whatsapp-msg-${(partidaTitulo || 'geral')}-${msg.trim().substring(0, 300)}`;
-    if (!verificarDisparoUnico(chaveMsg, 10000)) {
-      return;
-    }
-
+  const handleRegistrarLogAutomacao = async (atletaNome: string, partidaTitulo: string, msg: string) => {
     // Insere o evento de teste inicial com ID local temporário
     const logId = `log-${Date.now()}-${Math.random().toString(36).substr(2, 4)}`;
     const novoLog: BotLog = {
@@ -366,15 +328,22 @@ export default function App() {
       enviado_em: new Date().toISOString()
     };
     
-    // Atualização instantânea e persistentente do estado local
+    // Atualização instantânea e persistente do estado local
     setWhatsappLogs(currentLogs => {
       const updated = [novoLog, ...currentLogs].slice(0, 50);
       saveWhatsappLogs(updated);
       return updated;
     });
     
-    if (getSupabase()) {
-      salvarBotLogNoSupabase(novoLog);
+    const supabase = getSupabase();
+    if (supabase) {
+       // Omitimos o ID customizado "log-..." para que o Postgres possa usar o default uuid_generate_v4()
+       const { id, ...supabaseLogPayload } = novoLog;
+       try {
+         await supabase.from('bot_logs').insert(supabaseLogPayload);
+       } catch (e) {
+         console.error('Erro ao salvar log no Supabase:', e);
+       }
     }
 
     if (whatsappAutomacaoAtiva && whatsappWebhookUrl) {
@@ -390,7 +359,7 @@ export default function App() {
               secret: whatsappWebhookToken,
               payload: {
                 mensagem: msg,
-                grupo_id: grupoIdOverride || whatsappGrupoLink
+                grupo_id: whatsappGrupoLink
               }
             })
           });
@@ -413,17 +382,21 @@ export default function App() {
               return updated;
             });
 
-            if (getSupabase()) {
-              salvarBotLogNoSupabase(logFalha);
+            if (supabase) {
+               const { id, ...supabaseLogPayload } = logFalha;
+               try {
+                 await supabase.from('bot_logs').insert(supabaseLogPayload);
+               } catch (e) {
+                 console.error(e);
+               }
             }
           } else {
             // Log de sucesso opcional para que o usuário sinta segurança de que deu certo de fato
-            const destinatarioNome = (grupoIdOverride || whatsappGrupoLink) === 'admin' ? 'administrador' : 'grupo';
             const logSucesso: BotLog = {
               id: `log-${Date.now()}-${Math.random().toString(36).substr(2, 4)}`,
               tabela: atletaNome,
               evento: 'SUCESSO_DISPARO',
-              mensagem: `Mensagem enviada com sucesso ao ${destinatarioNome}: "${msg.substring(0, 60)}..."`,
+              mensagem: `Mensagem enviada com sucesso ao grupo: "${msg.substring(0, 60)}..."`,
               enviado_em: new Date().toISOString()
             };
 
@@ -433,8 +406,13 @@ export default function App() {
               return updated;
             });
 
-            if (getSupabase()) {
-              salvarBotLogNoSupabase(logSucesso);
+            if (supabase) {
+               const { id, ...supabaseLogPayload } = logSucesso;
+               try {
+                 await supabase.from('bot_logs').insert(supabaseLogPayload);
+               } catch (e) {
+                 console.error(e);
+               }
             }
           }
         } catch (error: any) {
@@ -453,8 +431,13 @@ export default function App() {
             return updated;
           });
 
-          if (getSupabase()) {
-            salvarBotLogNoSupabase(logFalha);
+          if (supabase) {
+             const { id, ...supabaseLogPayload } = logFalha;
+             try {
+               await supabase.from('bot_logs').insert(supabaseLogPayload);
+             } catch (e) {
+               console.error(e);
+             }
           }
         }
       }, 50);
@@ -467,35 +450,11 @@ export default function App() {
     await limparBotLogsDoSupabase();
   };
 
-  const handleSendTestAlert = (msg?: string, destinatario?: 'grupo' | 'admin') => {
+  const handleSendTestAlert = (msg?: string) => {
     handleRegistrarLogAutomacao(
-      destinatario === 'admin' ? 'Administrador' : 'Automação (Teste)',
-      destinatario === 'admin' ? 'PENDENTE_APROVACAO_ADMIN' : 'Teste Painel',
-      msg || '📢 [ALERTA DE TESTE]: Disparo de teste bem-sucedido via painel de controle!',
-      destinatario === 'admin' ? 'admin' : undefined
-    );
-  };
-
-  const handleResendMessage = (log: any) => {
-    const parts = log.mensagem.split(' | ⚠️ ');
-    const originalMsg = parts[0];
-
-    let grupoIdOverride: string | undefined = undefined;
-    if (
-      log.tabela?.toLowerCase() === 'administrador' ||
-      log.mensagem.includes('ADMINISTRADOR') ||
-      log.mensagem.includes('Aprovar cadastro')
-    ) {
-      grupoIdOverride = 'admin';
-    }
-
-    const originalEvento = log.evento && !log.evento.includes('FALHA') ? log.evento : 'REENVIO_MENSAGEM';
-
-    handleRegistrarLogAutomacao(
-      log.tabela || 'Reenvio',
-      originalEvento,
-      originalMsg,
-      grupoIdOverride
+      'Automação (Teste)',
+      'Teste Painel',
+      msg || '📢 [ALERTA DE TESTE]: Disparo de teste bem-sucedido via painel de controle!'
     );
   };
 
@@ -506,9 +465,6 @@ export default function App() {
     localStorage.setItem('racha_valor_4s', v4.toString());
     localStorage.setItem('racha_valor_5s', v5.toString());
     localStorage.setItem('racha_valor_diaria', vDiaria.toString());
-    salvarConfiguracaoNoSupabase('racha_valor_4s',     v4.toString());
-    salvarConfiguracaoNoSupabase('racha_valor_5s',     v5.toString());
-    salvarConfiguracaoNoSupabase('racha_valor_diaria', vDiaria.toString());
   };
 
   // Estados para Modal de Edição de Perfil
@@ -546,28 +502,37 @@ export default function App() {
     };
   }, []);
 
-  // Alerta de aprovações pendentes (cadastros, desligamentos ou pagamentos) para o administrador após login
+  // Alerta de novos cadastros pendentes para o administrador após login
   useEffect(() => {
     if (jogadorAtual && jogadorAtual.role === 'admin') {
       const sessaoAlertaAdminChave = `alerta_admin_aprovacoes_mostrada_${jogadorAtual.id}`;
       const jaMostradoAdmin = sessionStorage.getItem(sessaoAlertaAdminChave);
       
-      const pendentesAtletas = jogadores.filter(j => j.status === 'pendente_aprovacao' || j.status === 'solicitou_exclusao');
-      const pendentesPagamentos = pagamentos.filter(p => p.status === 'pendente_confirmacao');
-      
-      if ((pendentesAtletas.length > 0 || pendentesPagamentos.length > 0) && !jaMostradoAdmin) {
+      const pendentes = jogadores.filter(j => j.status === 'pendente_aprovacao' || j.status === 'solicitou_exclusao');
+      if (pendentes.length > 0 && !jaMostradoAdmin) {
         setMostrarPopUpAlertaAdminAprovacoes(true);
         sessionStorage.setItem(sessaoAlertaAdminChave, 'true');
       }
     } else {
       setMostrarPopUpAlertaAdminAprovacoes(false);
     }
-  }, [jogadorAtual, jogadores, pagamentos]);
+  }, [jogadorAtual, jogadores]);
 
-  // Desativado por unificação no popup geral de aprovações
+  // Alerta de pagamentos pendentes para o administrador após login
   useEffect(() => {
-    setMostrarPopUpAlertaAdminPagamentos(false);
-  }, []);
+    if (jogadorAtual && jogadorAtual.role === 'admin') {
+      const sessaoAlertaAdminPagamentosChave = `alerta_admin_pagamentos_mostrada_${jogadorAtual.id}`;
+      const jaMostradoAdminPagamentos = sessionStorage.getItem(sessaoAlertaAdminPagamentosChave);
+      
+      const pendentesPagamentos = pagamentos.filter(p => p.status === 'pendente_confirmacao');
+      if (pendentesPagamentos.length > 0 && !jaMostradoAdminPagamentos) {
+        setMostrarPopUpAlertaAdminPagamentos(true);
+        sessionStorage.setItem(sessaoAlertaAdminPagamentosChave, 'true');
+      }
+    } else {
+      setMostrarPopUpAlertaAdminPagamentos(false);
+    }
+  }, [jogadorAtual, pagamentos]);
 
   // Helpers de status de membros dinâmicos/efetivos baseados em adimplência
   const jogadorAtualEfetivo = useMemo(() => {
@@ -683,58 +648,6 @@ export default function App() {
           }
         }
 
-        // Carregar configurações de WhatsApp do Supabase
-        // (substituem o localStorage para funcionar em qualquer navegador)
-        // Carregar TODAS as configurações do Supabase em paralelo
-        const [
-          dbGrupoLink, dbAutomacao, dbWebhookUrl, dbWebhookToken,
-          dbValor4s, dbValor5s, dbValorDiaria,
-          dbStartupMonth, dbAluguelBase, dbAluguelMap,
-          dbPixChave, dbPixNome, dbPixCidade,
-          dbMpToken, dbMpPublicKey,
-        ] = await Promise.all([
-          obterConfiguracaoDoSupabase('racha_whatsapp_grupo_link'),
-          obterConfiguracaoDoSupabase('racha_whatsapp_automacao_ativa'),
-          obterConfiguracaoDoSupabase('racha_whatsapp_webhook_url'),
-          obterConfiguracaoDoSupabase('racha_whatsapp_webhook_token'),
-          obterConfiguracaoDoSupabase('racha_valor_4s'),
-          obterConfiguracaoDoSupabase('racha_valor_5s'),
-          obterConfiguracaoDoSupabase('racha_valor_diaria'),
-          obterConfiguracaoDoSupabase('futebol_startup_month'),
-          obterConfiguracaoDoSupabase('futebol_aluguel_campo_base'),
-          obterConfiguracaoDoSupabase('futebol_aluguel_mensal_map'),
-          obterConfiguracaoDoSupabase('direto_pix_chave'),
-          obterConfiguracaoDoSupabase('direto_pix_nome'),
-          obterConfiguracaoDoSupabase('direto_pix_cidade'),
-          obterConfiguracaoDoSupabase('mercado_pago_access_token'),
-          obterConfiguracaoDoSupabase('mercado_pago_public_key'),
-        ]);
-
-        // WhatsApp — atualiza estado React e sincroniza localStorage
-        if (dbGrupoLink    !== null) { setWhatsappGrupoLink(dbGrupoLink);                        localStorage.setItem('racha_whatsapp_grupo_link',       dbGrupoLink); }
-        if (dbAutomacao    !== null) { setWhatsappAutomacaoAtiva(dbAutomacao === 'true');         localStorage.setItem('racha_whatsapp_automacao_ativa',  dbAutomacao); }
-        if (dbWebhookUrl   !== null) { setWhatsappWebhookUrl(dbWebhookUrl);                      localStorage.setItem('racha_whatsapp_webhook_url',       dbWebhookUrl); }
-        if (dbWebhookToken !== null) { setWhatsappWebhookToken(dbWebhookToken);                  localStorage.setItem('racha_whatsapp_webhook_token',     dbWebhookToken); }
-
-        // Mensalidade / Diária — atualiza estado React e sincroniza localStorage
-        if (dbValor4s      !== null) { setValor4Sabados(parseFloat(dbValor4s));                  localStorage.setItem('racha_valor_4s',                  dbValor4s); }
-        if (dbValor5s      !== null) { setValor5Sabados(parseFloat(dbValor5s));                  localStorage.setItem('racha_valor_5s',                  dbValor5s); }
-        if (dbValorDiaria  !== null) { setValorDiaria(parseFloat(dbValorDiaria));                localStorage.setItem('racha_valor_diaria',               dbValorDiaria); }
-
-        // Aluguel e mês — sincroniza localStorage (lido por ControlePagamentos e ControleCaixa)
-        if (dbAluguelBase  !== null) {                                                           localStorage.setItem('futebol_aluguel_campo_base',       dbAluguelBase); }
-        if (dbAluguelMap   !== null) {                                                           localStorage.setItem('futebol_aluguel_mensal_map',       dbAluguelMap); }
-        if (dbStartupMonth !== null) {                                                           localStorage.setItem('futebol_startup_month',            dbStartupMonth); }
-
-        // PIX direto — sincroniza localStorage (lido por CheckoutPixModal)
-        if (dbPixChave     !== null) {                                                           localStorage.setItem('direto_pix_chave',                 dbPixChave); }
-        if (dbPixNome      !== null) {                                                           localStorage.setItem('direto_pix_nome',                  dbPixNome); }
-        if (dbPixCidade    !== null) {                                                           localStorage.setItem('direto_pix_cidade',                dbPixCidade); }
-
-        // Mercado Pago — sincroniza localStorage (lido por ConfiguracaoSystem)
-        if (dbMpToken      !== null) {                                                           localStorage.setItem('mercado_pago_access_token',        dbMpToken); }
-        if (dbMpPublicKey  !== null) {                                                           localStorage.setItem('mercado_pago_public_key',          dbMpPublicKey); }
-
         // Carregar logs do bot
         const bLogs = await carregarBotLogsDoSupabase();
         if (bLogs) {
@@ -795,7 +708,9 @@ export default function App() {
 
       // Se ontem foi o último sábado do seu respectivo mês:
       if (ontem.getMonth() !== proximoSabado.getMonth()) {
-        const mesRef = obterMesReferenciaParaRenovacao(partidas);
+        const refAno = proximoSabado.getFullYear();
+        const refMesString = String(proximoSabado.getMonth() + 1).padStart(2, '0');
+        const mesRef = `${refAno}-${refMesString}`;
 
         const key = `renew_alert_sent_${mesRef}`;
         if (!localStorage.getItem(key)) {
@@ -809,7 +724,7 @@ export default function App() {
         }
       }
     }
-  }, [jogadores, pagamentos, whatsappAutomacaoAtiva, valor4Sabados, valor5Sabados, partidas]);
+  }, [jogadores, pagamentos, whatsappAutomacaoAtiva, valor4Sabados, valor5Sabados]);
 
   // Alerta de Abertura de Janela de Confirmação Semanal Automática
   useEffect(() => {
@@ -921,56 +836,6 @@ export default function App() {
     saveJogadores(atualizados);
 
     await salvarJogadorNoSupabase(novoJogador);
-
-    // Enviar notificação de novo cadastro para o administrador
-    if (whatsappAutomacaoAtiva && whatsappWebhookUrl) {
-      const msgCadastroAdmin = `👤 *NOVO CADASTRO AGUARDANDO APROVAÇÃO* 👤\n\n` +
-        `Um novo jogador se cadastrou no portal e aguarda a sua aprovação:\n\n` +
-        `🏷️ Nome: *${novoJogador.nome} ${novoJogador.sobrenome || ''}*\n` +
-        `📧 E-mail: *${novoJogador.email || 'Não informado'}*\n` +
-        `⚽ Posição: *${novoJogador.posicao || 'Não informada'}*\n` +
-        `⭐ Mensalista/Diarista: *${novoJogador.membroStatus || 'diarista'}*\n\n` +
-        `👉 Acesse o painel do administrador para aprovar:\n${window.location.origin}`;
-
-      setTimeout(async () => {
-        try {
-          await fetch('/api/bot-proxy', {
-            method: 'POST',
-            headers: {
-              'Content-Type': 'application/json'
-            },
-            body: JSON.stringify({
-              url: whatsappWebhookUrl,
-              secret: whatsappWebhookToken,
-              payload: {
-                mensagem: msgCadastroAdmin,
-                grupo_id: 'admin'
-              }
-            })
-          });
-
-          const logSucesso: BotLog = {
-            id: `log-${Date.now()}-${Math.random().toString(36).substr(2, 4)}`,
-            tabela: `${novoJogador.nome} ${novoJogador.sobrenome}`,
-            evento: 'PENDENTE_APROVACAO_ADMIN',
-            mensagem: `Notificação de novo cadastro pendente enviada ao Administrador: "${novoJogador.nome} ${novoJogador.sobrenome}"`,
-            enviado_em: new Date().toISOString()
-          };
-
-          setWhatsappLogs(currentLogs => {
-            const updated = [logSucesso, ...currentLogs].slice(0, 50);
-            saveWhatsappLogs(updated);
-            return updated;
-          });
-
-          if (getSupabase()) {
-            salvarBotLogNoSupabase(logSucesso);
-          }
-        } catch (e: any) {
-          console.warn('Erro ao notificar administrador sobre novo cadastro:', e);
-        }
-      }, 200);
-    }
   };
 
   // 2. Aprovar / Recusar cadastro pendente (Ação administrativa)
@@ -995,22 +860,6 @@ export default function App() {
 
     if (modificado) {
       await salvarJogadorNoSupabase(modificado);
-
-      // Enviar e-mail de Boas-vindas (Conta Aprovada) via SMTP
-      if (modificado.email) {
-        try {
-          fetch('/api/send-welcome-email', {
-            method: 'POST',
-            headers: { 'Content-Type': 'application/json' },
-            body: JSON.stringify({
-              email: modificado.email,
-              nome: `${modificado.nome} ${modificado.sobrenome || ''}`.trim()
-            })
-          });
-        } catch (err) {
-          console.error("Erro ao solicitar envio de e-mail de boas-vindas:", err);
-        }
-      }
     } else if (!aprovar) {
       const supabase = getSupabase();
       if (supabase) {
@@ -1038,11 +887,8 @@ export default function App() {
   // 4. Editar Informações Básicas do Atleta (Ação administrativa)
   const handleEditarJogador = async (id: string, camposAtualizados: Partial<Jogador>) => {
     let modificado: Jogador | null = null;
-    let statusAnterior: string | undefined = undefined;
-
     const atualizados = jogadores.map(j => {
       if (j.id === id) {
-        statusAnterior = j.status;
         modificado = { ...j, ...camposAtualizados };
         return modificado;
       }
@@ -1053,22 +899,6 @@ export default function App() {
 
     if (modificado) {
       await salvarJogadorNoSupabase(modificado);
-
-      // Se o status mudou para 'ativo' vindo de pendente_aprovacao, enviar e-mail de Boas-Vindas
-      if (camposAtualizados.status === 'ativo' && statusAnterior === 'pendente_aprovacao' && modificado.email) {
-        try {
-          fetch('/api/send-welcome-email', {
-            method: 'POST',
-            headers: { 'Content-Type': 'application/json' },
-            body: JSON.stringify({
-              email: modificado.email,
-              nome: `${modificado.nome} ${modificado.sobrenome || ''}`.trim()
-            })
-          });
-        } catch (err) {
-          console.error("Erro ao solicitar envio de e-mail de boas-vindas:", err);
-        }
-      }
     }
 
     // Atualizar sessão corrente caso tenha editado o próprio perfil
@@ -1314,11 +1144,9 @@ export default function App() {
     valor: number,
     partidaId?: string
   ) => {
-    const pagamentoAnterior = partidaId 
-      ? pagamentos.find(p => p.jogadorId === jogadorId && p.partidaId === partidaId)
-      : pagamentos.find(p => p.jogadorId === jogadorId && p.mesRef === mesRef && !p.partidaId);
-    
-    const existe = !!pagamentoAnterior;
+    const existe = partidaId 
+      ? pagamentos.some(p => p.jogadorId === jogadorId && p.partidaId === partidaId)
+      : pagamentos.some(p => p.jogadorId === jogadorId && p.mesRef === mesRef && !p.partidaId);
     
     let atualizados: Pagamento[];
     let pagModificado: Pagamento;
@@ -1372,35 +1200,6 @@ export default function App() {
     if (pagModificado!) {
       await salvarPagamentoNoSupabase(pagModificado);
 
-      // Se o status mudou para 'pago' (e não era pago antes), enviar e-mail de Recibo via SMTP
-      if (status === 'pago' && (!pagamentoAnterior || pagamentoAnterior.status !== 'pago')) {
-        const atleta = jogadores.find(j => j.id === jogadorId);
-        if (atleta && atleta.email) {
-          const descReferencia = partidaId 
-            ? `Partida avulsa`
-            : `Mensalidade ref. ${mesRef.split('-').reverse().join('/')}`;
-
-          const chaveEmail = `email-recibo-${jogadorId}-${mesRef}-${partidaId || 'mensalidade'}`;
-          if (verificarDisparoUnico(chaveEmail, 10000)) {
-            try {
-              fetch('/api/send-receipt-email', {
-                method: 'POST',
-                headers: { 'Content-Type': 'application/json' },
-                body: JSON.stringify({
-                  email: atleta.email,
-                  nome: `${atleta.nome} ${atleta.sobrenome || ''}`.trim(),
-                  valor: valor,
-                  referencia: descReferencia,
-                  dataPagamento: dataPagamento
-                })
-              });
-            } catch (err) {
-              console.error("Erro ao enviar e-mail de recibo:", err);
-            }
-          }
-        }
-      }
-
       // Se for quitação de mensalidade (sem partidaId associada) e o bot estiver ativo, disparar mensagem com a lista atualizada
       if (whatsappAutomacaoAtiva && !partidaId && status === 'pago') {
         const msgCompleta = obterTextoListaRenovacao(mesRef, jogadores, atualizados, valor4Sabados, valor5Sabados);
@@ -1411,64 +1210,6 @@ export default function App() {
           `Renovação de Mensalidade ${mesRef.split('-').reverse().join('/')}`,
           msgCompleta
         );
-      }
-
-      // Se for um novo pagamento manual informado aguardando aprovação, notificar o administrador
-      if (whatsappAutomacaoAtiva && status === 'pendente_confirmacao' && whatsappWebhookUrl) {
-        const atleta = jogadores.find(j => j.id === jogadorId);
-        const atletaNome = atleta ? `${atleta.nome} ${atleta.sobrenome}` : 'Atleta';
-        const descReferencia = partidaId 
-          ? `Partida avulsa`
-          : `Mensalidade ref. ${mesRef.split('-').reverse().join('/')}`;
-
-        const chaveNovoPag = `pag-pendente-${jogadorId}-${mesRef}-${partidaId || 'mensalidade'}`;
-        if (verificarDisparoUnico(chaveNovoPag, 10000)) {
-          const msgPagamentoAdmin = `💰 *NOVO PAGAMENTO DECLARADO* 💰\n\n` +
-            `Um pagamento manual foi informado e aguarda sua validação no portal:\n\n` +
-            `👤 Atleta: *${atletaNome}*\n` +
-            `💵 Valor: *R$ ${Number(valor).toFixed(2).replace('.', ',')}*\n` +
-            `📝 Referência: *${descReferencia}*\n\n` +
-            `👉 Acesse o portal para conferir o comprovante e aprovar:\n${window.location.origin}`;
-
-          setTimeout(async () => {
-            try {
-              await fetch('/api/bot-proxy', {
-                method: 'POST',
-                headers: {
-                  'Content-Type': 'application/json'
-                },
-                body: JSON.stringify({
-                  url: whatsappWebhookUrl,
-                  secret: whatsappWebhookToken,
-                  payload: {
-                    mensagem: msgPagamentoAdmin,
-                    grupo_id: 'admin'
-                  }
-                })
-              });
-
-              const logSucesso: BotLog = {
-                id: `log-${Date.now()}-${Math.random().toString(36).substr(2, 4)}`,
-                tabela: atletaNome,
-                evento: 'PAGAMENTO_DECLARADO_ADMIN',
-                mensagem: `Notificação de pagamento pendente enviada ao Administrador: "${atletaNome} - R$ ${Number(valor).toFixed(2).replace('.', ',')}"`,
-                enviado_em: new Date().toISOString()
-              };
-
-              setWhatsappLogs(currentLogs => {
-                const updated = [logSucesso, ...currentLogs].slice(0, 50);
-                saveWhatsappLogs(updated);
-                return updated;
-              });
-
-              if (getSupabase()) {
-                salvarBotLogNoSupabase(logSucesso);
-              }
-            } catch (e: any) {
-              console.warn('Erro ao notificar administrador sobre pagamento manual:', e);
-            }
-          }, 200);
-        }
       }
     }
   };
@@ -1485,19 +1226,11 @@ export default function App() {
   ) => {
     let atualizados = [...pagamentos];
     const modificados: Pagamento[] = [];
-    const statusAnterioresMap = new Map<string, string | undefined>();
 
     for (const item of items) {
       const existeIndex = item.partidaId
         ? atualizados.findIndex(p => p.jogadorId === jogadorId && p.partidaId === item.partidaId)
         : atualizados.findIndex(p => p.jogadorId === jogadorId && p.mesRef === item.mesRef && !p.partidaId);
-
-      const key = item.partidaId ? `partida-${item.partidaId}` : `mesRef-${item.mesRef}`;
-      if (existeIndex >= 0) {
-        statusAnterioresMap.set(key, atualizados[existeIndex].status);
-      } else {
-        statusAnterioresMap.set(key, undefined);
-      }
 
       let pagModificado: Pagamento;
       if (existeIndex >= 0) {
@@ -1545,96 +1278,6 @@ export default function App() {
 
     for (const pag of modificados) {
       await salvarPagamentoNoSupabase(pag);
-
-      const key = pag.partidaId ? `partida-${pag.partidaId}` : `mesRef-${pag.mesRef}`;
-      const statusAnterior = statusAnterioresMap.get(key);
-
-      // Se o status mudou para 'pago' (e não era pago antes), enviar e-mail de Recibo via SMTP
-      if (pag.status === 'pago' && statusAnterior !== 'pago') {
-        const atleta = jogadores.find(j => j.id === jogadorId);
-        if (atleta && atleta.email) {
-          const descReferencia = pag.partidaId 
-            ? `Partida avulsa`
-            : `Mensalidade ref. ${pag.mesRef.split('-').reverse().join('/')}`;
-
-          const chaveEmail = `email-recibo-${jogadorId}-${pag.mesRef}-${pag.partidaId || 'mensalidade'}`;
-          if (verificarDisparoUnico(chaveEmail, 10000)) {
-            try {
-              fetch('/api/send-receipt-email', {
-                method: 'POST',
-                headers: { 'Content-Type': 'application/json' },
-                body: JSON.stringify({
-                  email: atleta.email,
-                  nome: `${atleta.nome} ${atleta.sobrenome || ''}`.trim(),
-                  valor: pag.valor,
-                  referencia: descReferencia,
-                  dataPagamento: pag.dataPagamento
-                })
-              });
-            } catch (err) {
-              console.error("Erro ao enviar e-mail de recibo em lote:", err);
-            }
-          }
-        }
-      }
-
-      // Se for um novo pagamento manual informado aguardando aprovação, notificar o administrador
-      if (whatsappAutomacaoAtiva && pag.status === 'pendente_confirmacao' && whatsappWebhookUrl) {
-        const atleta = jogadores.find(j => j.id === jogadorId);
-        const atletaNome = atleta ? `${atleta.nome} ${atleta.sobrenome}` : 'Atleta';
-        const descReferencia = pag.partidaId 
-          ? `Partida avulsa`
-          : `Mensalidade ref. ${pag.mesRef.split('-').reverse().join('/')}`;
-
-        const chaveNovoPag = `pag-pendente-${jogadorId}-${pag.mesRef}-${pag.partidaId || 'mensalidade'}`;
-        if (verificarDisparoUnico(chaveNovoPag, 10000)) {
-          const msgPagamentoAdmin = `💰 *NOVO PAGAMENTO DECLARADO* 💰\n\n` +
-            `Um pagamento manual foi informado e aguarda sua validação no portal:\n\n` +
-            `👤 Atleta: *${atletaNome}*\n` +
-            `💵 Valor: *R$ ${Number(pag.valor).toFixed(2).replace('.', ',')}*\n` +
-            `📝 Referência: *${descReferencia}*\n\n` +
-            `👉 Acesse o portal para conferir o comprovante e aprovar:\n${window.location.origin}`;
-
-          setTimeout(async () => {
-            try {
-              await fetch('/api/bot-proxy', {
-                method: 'POST',
-                headers: {
-                  'Content-Type': 'application/json'
-                },
-                body: JSON.stringify({
-                  url: whatsappWebhookUrl,
-                  secret: whatsappWebhookToken,
-                  payload: {
-                    mensagem: msgPagamentoAdmin,
-                    grupo_id: 'admin'
-                  }
-                })
-              });
-
-              const logSucesso: BotLog = {
-                id: `log-${Date.now()}-${Math.random().toString(36).substr(2, 4)}`,
-                tabela: atletaNome,
-                evento: 'PAGAMENTO_DECLARADO_ADMIN',
-                mensagem: `Notificação de pagamento pendente enviada ao Administrador: "${atletaNome} - R$ ${Number(pag.valor).toFixed(2).replace('.', ',')}"`,
-                enviado_em: new Date().toISOString()
-              };
-
-              setWhatsappLogs(currentLogs => {
-                const updated = [logSucesso, ...currentLogs].slice(0, 50);
-                saveWhatsappLogs(updated);
-                return updated;
-              });
-
-              if (getSupabase()) {
-                salvarBotLogNoSupabase(logSucesso);
-              }
-            } catch (e: any) {
-              console.warn('Erro ao notificar administrador sobre pagamento manual:', e);
-            }
-          }, 200);
-        }
-      }
     }
   };
 
@@ -1952,7 +1595,7 @@ export default function App() {
       </header>
 
       {/* ÁREA DE CONTEÚDO PRINCIPAL COM LAYOUT FLEX ADAPTÁVEL PARA CELULAR (flex-col) E DESKTOP (flex-row) */}
-      <div className={`flex-grow w-full max-w-7xl mx-auto flex flex-col md:flex-row items-start p-3 sm:p-4 md:p-6 pb-28 md:pb-6 gap-4 sm:gap-5 md:gap-6 relative`}>
+      <div className={`flex-grow w-full max-w-7xl mx-auto flex flex-col md:flex-row items-start p-3 sm:p-4 md:p-6 pb-28 md:pb-6 gap-4 sm:gap-5 md:gap-6 relative z-10`}>
         
         {/* MENU NAVEGAÇÃO DE DESKTOP (Somente se autenticado) */}
         {jogadorAtual && (
@@ -2206,7 +1849,6 @@ export default function App() {
                   valor5Sabados={valor5Sabados}
                   whatsappAutomacaoAtiva={whatsappAutomacaoAtiva}
                   onRegistrarLogAutomacao={handleRegistrarLogAutomacao}
-                  partidas={partidasMescladas}
                 />
               )}
 
@@ -2223,10 +1865,8 @@ export default function App() {
                 <PainelAdmin
                   jogadores={jogadoresEfetivos}
                   partidas={partidasMescladas}
-                  pagamentos={pagamentos}
                   jogadorAtual={jogadorAtual}
                   onAprovarJogador={handleAprovarJogador}
-                  onRegistrarPagamento={handleRegistrarPagamento}
                 />
               )}
 
@@ -2241,16 +1881,11 @@ export default function App() {
                   whatsappLogs={whatsappLogs}
                   onClearLogs={handleClearWhatsappLogs}
                   onSendTestAlert={handleSendTestAlert}
-                  onResendMessage={handleResendMessage}
                   valor4Sabados={valor4Sabados}
                   valor5Sabados={valor5Sabados}
                   valorDiaria={valorDiaria}
                   onUpdateValoresConfig={handleUpdateValoresConfig}
                   onResetDatabase={handleResetDatabase}
-                  partidas={partidasMescladas}
-                  jogadores={jogadoresEfetivos}
-                  pagamentos={pagamentos}
-                  onRegistrarLogAutomacao={handleRegistrarLogAutomacao}
                 />
               )}
             </div>
@@ -2277,9 +1912,9 @@ export default function App() {
       {showConfirmacaoModal && (
         <div 
           id="confirmacao-sucesso-popup"
-          className="fixed inset-0 z-50 flex items-center justify-center p-4 overflow-y-auto bg-black/80 backdrop-blur-md animate-fade-in"
+          className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/80 backdrop-blur-md animate-fade-in"
         >
-          <div className="bg-emerald-900 border border-emerald-500/35 rounded-2xl max-w-sm w-full max-h-[72vh] md:max-h-[85vh] overflow-y-auto p-6 text-center shadow-2xl relative animate-scale-up">
+          <div className="bg-emerald-900 border border-emerald-500/35 rounded-2xl max-w-sm w-full p-6 text-center shadow-2xl relative animate-scale-up">
             <div className="w-16 h-16 bg-emerald-500/10 border-2 border-emerald-500 text-teal-400 rounded-full flex items-center justify-center mx-auto mb-4">
               <Check className="w-8 h-8" />
             </div>
@@ -2303,9 +1938,9 @@ export default function App() {
       {showSessaoExpiradaModal && (
         <div 
           id="popup-sessao-expirada"
-          className="fixed inset-0 z-50 flex items-center justify-center p-4 overflow-y-auto bg-black/90 backdrop-blur-md animate-fade-in text-white font-sans"
+          className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/90 backdrop-blur-md animate-fade-in text-white font-sans"
         >
-          <div className="bg-emerald-950 border border-teal-500/30 rounded-2xl max-w-sm w-full max-h-[72vh] md:max-h-[85vh] overflow-y-auto p-6 text-center shadow-2xl relative animate-scale-up">
+          <div className="bg-emerald-950 border border-teal-500/30 rounded-2xl max-w-sm w-full p-6 text-center shadow-2xl relative animate-scale-up">
             <div className="w-16 h-16 bg-teal-500/10 border-2 border-teal-500 text-teal-400 rounded-full flex items-center justify-center mx-auto mb-4">
               <Lock className="w-8 h-8 animate-pulse" />
             </div>
@@ -2329,9 +1964,9 @@ export default function App() {
       {jogadorAtual && jogadorAtual.status === 'suspenso' && (
         <div 
           id="popup-conta-suspensa"
-          className="fixed inset-0 z-[100] flex items-center justify-center p-4 overflow-y-auto bg-black/95 backdrop-blur-md animate-fade-in text-white font-sans"
+          className="fixed inset-0 z-[100] flex items-center justify-center p-4 bg-black/95 backdrop-blur-md animate-fade-in text-white font-sans"
         >
-          <div className="bg-emerald-950 border border-rose-500/30 rounded-2xl max-w-sm w-full max-h-[72vh] md:max-h-[85vh] overflow-y-auto p-6 text-center shadow-2xl relative animate-scale-up">
+          <div className="bg-emerald-950 border border-rose-500/30 rounded-2xl max-w-sm w-full p-6 text-center shadow-2xl relative animate-scale-up">
             <div className="w-16 h-16 bg-rose-500/10 border-2 border-rose-500 text-rose-400 rounded-full flex items-center justify-center mx-auto mb-4">
               <ShieldAlert className="w-8 h-8 animate-pulse" />
             </div>
@@ -2359,9 +1994,9 @@ export default function App() {
       {mostrarPopUpAlertaMensalista && jogadorAtual && (
         <div 
           id="popup-alerta-mensalidade-pendente"
-          className="fixed inset-0 z-50 flex items-center justify-center p-4 overflow-y-auto bg-black/80 backdrop-blur-md animate-fade-in"
+          className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/80 backdrop-blur-md animate-fade-in"
         >
-          <div className="bg-emerald-950 border border-amber-500/30 rounded-2xl max-w-md w-full max-h-[72vh] md:max-h-[85vh] overflow-y-auto p-6 text-left shadow-2xl relative animate-scale-up">
+          <div className="bg-emerald-950 border border-amber-500/30 rounded-2xl max-w-md w-full p-6 text-left shadow-2xl relative animate-scale-up">
             <div className="flex items-center gap-3 border-b border-white/10 pb-3.5 mb-4">
               <div className="w-10 h-10 bg-amber-500/10 border border-amber-500/30 text-amber-400 rounded-xl flex items-center justify-center shrink-0">
                 <ShieldAlert className="w-5 h-5 animate-pulse" />
@@ -2410,9 +2045,9 @@ export default function App() {
       {mostrarPopUpAlertaDiarista && jogadorAtual && (
         <div 
           id="popup-alerta-diaria-pendente"
-          className="fixed inset-0 z-50 flex items-center justify-center p-4 overflow-y-auto bg-black/80 backdrop-blur-md animate-fade-in"
+          className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/80 backdrop-blur-md animate-fade-in"
         >
-          <div className="bg-emerald-955 border border-rose-500/30 rounded-2xl max-w-md w-full max-h-[72vh] md:max-h-[85vh] overflow-y-auto p-6 text-left shadow-2xl relative animate-scale-up">
+          <div className="bg-emerald-955 border border-rose-500/30 rounded-2xl max-w-md w-full p-6 text-left shadow-2xl relative animate-scale-up">
             <div className="flex items-center gap-3 border-b border-white/10 pb-3.5 mb-4">
               <div className="w-10 h-10 bg-rose-500/10 border border-rose-500/30 text-rose-400 rounded-xl flex items-center justify-center shrink-0">
                 <ShieldAlert className="w-5 h-5 animate-pulse" />
@@ -2480,17 +2115,17 @@ export default function App() {
       {mostrarPopUpAlertaAdminAprovacoes && jogadorAtual && jogadorAtual.role === 'admin' && (
         <div 
           id="popup-alerta-admin-aprovacoes"
-          className="fixed inset-0 z-50 flex items-center justify-center p-4 overflow-y-auto bg-black/80 backdrop-blur-md animate-fade-in"
+          className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/80 backdrop-blur-md animate-fade-in"
         >
-          <div className="bg-emerald-950 border border-teal-500/30 rounded-2xl max-w-lg w-full max-h-[72vh] md:max-h-[85vh] overflow-y-auto p-6 text-left shadow-2xl relative animate-scale-up flex flex-col">
+          <div className="bg-emerald-950 border border-teal-500/30 rounded-2xl max-w-lg w-full p-6 text-left shadow-2xl relative animate-scale-up max-h-[90vh] flex flex-col">
             <div className="flex items-center justify-between border-b border-white/10 pb-3.5 mb-4 shrink-0">
               <div className="flex items-center gap-3">
                 <div className="w-10 h-10 bg-teal-500/10 border border-teal-500/30 text-teal-400 rounded-xl flex items-center justify-center shrink-0">
                   <UserPlus className="w-5 h-5 animate-pulse" />
                 </div>
                 <div>
-                  <h3 className="font-display font-black text-sm uppercase tracking-wide text-teal-300">Aprovações Pendentes (Geral)</h3>
-                  <p className="text-[10px] text-emerald-400/80 font-mono">Solicitações de atletas e quitações financeiras aguardando liberação</p>
+                  <h3 className="font-display font-black text-sm uppercase tracking-wide text-teal-300">Solicitações de Acesso & Desligamento</h3>
+                  <p className="text-[10px] text-emerald-400/80 font-mono">Solicitações de atletas aguardando deliberação de cadastro ou exclusão</p>
                 </div>
               </div>
               <button
@@ -2504,11 +2139,10 @@ export default function App() {
             </div>
             
             <p className="text-xs text-emerald-200 leading-relaxed font-sans mb-4 shrink-0">
-              Olá, Administrador <b>{jogadorAtual.nome}</b>. Identificamos solicitações pendentes de novos atletas, desligamentos de perfil de jogador ou confirmações de pagamento:
+              Olá, Administrador <b>{jogadorAtual.nome}</b>. Identificamos solicitações pendentes de novos atletas ou desligamento de perfil de jogador:
             </p>
             
             <div className="flex-grow overflow-y-auto space-y-3 pr-1 mb-5 select-none scrollbar-thin font-sans">
-              {/* Seção 1: Atletas */}
               {jogadores.filter(j => j.status === 'pendente_aprovacao' || j.status === 'solicitou_exclusao').map((j) => {
                 const isExclusao = j.status === 'solicitou_exclusao';
                 return (
@@ -2555,7 +2189,7 @@ export default function App() {
                       </div>
                     </div>
                     
-                    <div className="flex gap-2 shrink-0 self-end sm:self-center">
+                    <div className="flex gap-2 shrink-0">
                       {isExclusao ? (
                         <>
                           <button
@@ -2580,7 +2214,7 @@ export default function App() {
                             className="px-3 py-1.5 bg-emerald-950 hover:bg-emerald-900 border border-white/10 text-emerald-300 font-bold text-[10px] uppercase rounded-lg transition-all flex items-center gap-1 cursor-pointer active:scale-95"
                           >
                             <X className="w-3.5 h-3.5" />
-                            Rejeitar
+                            Rejeitar / Manter
                           </button>
                         </>
                       ) : (
@@ -2611,83 +2245,9 @@ export default function App() {
                   </div>
                 );
               })}
-
-              {/* Seção 2: Pagamentos */}
-              {pagamentos.filter(p => p.status === 'pendente_confirmacao').map((p) => {
-                const jogador = jogadores.find(j => j.id === p.jogadorId);
-                const partidaObj = p.partidaId ? partidas.find(pt => pt.id === p.partidaId) : null;
-                if (!jogador) return null;
-                
-                return (
-                  <div 
-                    key={p.id} 
-                    className="p-3.5 rounded-xl border border-amber-500/15 bg-amber-950/15 hover:bg-amber-955/25 flex flex-col sm:flex-row sm:items-center justify-between gap-3 transition-all"
-                  >
-                    <div className="flex items-center gap-3 min-w-0">
-                      <div 
-                        className="w-9 h-9 rounded-full flex items-center justify-center text-xs font-bold shrink-0 shadow-inner overflow-hidden text-black font-sans"
-                        style={{ 
-                          backgroundColor: getSessaoAvatarProps ? getSessaoAvatarProps(jogador.foto || '').color : '#10b981',
-                          color: getSessaoAvatarProps && getSessaoAvatarProps(jogador.foto || '').text === '⚪' ? '#fff' : '#000'
-                        }}
-                      >
-                        {jogador.foto && (jogador.foto.startsWith('http') || jogador.foto.startsWith('data:')) ? (
-                          <img src={jogador.foto} className="w-full h-full object-cover rounded-full" alt="" referrerPolicy="no-referrer" />
-                        ) : (
-                          jogador.nome.substring(0, 1).toUpperCase()
-                        )}
-                      </div>
-                      <div className="min-w-0 text-left">
-                        <div className="flex items-center gap-1.5 flex-wrap">
-                          <p className="text-xs font-bold text-white truncate leading-tight">{jogador.nome} {jogador.sobrenome}</p>
-                          <span className="text-[8px] font-black uppercase text-amber-400 bg-amber-950/60 border border-amber-500/25 px-1 py-0.5 rounded leading-none">
-                            Quitação PIX
-                          </span>
-                        </div>
-                        <p className="text-[10px] text-emerald-350 font-mono mt-1 leading-none text-left">
-                          {partidaObj 
-                            ? `Diária Jogo: ${partidaObj.titulo}` 
-                            : `Mensalidade: ${p.mesRef.split('-').reverse().join('/')}`}
-                        </p>
-                      </div>
-                    </div>
-                    
-                    <div className="flex items-center gap-2 self-end sm:self-center shrink-0">
-                      <div className="text-right mr-2 shrink-0">
-                        <span className="block font-mono font-black text-white text-xs">
-                          R$ {p.valor.toFixed(2)}
-                        </span>
-                      </div>
-                      <button
-                        type="button"
-                        onClick={() => {
-                          const hojeStr = new Date().toISOString().split('T')[0];
-                          handleRegistrarPagamento(jogador.id, p.mesRef, 'pago', hojeStr, p.valor, p.partidaId);
-                        }}
-                        className="px-3 py-1.5 bg-teal-500 hover:bg-teal-400 text-emerald-950 font-black text-[10px] uppercase rounded-lg transition-all flex items-center gap-1 cursor-pointer active:scale-95"
-                      >
-                        <Check className="w-3.5 h-3.5" />
-                        Aprovar
-                      </button>
-                      <button
-                        type="button"
-                        onClick={() => {
-                          handleRegistrarPagamento(jogador.id, p.mesRef, 'pendente', null, p.valor, p.partidaId);
-                        }}
-                        className="px-3 py-1.5 bg-rose-500/10 hover:bg-rose-500 border border-rose-500/30 hover:border-transparent text-rose-300 hover:text-white font-bold text-[10px] uppercase rounded-lg transition-all flex items-center gap-1 cursor-pointer active:scale-95"
-                      >
-                        <X className="w-3.5 h-3.5" />
-                        Estornar
-                      </button>
-                    </div>
-                  </div>
-                );
-              })}
-
-              {jogadores.filter(j => j.status === 'pendente_aprovacao' || j.status === 'solicitou_exclusao').length === 0 && 
-               pagamentos.filter(p => p.status === 'pendente_confirmacao').length === 0 && (
+              {jogadores.filter(j => j.status === 'pendente_aprovacao' || j.status === 'solicitou_exclusao').length === 0 && (
                 <div className="text-center py-6 text-emerald-400/60 italic text-xs">
-                  Todas as solicitações e confirmações pendentes já foram processadas!
+                  Todas as solicitações pendentes já foram processadas!
                 </div>
               )}
             </div>
@@ -2719,9 +2279,9 @@ export default function App() {
       {mostrarPopUpAlertaAdminPagamentos && jogadorAtual && jogadorAtual.role === 'admin' && (
         <div 
           id="popup-alerta-admin-pagamentos"
-          className="fixed inset-0 z-50 flex items-center justify-center p-4 overflow-y-auto bg-black/80 backdrop-blur-md animate-fade-in"
+          className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/80 backdrop-blur-md animate-fade-in"
         >
-          <div className="bg-emerald-950 border border-amber-500/30 rounded-2xl max-w-lg w-full max-h-[72vh] md:max-h-[85vh] overflow-y-auto p-6 text-left shadow-2xl relative animate-scale-up flex flex-col">
+          <div className="bg-emerald-950 border border-amber-500/30 rounded-2xl max-w-lg w-full p-6 text-left shadow-2xl relative animate-scale-up max-h-[90vh] flex flex-col">
             <div className="flex items-center justify-between border-b border-white/10 pb-3.5 mb-4 shrink-0">
               <div className="flex items-center gap-3">
                 <div className="w-10 h-10 bg-amber-500/10 border border-amber-500/30 text-amber-400 rounded-xl flex items-center justify-center shrink-0">
@@ -2822,9 +2382,9 @@ export default function App() {
       {modalPerfilAberto && jogadorAtual && (
         <div 
           id="modal-editar-perfil-atual"
-          className="fixed inset-0 z-40 flex items-center justify-center p-4 overflow-y-auto bg-black/80 backdrop-blur-md"
+          className="fixed inset-0 z-40 flex items-center justify-center p-4 bg-black/80 backdrop-blur-md"
         >
-          <div className="bg-emerald-900 border border-white/10 rounded-2xl max-w-md w-full max-h-[72vh] md:max-h-[85vh] overflow-y-auto p-5 sm:p-6 shadow-2xl relative">
+          <div className="bg-emerald-900 border border-white/10 rounded-2xl max-w-md w-full p-5 sm:p-6 shadow-2xl relative max-h-[90vh] overflow-y-auto">
             
             {/* Cabeçalho do Modal */}
             <div className="flex items-center justify-between border-b border-white/10 pb-3 mb-4">
@@ -3150,11 +2710,11 @@ export default function App() {
       {fotoZoomada && (
         <div 
           id="popup-foto-zoom"
-          className="fixed inset-0 z-[100] flex items-center justify-center p-4 overflow-y-auto bg-black/90 backdrop-blur-md animate-fade-in"
+          className="fixed inset-0 z-[100] flex items-center justify-center p-4 bg-black/90 backdrop-blur-md animate-fade-in"
           onClick={() => setFotoZoomada(null)}
         >
           <div 
-            className="relative max-w-md w-full max-h-[72vh] md:max-h-[85vh] overflow-y-auto bg-emerald-950 border border-white/10 rounded-2xl p-4 text-center shadow-2xl animate-scale-up"
+            className="relative max-w-md w-full bg-emerald-950 border border-white/10 rounded-2xl p-4 text-center shadow-2xl animate-scale-up"
             onClick={(e) => e.stopPropagation()}
           >
             <button
@@ -3285,9 +2845,9 @@ export default function App() {
 
       {showLogoutConfirm && (
         <div 
-          className="fixed inset-0 z-50 flex items-center justify-center p-4 overflow-y-auto bg-black/80 backdrop-blur-md animate-fade-in"
+          className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/80 backdrop-blur-md animate-fade-in"
         >
-          <div className="bg-emerald-955 border border-teal-500/30 rounded-2xl max-w-sm w-full max-h-[72vh] md:max-h-[85vh] overflow-y-auto p-6 text-center shadow-2xl relative animate-scale-up">
+          <div className="bg-emerald-955 border border-teal-500/30 rounded-2xl max-w-sm w-full p-6 text-center shadow-2xl relative animate-scale-up">
             <div className="w-12 h-12 bg-rose-500/10 border border-rose-500/30 text-rose-400 rounded-full flex items-center justify-center mx-auto mb-4">
               <LogOut className="w-6 h-6" />
             </div>

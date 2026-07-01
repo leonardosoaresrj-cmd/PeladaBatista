@@ -268,7 +268,6 @@ export default function ConfirmacaoPresenca({
       const jaPagoMensalidade = pagamentos.some(
         p => p.jogadorId === id && 
              p.mesRef === matchMesRef && 
-             !p.partidaId &&
              p.status === 'pago'
       );
 
@@ -281,7 +280,6 @@ export default function ConfirmacaoPresenca({
       const jaInformouMensalidade = pagamentos.some(
         p => p.jogadorId === id && 
              p.mesRef === matchMesRef && 
-             !p.partidaId &&
              p.status === 'pendente_confirmacao'
       );
 
@@ -471,7 +469,7 @@ export default function ConfirmacaoPresenca({
                       </span>
                     )}
                     <div 
-                      className="w-11 h-11 rounded-full flex items-center justify-center text-[13px] font-bold shadow shrink-0 overflow-hidden border border-white/10 cursor-zoom-in hover:scale-110 active:scale-95 transition-all duration-200"
+                      className="w-7.5 h-7.5 rounded-full flex items-center justify-center text-[10.5px] font-bold shadow shrink-0 overflow-hidden border border-white/10 cursor-zoom-in hover:scale-110 active:scale-95 transition-all duration-200"
                       style={{ backgroundColor: style.color }}
                       onClick={(e) => {
                         e.stopPropagation();
@@ -562,13 +560,13 @@ export default function ConfirmacaoPresenca({
 
         {/* Seletor do Próximo Jogo */}
         {partidasAtivas.length > 0 && (
-          <div className="flex items-center gap-2 w-full sm:w-auto min-w-0">
+          <div className="flex items-center gap-2">
             <span className="text-xs font-bold text-emerald-300 uppercase tracking-widest font-sans shrink-0">Jogo Ativo:</span>
             <select
               id="select-partida-confirmacao"
               value={idPartidaCorrente || ''}
               onChange={(e) => setPartidaSelecionadaId(e.target.value)}
-              className="bg-emerald-950 border border-white/10 text-white text-xs font-bold font-mono rounded-lg px-3 py-2 cursor-pointer focus:outline-none focus:border-white w-full sm:w-auto min-w-0 max-w-[180px] xs:max-w-[240px] sm:max-w-xs md:max-w-md truncate"
+              className="bg-emerald-950 border border-white/10 text-white text-xs font-bold font-mono rounded-lg px-3 py-2 cursor-pointer focus:outline-none focus:border-white"
             >
               {partidasAtivas.map((p) => (
                 <option key={p.id} value={p.id} className="text-white bg-emerald-955">
@@ -890,7 +888,7 @@ export default function ConfirmacaoPresenca({
                                 {index + 1}°
                               </span>
                               <div 
-                                className="w-11 h-11 rounded-full flex items-center justify-center text-[13px] font-bold shadow shrink-0 overflow-hidden border border-white/10 cursor-zoom-in hover:scale-110 active:scale-95 transition-all duration-200"
+                                className="w-7.5 h-7.5 rounded-full flex items-center justify-center text-[10.5px] font-bold shadow shrink-0 overflow-hidden border border-white/10 cursor-zoom-in hover:scale-110 active:scale-95 transition-all duration-200"
                                 style={{ backgroundColor: style.color }}
                                 onClick={(e) => {
                                   e.stopPropagation();
@@ -987,7 +985,7 @@ export default function ConfirmacaoPresenca({
                                 {index + 1}°
                               </span>
                               <div 
-                                className="w-11 h-11 rounded-full flex items-center justify-center text-[13px] font-bold shadow shrink-0 overflow-hidden border border-white/10 cursor-zoom-in hover:scale-110 active:scale-95 transition-all duration-200"
+                                className="w-7.5 h-7.5 rounded-full flex items-center justify-center text-[10.5px] font-bold shadow shrink-0 overflow-hidden border border-white/10 cursor-zoom-in hover:scale-110 active:scale-95 transition-all duration-200"
                                 style={{ backgroundColor: style.color }}
                                 onClick={(e) => {
                                   e.stopPropagation();
@@ -1078,7 +1076,7 @@ export default function ConfirmacaoPresenca({
                                 {index + 1}°
                               </span>
                               <div 
-                                className="w-11 h-11 rounded-full flex items-center justify-center text-[13px] font-bold shadow shrink-0 overflow-hidden border border-white/10 cursor-zoom-in hover:scale-110 active:scale-95 transition-all duration-200"
+                                className="w-7.5 h-7.5 rounded-full flex items-center justify-center text-[10.5px] font-bold shadow shrink-0 overflow-hidden border border-white/10 cursor-zoom-in hover:scale-110 active:scale-95 transition-all duration-200"
                                 style={{ backgroundColor: style.color }}
                                 onClick={(e) => {
                                   e.stopPropagation();
@@ -1265,7 +1263,7 @@ export default function ConfirmacaoPresenca({
                       >
                         <div className="flex items-center gap-2 overflow-hidden bg-transparent">
                           <div 
-                            className="w-11 h-11 rounded-full flex items-center justify-center text-[13px] font-bold shadow shrink-0 overflow-hidden border border-white/10 cursor-zoom-in hover:scale-110 active:scale-95 transition-all duration-200"
+                            className="w-7.5 h-7.5 rounded-full flex items-center justify-center text-[10.5px] font-bold shadow shrink-0 overflow-hidden border border-white/10 cursor-zoom-in hover:scale-110 active:scale-95 transition-all duration-200"
                             style={{ backgroundColor: style.color }}
                             onClick={(e) => {
                               e.stopPropagation();
@@ -1330,8 +1328,8 @@ export default function ConfirmacaoPresenca({
 
       {/* MODAL DE COMPARTILHAMENTO WHATSAPP */}
       {showShareModal && (
-        <div className="fixed inset-0 bg-black/85 backdrop-blur-sm flex items-center justify-center p-4 z-50 overflow-y-auto">
-          <div className="bg-emerald-950 border border-white/20 rounded-2xl w-full max-w-lg max-h-[72vh] md:max-h-[85vh] overflow-y-auto p-6 shadow-2xl space-y-4">
+        <div className="fixed inset-0 bg-black/85 backdrop-blur-sm flex items-center justify-center p-4 z-50">
+          <div className="bg-emerald-950 border border-white/20 rounded-2xl w-full max-w-lg p-6 shadow-2xl space-y-4">
             <div className="flex items-center justify-between border-b border-white/10 pb-3">
               <h3 className="font-display font-bold text-base text-white flex items-center gap-2">
                 <Share2 className="w-5 h-5 text-emerald-400" />
@@ -1406,7 +1404,7 @@ export default function ConfirmacaoPresenca({
       {/* POPUP / MODAL DE INFORMAÇÕES E EDIÇÃO DO ATLETA */}
       {showPlayerModal && jogadorSelecionadoModal && (
         <div className="fixed inset-0 bg-black/85 backdrop-blur-sm flex items-center justify-center p-4 z-50 animate-fade-in overflow-y-auto">
-          <div className="bg-emerald-950/95 border border-white/20 rounded-2xl w-full max-w-lg max-h-[72vh] md:max-h-[85vh] overflow-y-auto p-6 shadow-2xl space-y-5 backdrop-blur-md my-8">
+          <div className="bg-emerald-950/95 border border-white/20 rounded-2xl w-full max-w-lg p-6 shadow-2xl space-y-5 backdrop-blur-md my-8">
             <div className="flex items-center justify-between border-b border-white/10 pb-3">
               <h3 className="font-display font-bold text-base text-white flex items-center gap-2">
                 👤 Ficha do Atleta
@@ -1695,7 +1693,7 @@ export default function ConfirmacaoPresenca({
       )}
 
       {showAutoToast && (
-        <div className="fixed bottom-24 md:bottom-6 right-4 sm:right-6 bg-teal-500 text-emerald-950 font-extrabold px-5 py-4 rounded-2xl shadow-2xl border border-teal-300 z-50 flex items-center gap-3 animate-bounce max-w-sm sm:max-w-md">
+        <div className="fixed bottom-6 right-6 bg-teal-500 text-emerald-950 font-extrabold px-5 py-4 rounded-2xl shadow-2xl border border-teal-300 z-50 flex items-center gap-3 animate-bounce max-w-sm sm:max-w-md">
           <span className="text-xl">🤖</span>
           <div className="text-left font-sans">
             <h5 className="text-[10px] font-black uppercase tracking-wider text-emerald-950">Bot de Automação Pelada</h5>
@@ -1706,8 +1704,8 @@ export default function ConfirmacaoPresenca({
 
       {/* MODAL DE ALERTA DE AGUARDANDO ADMINISTRAÇÃO */}
       {showAguardandoAdminModal && (
-        <div id="modal-aguardando-admin" className="fixed inset-0 bg-black/95 backdrop-blur-md z-50 flex items-center justify-center p-4 overflow-y-auto animate-fade-in">
-          <div className="bg-emerald-950 border border-amber-500/30 rounded-2xl w-full max-w-sm max-h-[72vh] md:max-h-[85vh] overflow-y-auto p-6 shadow-2xl space-y-5 text-center relative overflow-hidden">
+        <div id="modal-aguardando-admin" className="fixed inset-0 bg-black/95 backdrop-blur-md z-50 flex items-center justify-center p-4 animate-fade-in">
+          <div className="bg-emerald-950 border border-amber-500/30 rounded-2xl w-full max-w-sm p-6 shadow-2xl space-y-5 text-center relative overflow-hidden">
             <div className="absolute top-0 left-0 right-0 h-1 bg-gradient-to-r from-amber-500/30 via-amber-500 to-amber-500/30 animate-pulse" />
             
             <div className="mx-auto w-14 h-14 rounded-full bg-amber-500/10 border border-amber-500/35 flex items-center justify-center text-amber-400 animate-pulse">
@@ -1743,7 +1741,7 @@ export default function ConfirmacaoPresenca({
       {/* MODAL DE ALERTA DE INADIMPLÊNCIA */}
       {showInadimplenteModal && (
         <div id="modal-alerta-inadimplencia" className="fixed inset-0 bg-black/85 backdrop-blur-sm flex items-center justify-center p-4 z-50 animate-fade-in overflow-y-auto">
-          <div className="bg-emerald-950 border border-rose-500/30 rounded-2xl w-full max-w-md max-h-[72vh] md:max-h-[85vh] overflow-y-auto p-6 shadow-2xl space-y-5 backdrop-blur-md">
+          <div className="bg-emerald-950 border border-rose-500/30 rounded-2xl w-full max-w-md p-6 shadow-2xl space-y-5 backdrop-blur-md">
             <div className="flex items-center gap-3 border-b border-rose-500/20 pb-3">
               <div className="w-10 h-10 rounded-full bg-rose-500/10 border border-rose-500/30 flex items-center justify-center text-rose-400">
                 <ShieldAlert className="w-6 h-6 animate-pulse" />
@@ -1821,7 +1819,7 @@ export default function ConfirmacaoPresenca({
       {/* MODAL DE FORA DO PERÍODO DE CONFIRMAÇÃO */}
       {showForaPeriodoModal && foraPeriodoInfo && (
         <div id="modal-fora-periodo-confirmacao" className="fixed inset-0 bg-black/85 backdrop-blur-sm flex items-center justify-center p-4 z-50 animate-fade-in overflow-y-auto">
-          <div className="bg-emerald-950 border border-amber-500/30 rounded-2xl w-full max-w-md max-h-[72vh] md:max-h-[85vh] overflow-y-auto p-6 shadow-2xl space-y-5 backdrop-blur-md">
+          <div className="bg-emerald-950 border border-amber-500/30 rounded-2xl w-full max-w-md p-6 shadow-2xl space-y-5 backdrop-blur-md">
             <div className="flex items-center gap-3 border-b border-amber-500/25 pb-3">
               <div className="w-10 h-10 rounded-full bg-amber-500/10 border border-amber-500/30 flex items-center justify-center text-amber-400">
                 <AlertTriangle className="w-6 h-6 animate-pulse" />
@@ -1875,8 +1873,8 @@ export default function ConfirmacaoPresenca({
 
       {/* MODAL DE CONFIRMAÇÃO DE CANCELAMENTO */}
       {showCancelConfirm && (
-        <div className="fixed inset-0 bg-black/85 backdrop-blur-sm flex items-center justify-center p-4 z-50 overflow-y-auto animate-fade-in">
-          <div className="bg-emerald-950 border border-rose-500/30 rounded-2xl w-full max-w-sm max-h-[72vh] md:max-h-[85vh] overflow-y-auto p-6 shadow-2xl relative text-center">
+        <div className="fixed inset-0 bg-black/85 backdrop-blur-sm flex items-center justify-center p-4 z-50 animate-fade-in">
+          <div className="bg-emerald-950 border border-rose-500/30 rounded-2xl w-full max-w-sm p-6 shadow-2xl relative text-center">
             <div className="w-12 h-12 bg-rose-500/10 border border-rose-500/30 text-rose-400 rounded-full flex items-center justify-center mx-auto mb-4">
               <ShieldAlert className="w-6 h-6" />
             </div>

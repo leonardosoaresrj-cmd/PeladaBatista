@@ -77,10 +77,9 @@ create table if not exists pagamentos (
   id uuid primary key default uuid_generate_v4(),
   jogador_id uuid references jogadores(id) on delete cascade not null,
   mes_ref varchar(7) not null, -- Formato 'YYYY-MM'
-  status varchar(40) not null check (status in ('pago', 'pendente', 'pendente_confirmacao', 'cancelado')),
+  status varchar(20) not null check (status in ('pago', 'pendente')),
   data_pagamento timestamp with time zone,
   valor numeric(10,2) not null,
-  partida_id uuid references partidas(id) on delete cascade,
   created_at timestamp with time zone default timezone('utc'::text, now()) not null
 );
 
@@ -89,7 +88,6 @@ create index if not exists idx_jogadores_email on jogadores(email);
 create index if not exists idx_partidas_data on partidas(data);
 create index if not exists idx_presencas_partida on presencas(partida_id);
 create index if not exists idx_pagamentos_jogador_mes on pagamentos(jogador_id, mes_ref);
-create index if not exists idx_pagamentos_partida on pagamentos(partida_id);
 
 -- 7. Configurar Row Level Security (RLS) para Supabase
 alter table jogadores enable row level security;

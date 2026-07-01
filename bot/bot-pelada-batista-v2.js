@@ -78,8 +78,6 @@ let cronInterval      = null;
 let saveDebounceTimer = null;   // debounce do salvarSessao
 
 const jidCache = new Map();
-let sessaoCorrompidaDetectada = false; // true quando MessageCounterError detectado após reconexão
-let limpandoSessao = false;           // mutex para evitar double-limpeza em race condition
 
 // ─── Express ──────────────────────────────────────────────────────────────────
 const app = express();
@@ -304,7 +302,7 @@ app.post('/teste', async (req, res) => {
 
   try {
     const jid = await resolverJID(grupoAlvo);
-    await sendComTimeout(jid, { text: mensagem });
+    await sock.sendMessage(jid, { text: mensagem });
     console.log(`📤 [/teste] → ${jid} | ${mensagem.substring(0, 60).replace(/\n/g, ' ')}`);
     await supabase.from('bot_logs').insert({
       evento: 'DIRETO', tabela: 'frontend',
@@ -313,17 +311,6 @@ app.post('/teste', async (req, res) => {
     res.json({ success: true, jid });
   } catch (err) {
     console.error('❌ /teste:', err.message);
-    if (ehErroCriptografia(err) && !limpandoSessao) {
-      limpandoSessao = true;
-      isConnected = false;
-      limparSessao()
-        .then(() => setTimeout(() => { limpandoSessao = false; conectarWhatsApp(); }, 2000))
-        .catch(() => setTimeout(() => { limpandoSessao = false; conectarWhatsApp(); }, 2000));
-      return res.status(503).json({
-        error: 'Sessão WhatsApp corrompida — limpando e reconectando. Tente novamente em 15s.',
-        reconnecting: true,
-      });
-    }
     res.status(500).json({ error: err.message });
   }
 });
@@ -502,26 +489,19 @@ async function limparSessao() {
     fs.rmSync(CONFIG.SESSION_LOCAL_PATH, { recursive: true, force: true });
   jidCache.clear();
 
-  // Limpa tabela bot_session (todos os registros, não só 'main')
+  // Limpa tabela bot_session
   try {
-    await supabase.from('bot_session').delete().neq('id', '___never___');
-    console.log('🗑️  bot_session limpa');
-  } catch (e) { console.warn('⚠️  Erro limpando bot_session:', e.message); }
+    await supabase.from('bot_session').delete().eq('id', 'main');
+  } catch {}
 
-  // Limpa Storage — pagina para garantir que apaga todos os arquivos
+  // Limpa Storage
   try {
-    let pagina = 0;
-    while (true) {
-      const { data: arqs } = await supabase.storage
-        .from(CONFIG.SUPABASE_BUCKET).list('session/', { limit: 200, offset: pagina * 200 });
-      if (!arqs?.length) break;
+    const { data: arqs } = await supabase.storage
+      .from(CONFIG.SUPABASE_BUCKET).list('session/', { limit: 200 });
+    if (arqs?.length)
       await supabase.storage.from(CONFIG.SUPABASE_BUCKET)
         .remove(arqs.map(f => `session/${f.name}`));
-      if (arqs.length < 200) break;
-      pagina++;
-    }
-    console.log('🗑️  Storage limpo');
-  } catch (e) { console.warn('⚠️  Erro limpando Storage:', e.message); }
+  } catch {}
 
   console.log('🗑️  Sessão limpa');
 }
@@ -694,65 +674,6 @@ async function processarEventoWebhook(tipo, tabela, rec, recAntigo) {
           } catch {}
         }, 3000);
       }
-    }
-  }
-
-  // Notificação extra para o Administrador: Novo Jogador cadastrado aguardando aprovação
-  if (tabela === 'jogadores' && tipo === 'INSERT' && rec.status === 'pendente_aprovacao') {
-    const msgCadastroAdmin = `👤 *NOVO CADASTRO AGUARDANDO APROVAÇÃO* 👤\n\n` +
-               `Um novo jogador se cadastrou no portal e aguarda a sua aprovação:\n\n` +
-               `🏷️ Nome: *${rec.nome} ${rec.sobrenome || ''}*\n` +
-               `📞 WhatsApp: *${rec.whatsapp || 'Não informado'}*\n` +
-               `⚽ Posição: *${rec.posicao || 'Não informada'}*\n` +
-               `⭐ Mensalista/Diarista: *${rec.membro_status || 'diarista'}*\n\n` +
-               `👉 Acesse o painel do administrador para aprovar:\nhttps://peladabatista.onrender.com`;
-               
-    setTimeout(async () => {
-      try {
-        const jidAdmin = await resolverJID('admin');
-        await sendComTimeout(jidAdmin, { text: msgCadastroAdmin });
-        await supabase.from('bot_logs').insert({
-          evento: 'PENDENTE_APROVACAO_ADMIN', tabela: 'jogadores',
-          mensagem: msgCadastroAdmin.substring(0, 500), enviado_em: new Date().toISOString(),
-        });
-        console.log(`✅ [NOTIFICAÇÃO ADMIN] Novo cadastro de ${rec.nome} enviado para o administrador.`);
-      } catch (err) {
-        console.error('❌ Erro ao notificar admin sobre novo jogador:', err.message);
-      }
-    }, 1000);
-  }
-
-  // Notificação extra para o Administrador: Novo Pagamento manual aguardando aprovação
-  if (tabela === 'pagamentos') {
-    const ficouPendenteConfirmacao = rec.status === 'pendente_confirmacao' && recAntigo?.status !== 'pendente_confirmacao';
-    if ((tipo === 'INSERT' && rec.status === 'pendente_confirmacao') || (tipo === 'UPDATE' && ficouPendenteConfirmacao)) {
-      setTimeout(async () => {
-        try {
-          const { data: jog } = await supabase
-            .from('jogadores').select('nome,sobrenome').eq('id', rec.jogador_id).maybeSingle();
-          const nomeAtleta = jog ? `${jog.nome} ${jog.sobrenome}` : 'Atleta';
-          const descReferencia = rec.partida_id 
-            ? `Partida avulsa`
-            : `Mensalidade ref. ${rec.mes_ref.split('-').reverse().join('/')}`;
-
-          const msgPagamentoAdmin = `💰 *NOVO PAGAMENTO DECLARADO* 💰\n\n` +
-                     `Um pagamento manual foi informado e aguarda sua validação no portal:\n\n` +
-                     `👤 Atleta: *${nomeAtleta}*\n` +
-                     `💵 Valor: *R$ ${Number(rec.valor).toFixed(2).replace('.', ',')}*\n` +
-                     `📝 Referência: *${descReferencia}*\n\n` +
-                     `👉 Acesse o portal para conferir o comprovante e aprovar:\nhttps://peladabatista.onrender.com`;
-                     
-          const jidAdmin = await resolverJID('admin');
-          await sendComTimeout(jidAdmin, { text: msgPagamentoAdmin });
-          await supabase.from('bot_logs').insert({
-            evento: 'PAGAMENTO_DECLARADO_ADMIN', tabela: 'pagamentos',
-            mensagem: msgPagamentoAdmin.substring(0, 500), enviado_em: new Date().toISOString(),
-          });
-          console.log(`✅ [NOTIFICAÇÃO ADMIN] Pagamento de ${nomeAtleta} enviado para o administrador.`);
-        } catch (err) {
-          console.error('❌ Erro ao notificar admin sobre pagamento:', err.message);
-        }
-      }, 1000);
     }
   }
 
@@ -979,76 +900,28 @@ async function gerarListaCompletaPartida(partidaId) {
 // ─────────────────────────────────────────────────────────────────────────────
 async function resolverJID(grupoId) {
   if (!grupoId) throw new Error('grupo_id vazio');
-  if (grupoId === 'admin') {
-    if (sock && sock.user && sock.user.id) {
-      const cleanJid = sock.user.id.split(':')[0] + '@s.whatsapp.net';
-      console.log(`🎯 Envio para Administrador (Self): ${cleanJid}`);
-      return cleanJid;
-    }
-    throw new Error('Não foi possível obter o JID do administrador conectado.');
-  }
   if (jidCache.has(grupoId)) return jidCache.get(grupoId);
   let jid;
-  if (grupoId.includes('@s.whatsapp.net')) {
-    jid = grupoId;
-  } else if (grupoId.includes('chat.whatsapp.com/')) {
+  if (grupoId.includes('chat.whatsapp.com/')) {
     const codigo = grupoId.split('chat.whatsapp.com/').pop().split('?')[0].trim();
     try { const meta = await sock.groupGetInviteInfo(codigo); jid = meta.id; }
     catch (err) { throw new Error(`Link inválido: ${err.message}`); }
   } else if (grupoId.includes('@g.us')) {
     jid = grupoId;
   } else {
-    // Preserva o hífen do ID do grupo (ex: 5521996134821-1396914476)
-    // O replace anterior removia o hífen, gerando JID inválido e timeout no sendMessage
-    const idLimpo = grupoId.replace(/[^0-9\-]/g, '').replace(/-+/g, '-').replace(/^-|-$/g, '');
-    jid = `${idLimpo}@g.us`;
+    jid = `${grupoId.replace(/\D/g, '')}@g.us`;
   }
   jidCache.set(grupoId, jid);
   console.log(`✅ JID: ${grupoId} → ${jid}`);
   return jid;
 }
 
-// Wrapper com timeout para evitar que sendMessage fique preso
-// em uma conexão "zumbi" (aberta mas com criptografia Signal corrompida)
-async function sendComTimeout(jid, payload, timeoutMs = 15000) {
-  return Promise.race([
-    sock.sendMessage(jid, payload),
-    new Promise((_, reject) =>
-      setTimeout(() => reject(new Error('Timed Out')), timeoutMs)
-    ),
-  ]);
-}
-
-// Detecta se o erro é de criptografia Signal — nesse caso força reconexão
-function ehErroCriptografia(err) {
-  const msg = err?.message || '';
-  return (
-    msg.includes('Timed Out') ||
-    msg.includes('Bad MAC') ||
-    msg.includes('MessageCounterError') ||
-    msg.includes('Key used already') ||
-    msg.includes('Failed to decrypt')
-  );
-}
-
 async function enviarParaGrupo(texto) {
   if (!sock || !isConnected) throw new Error('WhatsApp não conectado');
   if (!CONFIG.DEFAULT_GROUP_ID) throw new Error('WHATSAPP_GROUP_ID não configurado');
   const jid = await resolverJID(CONFIG.DEFAULT_GROUP_ID);
-  try {
-    await sendComTimeout(jid, { text: texto });
-    console.log(`📤 → ${jid}`);
-  } catch (err) {
-    if (ehErroCriptografia(err) && !limpandoSessao) {
-      limpandoSessao = true;
-      console.warn('⚠️  Erro de criptografia em enviarParaGrupo — limpando sessão e reconectando...');
-      isConnected = false;
-      limparSessao()
-        .then(() => setTimeout(() => { limpandoSessao = false; conectarWhatsApp(); }, 2000))
-        .catch(() => setTimeout(() => { limpandoSessao = false; conectarWhatsApp(); }, 2000));
-    }
-    throw err;
-  }
+  await sock.sendMessage(jid, { text: texto });
+  console.log(`📤 → ${jid}`);
 }
 
 // ─────────────────────────────────────────────────────────────────────────────
@@ -1070,22 +943,6 @@ function iniciarSelfPing() {
 // BAILEYS
 // ─────────────────────────────────────────────────────────────────────────────
 async function conectarWhatsApp() {
-  // ── FIX MEMÓRIA: destrói o socket anterior antes de criar um novo ──────
-  // Sem isso, cada reconexão deixa o socket antigo (com seus listeners,
-  // WebSocket e cache de mensagens) preso na memória, pois o GC do Node
-  // não libera objetos com listeners pendentes. Em instâncias instáveis
-  // com reconexões frequentes, isso causa crescimento de memória até OOM.
-  if (sock) {
-    try {
-      sock.ev.removeAllListeners();
-      sock.ws?.close();
-    } catch (e) {
-      console.warn('⚠️  Erro ao limpar socket anterior (ignorado):', e.message);
-    }
-    sock = null;
-  }
-  if (global.gc) global.gc(); // libera memória imediatamente se --expose-gc estiver ativo
-
   if (!fs.existsSync(CONFIG.SESSION_LOCAL_PATH))
     fs.mkdirSync(CONFIG.SESSION_LOCAL_PATH, { recursive: true });
 
@@ -1098,14 +955,6 @@ async function conectarWhatsApp() {
     printQRInTerminal: false, markOnlineOnConnect: false,
     connectTimeoutMs: 60000, defaultQueryTimeoutMs: 60000,
     keepAliveIntervalMs: 30000, retryRequestDelayMs: 3000,
-    // ── FIX MEMÓRIA: bot não usa histórico de mensagens (só envia avisos) ──
-    // Sem isso, o Baileys baixa e processa TODO o histórico de TODOS os
-    // chats/grupos na primeira conexão — maior consumidor de RAM conhecido
-    // em bots Baileys, e causa direta de OOM em instâncias de 512MB.
-    syncFullHistory: false,
-    shouldSyncHistoryMessage: () => false,
-    // Evita cache ilimitado de metadados de grupo (cresce a cada grupo visto)
-    cachedGroupMetadata: async () => undefined,
   });
 
   // FIX: usa agendarSalvarSessao (debounced) em vez de salvarSessao direto
@@ -1114,46 +963,13 @@ async function conectarWhatsApp() {
     agendarSalvarSessao();
   });
 
-  // Detecta erros de descriptografia Signal que aparecem como logs de erro
-  // logo após reconexão (MessageCounterError / Bad MAC)
-  // O Baileys não emite evento específico — interceptamos via stderr do processo
-  const origConsoleError = console.error.bind(console);
-  const tempErrorHandler = (...args) => {
-    const msg = args.join(' ');
-    if (
-      msg.includes('MessageCounterError') ||
-      msg.includes('Bad MAC') ||
-      msg.includes('Key used already') ||
-      msg.includes('Failed to decrypt')
-    ) {
-      sessaoCorrompidaDetectada = true;
-    }
-    origConsoleError(...args);
-  };
-  // Sobrescreve console.error temporariamente por 5s após conectar
-  console.error = tempErrorHandler;
-  setTimeout(() => { console.error = origConsoleError; }, 5000);
-
   sock.ev.on('connection.update', async ({ connection, lastDisconnect, qr }) => {
     if (qr) { currentQR = qr; console.log(`\n🔗 QR: ${CONFIG.SELF_URL}/qr\n`); }
 
     if (connection === 'open') {
       isConnected = true; currentQR = null; reconnectAttempts = 0;
       console.log('✅ WhatsApp conectado!');
-
-      // Aguarda 3s para capturar erros de descriptografia que chegam logo após conectar
-      // (MessageCounterError aparece em connection=open, não em connection=close)
-      await new Promise(r => setTimeout(r, 3000));
-
-      // Se erros de criptografia foram detectados nos 3s após conectar → limpa sessão
-      if (sessaoCorrompidaDetectada) {
-        sessaoCorrompidaDetectada = false;
-        console.warn('🔑 Sessão corrompida detectada logo após conectar — limpando...');
-        await limparSessao();
-        setTimeout(conectarWhatsApp, 2000);
-        return;
-      }
-
+      // Salva sessão após conectar (sem debounce — é um evento único)
       await salvarSessao();
       iniciarSelfPing();
       iniciarCronDiario();
@@ -1162,17 +978,7 @@ async function conectarWhatsApp() {
     if (connection === 'close') {
       isConnected = false;
       const code = lastDisconnect?.error?.output?.statusCode;
-      const errMsg = lastDisconnect?.error?.message || '';
       console.warn(`⚠️  Conexão encerrada — código: ${code}`);
-
-      // Erro de criptografia Signal (Bad MAC = chaves dessincronizadas com o servidor WA)
-      // → limpa TODA a sessão (local + Supabase) para forçar nova sincronização de chaves
-      // Sem isso, o bot fica em loop enviando mensagens criptografadas com chaves erradas
-      // (visível no WhatsApp como "Aguardando mensagem. Essa ação pode levar alguns instantes.")
-      if (errMsg.includes('Bad MAC') || errMsg.includes('MessageCounterError') || errMsg.includes('Key used already')) {
-        console.warn('🔑 Bad MAC detectado — limpando sessão completa (local + Supabase)...');
-        await limparSessao();
-      }
 
       if (code === DisconnectReason.loggedOut) {
         console.error('🚪 Logout! Limpando sessão...');

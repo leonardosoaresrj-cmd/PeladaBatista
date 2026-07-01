@@ -24,15 +24,13 @@
     "noEmit": true
   },
   "include": [
-    "src"
+    "src/**/*",
+    "server.ts",
+    "test-smtp.ts"
   ],
   "exclude": [
     "node_modules",
-    "dist",
     "supabase",
-    "bot",
-    "repo_extracted",
-    "repo_extracted_temp",
     "App.tsx"
   ]
 }

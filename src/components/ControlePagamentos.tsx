@@ -17,10 +17,9 @@ import {
   ShieldAlert,
   History,
   Sparkles,
-  RefreshCw,
-  Mail
+  RefreshCw
 } from 'lucide-react';
-import { isFechamentoMensalistas, obterDebitosDoJogador, obterNumeroRecibo, obterMesReferenciaParaRenovacao } from '../utils/confirmationRules';
+import { isFechamentoMensalistas, obterDebitosDoJogador } from '../utils/confirmationRules';
 import CheckoutPixModal from './CheckoutPixModal';
 
 interface ControlePagamentosProps {
@@ -82,47 +81,6 @@ export default function ControlePagamentos({
   // Estado para confirmar cancelamento sem window.confirm
   const [cancelarConfirmId, setCancelarConfirmId] = useState<string | null>(null);
 
-  const [alertMessage, setAlertMessage] = useState<{ type: 'success' | 'error', text: string } | null>(null);
-  const [sendingReceiptId, setSendingReceiptId] = useState<string | null>(null);
-
-  const handleReenviarRecibo = async (p: Pagamento, descReferencia: string) => {
-    setSendingReceiptId(p.id);
-    const numRecibo = obterNumeroRecibo(p.id).replace('#', '');
-    try {
-      const res = await fetch('/api/send-receipt-email', {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({
-          email: jogadorAtual.email,
-          nome: `${jogadorAtual.nome} ${jogadorAtual.sobrenome || ''}`.trim(),
-          valor: p.valor,
-          referencia: descReferencia,
-          dataPagamento: p.dataPagamento || new Date().toISOString(),
-          numRecibo: numRecibo
-        })
-      });
-      const data = await res.json();
-      if (res.ok && data.success) {
-        setAlertMessage({
-          type: 'success',
-          text: `Recibo de pagamento enviado com sucesso para o e-mail: ${jogadorAtual.email}`
-        });
-      } else {
-        setAlertMessage({
-          type: 'error',
-          text: `Erro ao enviar recibo: ${data.error || 'Falha na comunicação com o servidor'}`
-        });
-      }
-    } catch (err: any) {
-      setAlertMessage({
-        type: 'error',
-        text: `Falha ao conectar ao servidor: ${err.message || err}`
-      });
-    } finally {
-      setSendingReceiptId(null);
-    }
-  };
-
   // Controle de estado do pop-up de checkout PIX Mercado Pago
   const [isCheckoutOpen, setIsCheckoutOpen] = useState(false);
   const [checkoutValorTotal, setCheckoutValorTotal] = useState(0);
@@ -180,7 +138,7 @@ export default function ControlePagamentos({
 
   // Obter o registro do pagamento atual do jogador para o mês selecionado
   const obterPagamentoDoJogador = (mes: string) => {
-    return pagamentos.find(p => p.jogadorId === jogadorAtual.id && p.mesRef === mes && !p.partidaId);
+    return pagamentos.find(p => p.jogadorId === jogadorAtual.id && p.mesRef === mes);
   };
 
   const pagAtual = obterPagamentoDoJogador(mesSelecionado);
@@ -200,11 +158,7 @@ export default function ControlePagamentos({
 
   // Histórico de competências que o usuário pode visualizar (computado dinamicamente)
   const competencasDisponiveis = useMemo(() => {
-    let mesLimit = obterMesAtual(); // ex: '2026-06'
-    const mesRenovacao = obterMesReferenciaParaRenovacao(partidas);
-    if (mesRenovacao > mesLimit) {
-      mesLimit = mesRenovacao;
-    }
+    const mesLimit = obterMesAtual(); // ex: '2026-06'
     const mesSet = new Set<string>();
     
     if (mesLimit >= startupMonth) {
@@ -495,60 +449,6 @@ export default function ControlePagamentos({
                 </div>
               )}
 
-              {/* Pagamentos Efetuados no Ciclo com Recibo e Segunda Via */}
-              {(() => {
-                const pagamentosEfetuadosCiclo = pagamentos.filter(
-                  p => p.jogadorId === jogadorAtual.id && p.mesRef === mesSelecionado && p.status === 'pago'
-                );
-                if (pagamentosEfetuadosCiclo.length === 0) return null;
-                return (
-                  <div className="w-full max-w-md bg-teal-950/20 border border-teal-500/25 p-4 rounded-2xl text-left space-y-3 font-sans mt-3">
-                    <h5 className="text-[11px] font-bold text-teal-400 uppercase tracking-widest flex items-center gap-1.5">
-                      <CheckCircle2 className="w-3.5 h-3.5 text-teal-400" />
-                      Pagamentos Efetuados e Recibos (Ciclo Selecionado)
-                    </h5>
-                    <div className="divide-y divide-teal-500/10 space-y-2.5">
-                      {pagamentosEfetuadosCiclo.map(p => {
-                        const numRec = obterNumeroRecibo(p.id);
-                        const desc = p.partidaId 
-                          ? `Diária ref. Jogo de ${p.mesRef.split('-').reverse().join('/')}`
-                          : `Mensalidade Fixa ref. ${p.mesRef.split('-').reverse().join('/')}`;
-                        return (
-                          <div key={p.id} className="flex flex-col gap-2 pt-2 first:pt-0">
-                            <div className="flex justify-between items-start text-xs">
-                              <div>
-                                <p className="font-bold text-white leading-snug">{desc}</p>
-                                <p className="text-[10px] text-teal-300 font-mono mt-0.5">Recibo: <span className="text-white font-extrabold">{numRec}</span></p>
-                              </div>
-                              <span className="font-mono font-bold text-teal-300 whitespace-nowrap">R$ {p.valor.toFixed(2)}</span>
-                            </div>
-                            
-                            <button
-                              type="button"
-                              disabled={sendingReceiptId === p.id}
-                              onClick={() => handleReenviarRecibo(p, desc)}
-                              className="w-full mt-1 bg-teal-900/60 hover:bg-teal-800 disabled:opacity-50 text-white font-bold text-[10px] py-1.5 px-3 rounded-lg border border-teal-500/20 hover:border-teal-500/40 transition-all flex items-center justify-center gap-1.5 cursor-pointer uppercase active:scale-97"
-                            >
-                              {sendingReceiptId === p.id ? (
-                                <>
-                                  <RefreshCw className="w-3 h-3 text-white animate-spin" />
-                                  Enviando...
-                                </>
-                              ) : (
-                                <>
-                                  <Mail className="w-3 h-3 text-teal-350" />
-                                  Segunda Via Recibo (E-mail)
-                                </>
-                              )}
-                            </button>
-                          </div>
-                        );
-                      })}
-                    </div>
-                  </div>
-                );
-              })()}
-
             </div>
           );
         })()}
@@ -718,41 +618,20 @@ export default function ControlePagamentos({
 
                     {/* Detalhamento das partidas pagas no mes pelo diarista */}
                     {pagamentosMes.length > 0 && (
-                      <div className="mt-2 pl-4 border-l-2 border-emerald-500/20 space-y-2">
+                      <div className="mt-2 pl-4 border-l-2 border-emerald-500/20 space-y-1.5">
                         <p className="text-[9.5px] font-bold text-emerald-400 mb-1">Relação de Diárias no Mês:</p>
                         {pagamentosMes.map(p => {
                           const prt = partidas.find(pt => pt.id === p.partidaId);
-                          const numRec = obterNumeroRecibo(p.id);
-                          const descRef = `Diária ref. Jogo de ${p.mesRef.split('-').reverse().join('/')}`;
                           return (
-                            <div key={p.id} className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-1.5 text-[10px] tracking-wide text-emerald-200 bg-black/10 p-2 rounded-lg border border-white/5">
-                              <div>
-                                <span className="font-bold">• {prt ? prt.titulo : 'Jogo Avulso'}</span>
-                                <span className="text-[9.5px] font-mono text-emerald-400 block mt-0.5">
-                                  {p.status === 'pago' ? `Quitado em ${p.dataPagamento?.split('-').reverse().join('/') || ''}` : 'Pendente'}
-                                </span>
-                                {p.status === 'pago' && (
-                                  <span className="text-[9px] font-mono text-teal-350 block mt-0.5">Recibo: <span className="text-white font-extrabold">{numRec}</span></span>
+                            <div key={p.id} className="flex justify-between items-center text-[10px] tracking-wide text-emerald-200">
+                              <span>• {prt ? prt.titulo : 'Jogo Avulso'} ({p.status === 'pago' ? 'PG' : 'PENDENTE'})</span>
+                              <div className="flex items-center gap-2">
+                                {p.status === 'pago' && p.dataPagamento && (
+                                  <span className="text-[9px] font-mono text-emerald-400 bg-emerald-950/40 px-1 rounded border border-emerald-500/20 font-bold">
+                                    PG: {p.dataPagamento.split('-').reverse().join('/')}
+                                  </span>
                                 )}
-                              </div>
-                              <div className="flex items-center gap-2.5 justify-between sm:justify-end w-full sm:w-auto mt-1 sm:mt-0">
-                                <span className="font-mono font-bold text-white text-[11px]">R$ {p.valor.toFixed(2)}</span>
-                                {p.status === 'pago' && (
-                                  <button
-                                    type="button"
-                                    disabled={sendingReceiptId === p.id}
-                                    onClick={() => handleReenviarRecibo(p, descRef)}
-                                    className="py-1 px-2.5 rounded bg-teal-900/60 hover:bg-teal-800 disabled:opacity-50 text-[9px] font-bold text-teal-300 border border-teal-500/20 transition-all flex items-center gap-1 cursor-pointer active:scale-95"
-                                    title="Reenviar segunda via do recibo para o seu e-mail"
-                                  >
-                                    {sendingReceiptId === p.id ? (
-                                      <RefreshCw className="w-2.5 h-2.5 text-white animate-spin" />
-                                    ) : (
-                                      <Mail className="w-2.5 h-2.5 text-teal-400" />
-                                    )}
-                                    Segunda Via
-                                  </button>
-                                )}
+                                <span className="font-mono font-bold">R$ {p.valor.toFixed(2)}</span>
                               </div>
                             </div>
                           );
@@ -783,15 +662,10 @@ export default function ControlePagamentos({
                       <p className="text-[10px] text-emerald-300 font-mono mt-0.5">
                         Faturamento de: {isGoleiro ? 'Isenção de Goleiro' : 'Mensalista Fixo'}
                       </p>
-                      {checkPg && checkPg.status === 'pago' && (
-                        <p className="text-[9px] text-teal-350 font-mono mt-0.5">
-                          Recibo: <span className="text-white font-extrabold">{obterNumeroRecibo(checkPg.id)}</span>
-                        </p>
-                      )}
                     </div>
                   </div>
 
-                  <div className="flex items-center justify-between sm:justify-end gap-3.5 flex-wrap">
+                  <div className="flex items-center justify-between sm:justify-end gap-3.5">
                     <span className="font-mono text-white font-bold">
                       R$ {isGoleiro ? '0,00' : (checkPg ? checkPg.valor : valorCobradoMes).toFixed(2)}
                     </span>
@@ -823,23 +697,6 @@ export default function ControlePagamentos({
                         PG: {checkPg.dataPagamento.split('-').reverse().join('/')}
                       </span>
                     )}
-
-                    {checkPg && checkPg.status === 'pago' && (
-                      <button
-                        type="button"
-                        disabled={sendingReceiptId === checkPg.id}
-                        onClick={() => handleReenviarRecibo(checkPg, `Mensalidade Fixa ref. ${comp.label}`)}
-                        className="py-1 px-2.5 rounded bg-teal-900/60 hover:bg-teal-800 disabled:opacity-50 text-[9px] font-bold text-teal-300 border border-teal-500/20 transition-all flex items-center gap-1 cursor-pointer active:scale-95"
-                        title="Reenviar segunda via do recibo para o seu e-mail"
-                      >
-                        {sendingReceiptId === checkPg.id ? (
-                          <RefreshCw className="w-2.5 h-2.5 text-white animate-spin" />
-                        ) : (
-                          <Mail className="w-2.5 h-2.5 text-teal-400" />
-                        )}
-                        Segunda Via
-                      </button>
-                    )}
                   </div>
                 </div>
               );
@@ -857,42 +714,6 @@ export default function ControlePagamentos({
         debitos={checkoutDebitos}
         onConfirmarPagamentoTotal={handleConfirmarPagamentoTotal}
       />
-
-      {/* POPUP ALERT DE RESPOSTA DO RECIBO */}
-      {alertMessage && (
-        <div className="fixed inset-0 bg-black/60 backdrop-blur-sm flex items-center justify-center z-50 animate-fade-in p-4">
-          <div className="bg-emerald-950 border border-white/10 rounded-2xl p-6 max-w-md w-full shadow-2xl space-y-4 text-center font-sans">
-            <div className="flex justify-center">
-              {alertMessage.type === 'success' ? (
-                <div className="w-12 h-12 rounded-full bg-teal-500/15 border border-teal-500/30 flex items-center justify-center text-teal-400">
-                  <CheckCircle2 className="w-6 h-6" />
-                </div>
-              ) : (
-                <div className="w-12 h-12 rounded-full bg-rose-500/15 border border-rose-500/30 flex items-center justify-center text-rose-400">
-                  <AlertCircle className="w-6 h-6 animate-bounce" />
-                </div>
-              )}
-            </div>
-            
-            <div className="space-y-1.5">
-              <h4 className="font-display font-black text-sm text-white uppercase tracking-wider">
-                {alertMessage.type === 'success' ? 'Recibo Enviado!' : 'Falha no Envio'}
-              </h4>
-              <p className="text-xs text-emerald-300/90 leading-relaxed">
-                {alertMessage.text}
-              </p>
-            </div>
-
-            <button
-              type="button"
-              onClick={() => setAlertMessage(null)}
-              className="w-full bg-white hover:bg-emerald-50 text-emerald-950 font-extrabold text-xs py-2.5 rounded-xl transition-all cursor-pointer uppercase font-sans tracking-wide active:scale-97"
-            >
-              Fechar
-            </button>
-          </div>
-        </div>
-      )}
 
     </div>
   );
