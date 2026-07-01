@@ -79,6 +79,7 @@ let saveDebounceTimer = null;   // debounce do salvarSessao
 
 const jidCache = new Map();
 let sessaoCorrompidaDetectada = false; // true quando MessageCounterError detectado após reconexão
+let limpandoSessao = false;           // mutex para evitar double-limpeza em race condition
 
 // ─── Express ──────────────────────────────────────────────────────────────────
 const app = express();
@@ -312,10 +313,12 @@ app.post('/teste', async (req, res) => {
     res.json({ success: true, jid });
   } catch (err) {
     console.error('❌ /teste:', err.message);
-    if (ehErroCriptografia(err)) {
-      // Conexão com criptografia corrompida — limpa sessão e reconecta
+    if (ehErroCriptografia(err) && !limpandoSessao) {
+      limpandoSessao = true;
       isConnected = false;
-      limparSessao().then(() => setTimeout(conectarWhatsApp, 2000)).catch(() => setTimeout(conectarWhatsApp, 2000));
+      limparSessao()
+        .then(() => setTimeout(() => { limpandoSessao = false; conectarWhatsApp(); }, 2000))
+        .catch(() => setTimeout(() => { limpandoSessao = false; conectarWhatsApp(); }, 2000));
       return res.status(503).json({
         error: 'Sessão WhatsApp corrompida — limpando e reconectando. Tente novamente em 15s.',
         reconnecting: true,
@@ -499,19 +502,26 @@ async function limparSessao() {
     fs.rmSync(CONFIG.SESSION_LOCAL_PATH, { recursive: true, force: true });
   jidCache.clear();
 
-  // Limpa tabela bot_session
+  // Limpa tabela bot_session (todos os registros, não só 'main')
   try {
-    await supabase.from('bot_session').delete().eq('id', 'main');
-  } catch {}
+    await supabase.from('bot_session').delete().neq('id', '___never___');
+    console.log('🗑️  bot_session limpa');
+  } catch (e) { console.warn('⚠️  Erro limpando bot_session:', e.message); }
 
-  // Limpa Storage
+  // Limpa Storage — pagina para garantir que apaga todos os arquivos
   try {
-    const { data: arqs } = await supabase.storage
-      .from(CONFIG.SUPABASE_BUCKET).list('session/', { limit: 200 });
-    if (arqs?.length)
+    let pagina = 0;
+    while (true) {
+      const { data: arqs } = await supabase.storage
+        .from(CONFIG.SUPABASE_BUCKET).list('session/', { limit: 200, offset: pagina * 200 });
+      if (!arqs?.length) break;
       await supabase.storage.from(CONFIG.SUPABASE_BUCKET)
         .remove(arqs.map(f => `session/${f.name}`));
-  } catch {}
+      if (arqs.length < 200) break;
+      pagina++;
+    }
+    console.log('🗑️  Storage limpo');
+  } catch (e) { console.warn('⚠️  Erro limpando Storage:', e.message); }
 
   console.log('🗑️  Sessão limpa');
 }
@@ -988,7 +998,10 @@ async function resolverJID(grupoId) {
   } else if (grupoId.includes('@g.us')) {
     jid = grupoId;
   } else {
-    jid = `${grupoId.replace(/\D/g, '')}@g.us`;
+    // Preserva o hífen do ID do grupo (ex: 5521996134821-1396914476)
+    // O replace anterior removia o hífen, gerando JID inválido e timeout no sendMessage
+    const idLimpo = grupoId.replace(/[^0-9\-]/g, '').replace(/-+/g, '-').replace(/^-|-$/g, '');
+    jid = `${idLimpo}@g.us`;
   }
   jidCache.set(grupoId, jid);
   console.log(`✅ JID: ${grupoId} → ${jid}`);
@@ -1026,10 +1039,13 @@ async function enviarParaGrupo(texto) {
     await sendComTimeout(jid, { text: texto });
     console.log(`📤 → ${jid}`);
   } catch (err) {
-    if (ehErroCriptografia(err)) {
+    if (ehErroCriptografia(err) && !limpandoSessao) {
+      limpandoSessao = true;
       console.warn('⚠️  Erro de criptografia em enviarParaGrupo — limpando sessão e reconectando...');
       isConnected = false;
-      limparSessao().then(() => setTimeout(conectarWhatsApp, 2000)).catch(() => setTimeout(conectarWhatsApp, 2000));
+      limparSessao()
+        .then(() => setTimeout(() => { limpandoSessao = false; conectarWhatsApp(); }, 2000))
+        .catch(() => setTimeout(() => { limpandoSessao = false; conectarWhatsApp(); }, 2000));
     }
     throw err;
   }
