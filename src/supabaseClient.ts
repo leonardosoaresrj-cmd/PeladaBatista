@@ -76,17 +76,15 @@ export function getSupabase(): SupabaseClient | null {
 /**
  * Cadastrar ou atualizar jogador no Supabase
  */
-export async function salvarJogadorNoSupabase(jogador: Jogador): Promise<boolean> {
+export async function salvarJogadorNoSupabase(jogador: Jogador): Promise<Jogador | null> {
   const supabase = getSupabase();
-  if (!supabase) return false;
+  if (!supabase) return null;
 
   try {
-    // Mapear de camelCase para snake_case esperado no Postgres do usuário
     const record = {
-      // Usar o id diretamente se for formato uuid, caso contrário o Supabase gera ou o Postgres lida
       nome: jogador.nome,
       sobrenome: jogador.sobrenome,
-      posicao: jogador.posicao,
+      posicao: jogador.posicao === 'Goleiro Aluguel' ? 'Goleiro' : jogador.posicao,
       data_nascimento: jogador.dataNascimento,
       foto: jogador.foto,
       membro_status: jogador.membroStatus,
@@ -97,7 +95,6 @@ export async function salvarJogadorNoSupabase(jogador: Jogador): Promise<boolean
       is_gold: jogador.isGold,
     };
 
-    // Verificar se já existe jogador com este email
     const { data: existente } = await supabase
       .from('jogadores')
       .select('id')
@@ -105,26 +102,31 @@ export async function salvarJogadorNoSupabase(jogador: Jogador): Promise<boolean
       .maybeSingle();
 
     if (existente) {
-      const { error } = await supabase
+      const { data, error } = await supabase
         .from('jogadores')
         .update(record)
-        .eq('id', existente.id);
+        .eq('id', existente.id)
+        .select()
+        .single();
       
       if (error) throw error;
+      return data ? { ...jogador, id: data.id } : jogador;
     } else {
-      const { error } = await supabase
+      const { data, error } = await supabase
         .from('jogadores')
         .insert({
           ...record,
-          id: jogador.id.startsWith('jog-') ? undefined : jogador.id // Se for ID temporário, deixa o Supabase gerar uuid
-        });
+          id: jogador.id.startsWith('jog-') ? undefined : jogador.id
+        })
+        .select()
+        .single();
       
       if (error) throw error;
+      return data ? { ...jogador, id: data.id } : jogador;
     }
-    return true;
   } catch (error) {
     console.warn('Erro ao sincronizar jogador no Supabase:', error);
-    return false;
+    return null;
   }
 }
 
@@ -145,21 +147,24 @@ export async function carregarJogadoresDoSupabase(): Promise<Jogador[] | null> {
     if (!data) return [];
 
     // Mapear de volta para o formato camelCase do frontend
-    return data.map((d: any) => ({
-      id: d.id,
-      nome: d.nome,
-      sobrenome: d.sobrenome,
-      posicao: d.posicao,
-      dataNascimento: d.data_nascimento,
-      foto: d.foto || 'jersey-red',
-      membroStatus: d.membro_status,
-      email: d.email,
-      senha: d.senha,
-      status: d.status,
-      role: d.role,
-      createdAt: d.created_at,
-      isGold: d.is_gold
-    }));
+    return data.map((d: any) => {
+      const isGoleiroAluguel = d.posicao === 'Goleiro' && d.email && d.email.includes('@pelada.com');
+      return {
+        id: d.id,
+        nome: d.nome,
+        sobrenome: d.sobrenome,
+        posicao: isGoleiroAluguel ? 'Goleiro Aluguel' : d.posicao,
+        dataNascimento: d.data_nascimento,
+        foto: d.foto || 'jersey-red',
+        membroStatus: d.membro_status,
+        email: d.email,
+        senha: d.senha,
+        status: d.status,
+        role: d.role,
+        createdAt: d.created_at,
+        isGold: d.is_gold
+      };
+    });
   } catch (error) {
     console.warn('Erro ao buscar jogadores do Supabase:', error);
     return null;

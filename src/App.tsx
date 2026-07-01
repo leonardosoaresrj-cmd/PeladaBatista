@@ -639,6 +639,22 @@ export default function App() {
   }, [jogadorAtual, pagamentos, partidasMescladas, valorDiaria, valor4Sabados, valor5Sabados]);
 
 
+  // Atualizar sessão e logar o usuário se foi deletado/suspenso remotamente
+  useEffect(() => {
+    if (jogadorAtual && jogadores.length > 0) {
+      const match = jogadores.find(j => j.id === jogadorAtual.id && (j.status === 'ativo' || j.status === 'suspenso'));
+      if (match) {
+        // Only update if there's a difference to avoid infinite re-renders
+        if (JSON.stringify(match) !== JSON.stringify(jogadorAtual)) {
+          setJogadorAtual(match);
+          sessionStorage.setItem('arena_user_session', JSON.stringify(match));
+        }
+      } else {
+        performLogout();
+      }
+    }
+  }, [jogadores]);
+
   // Carregar todos os dados (live Supabase com fallback Offline)
   const fetchTodoDados = async () => {
     // Carregar primeiro as deletadas locais para feedback instantâneo
@@ -772,16 +788,12 @@ export default function App() {
     // Carrega sessao do sessionStorage (ou localStorage anterior caso exista para transição suave)
     const savedSession = sessionStorage.getItem('arena_user_session') || localStorage.getItem('arena_user_session');
     if (savedSession) {
-      const parsed = JSON.parse(savedSession) as Jogador;
-      // Validar se o jogador ainda existe no banco
-      const baseJogadores = getSavedJogadores();
-      const match = baseJogadores.find(j => j.id === parsed.id && (j.status === 'ativo' || j.status === 'suspenso'));
-      if (match) {
-        setJogadorAtual(match);
-        // Migramos para sessionStorage para deslogar ao sair do app (fechar aba/desligar pc)
-        sessionStorage.setItem('arena_user_session', JSON.stringify(match));
+      try {
+        const parsed = JSON.parse(savedSession) as Jogador;
+        setJogadorAtual(parsed);
+        sessionStorage.setItem('arena_user_session', JSON.stringify(parsed));
         localStorage.removeItem('arena_user_session');
-      } else {
+      } catch (e) {
         sessionStorage.removeItem('arena_user_session');
         localStorage.removeItem('arena_user_session');
       }
@@ -915,9 +927,10 @@ export default function App() {
 
   // 1. Cadastro Solicitado por jogador (status 'pendente_aprovacao')
   const handleAdminCriarJogador = async (novo: Omit<Jogador, 'id' | 'status' | 'role' | 'createdAt'>) => {
-    const novoJogador: Jogador = {
+    const tempId = `jog-${Date.now()}`;
+    let novoJogador: Jogador = {
       ...novo,
-      id: `jog-${Date.now()}`,
+      id: tempId,
       status: 'ativo',
       role: 'jogador',
       createdAt: new Date().toISOString(),
@@ -925,27 +938,42 @@ export default function App() {
       isGoldDb: novo.isGold,
     };
     
-    const atualizados = [...jogadores, novoJogador];
+    // Mostra no frontend imediatamente
+    let atualizados = [...jogadores, novoJogador];
     setJogadores(atualizados);
     saveJogadores(atualizados);
 
-    await salvarJogadorNoSupabase(novoJogador);
+    // Salva no Supabase e pega o ID real
+    const saved = await salvarJogadorNoSupabase(novoJogador);
+    if (saved && saved.id !== tempId) {
+      novoJogador = saved;
+      atualizados = jogadores.map(j => j.id === tempId || j.email === novoJogador.email ? novoJogador : j);
+      setJogadores(atualizados);
+      saveJogadores(atualizados);
+    }
   };
 
   const handleRegistrarJogador = async (novo: Omit<Jogador, 'id' | 'status' | 'role' | 'createdAt'>) => {
-    const novoJogador: Jogador = {
+    const tempId = `jog-${Date.now()}`;
+    let novoJogador: Jogador = {
       ...novo,
-      id: `jog-${Date.now()}`,
+      id: tempId,
       status: 'pendente_aprovacao',
       role: 'jogador',
       createdAt: new Date().toISOString(),
     };
     
-    const atualizados = [...jogadores, novoJogador];
+    let atualizados = [...jogadores, novoJogador];
     setJogadores(atualizados);
     saveJogadores(atualizados);
 
-    await salvarJogadorNoSupabase(novoJogador);
+    const saved = await salvarJogadorNoSupabase(novoJogador);
+    if (saved && saved.id !== tempId) {
+      novoJogador = saved;
+      atualizados = jogadores.map(j => j.id === tempId || j.email === novoJogador.email ? novoJogador : j);
+      setJogadores(atualizados);
+      saveJogadores(atualizados);
+    }
 
     // Enviar notificação de novo cadastro para o administrador
     if (whatsappAutomacaoAtiva && whatsappWebhookUrl) {

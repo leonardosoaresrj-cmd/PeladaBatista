@@ -226,62 +226,30 @@ create policy "Admins gerenciam configurações do racha" on racha_configuracoes
 
 // Carregar dados iniciais guardados de jogadores (com persistência real)
 export function getSavedJogadores(): Jogador[] {
-  const json = localStorage.getItem('futebol_jogadores');
-  let list: Jogador[] = [];
-  if (json) {
-    try {
-      list = JSON.parse(json);
-    } catch (e) {
-      list = [];
-    }
-  }
-  
-  // Garante que o administrador Leonardo Soares sempre exista na lista
-  const hasAdmin = list.some(j => j.email.toLowerCase().trim() === 'leonardo.soares.rj@gmail.com');
-  if (!hasAdmin) {
-    list.unshift(...INITIAL_JOGADORES);
-  }
-  
-  localStorage.setItem('futebol_jogadores', JSON.stringify(list));
-  return list;
+  // Disabling localStorage logic as per user request to use Supabase strictly
+  return INITIAL_JOGADORES;
 }
 
 export function saveJogadores(jogadores: Jogador[]) {
-  localStorage.setItem('futebol_jogadores', JSON.stringify(jogadores));
+  // Disabling localStorage saving
 }
 
 // Carregar partidas salvas no localStorage
 export function getSavedPartidas(): Partida[] {
-  const json = localStorage.getItem('futebol_partidas');
-  if (json) {
-    try {
-      return JSON.parse(json);
-    } catch (e) {
-      return [];
-    }
-  }
-  return [];
+  return INITIAL_PARTIDAS;
 }
 
 export function savePartidas(partidas: Partida[]) {
-  localStorage.setItem('futebol_partidas', JSON.stringify(partidas));
+  // Disabling localStorage saving
 }
 
 // Carregar pagamentos salvos no localStorage
 export function getSavedPagamentos(): Pagamento[] {
-  const json = localStorage.getItem('futebol_pagamentos');
-  if (json) {
-    try {
-      return JSON.parse(json);
-    } catch (e) {
-      return [];
-    }
-  }
-  return [];
+  return INITIAL_PAGAMENTOS;
 }
 
 export function savePagamentos(pagamentos: Pagamento[]) {
-  localStorage.setItem('futebol_pagamentos', JSON.stringify(pagamentos));
+  // Disabling localStorage saving
 }
 
 // Carregar lançamentos salvos no localStorage

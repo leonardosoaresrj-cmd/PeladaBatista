@@ -276,7 +276,7 @@ export function obterDebitosDoJogador(
     partidas.forEach(p => {
       if (p.data && p.data.length >= 7) {
         const m = p.data.substring(0, 7);
-        if (!mesSelecionado || m <= mesLimit) {
+        if (m <= mesLimit) {
           mesSet.add(m);
         }
       }
@@ -285,21 +285,13 @@ export function obterDebitosDoJogador(
     pagamentos.forEach(p => {
       if (p.mesRef && p.mesRef.length >= 7) {
         const m = p.mesRef;
-        if (!mesSelecionado || m <= mesLimit) {
+        if (m <= mesLimit) {
           mesSet.add(m);
+        } else if (p.jogadorId === jogadorId) {
+          mesSet.add(m); // Add future months only if this specific player has a payment
         }
       }
     });
-
-    // Atualizar o mesLimit para ser o maior mês presente em mesSet
-    mesSet.forEach(m => {
-      if (m > mesLimit) {
-        mesLimit = m;
-      }
-    });
-
-    // Garantir que mesLimit está em mesSet
-    mesSet.add(mesLimit);
 
     const listaMeses = Array.from(mesSet).sort();
     let meses: string[] = [];
@@ -320,6 +312,13 @@ export function obterDebitosDoJogador(
           curY++;
         }
       }
+      
+      // Add any specific future months the player has payments for
+      listaMeses.forEach(m => {
+        if (m > mesLimit && !meses.includes(m)) {
+          meses.push(m);
+        }
+      });
     } else {
       meses = [mesLimit];
     }
@@ -345,15 +344,17 @@ export function obterDebitosDoJogador(
 
       const pag = pagamentos.find(p => p.jogadorId === jogadorId && p.mesRef === mes && !p.partidaId);
       if (!pag) {
-        debitos.push({
-          id: `mensalidade-${mes}`,
-          tipo: 'mensalidade',
-          referencia: `Mensalidade de ${mes.split('-').reverse().join('/')}`,
-          dataOrigem: `${mes}-01`,
-          mesRef: mes,
-          valor: valorMensalidade,
-          status: 'pendente'
-        });
+        if (mes <= mesLimit) {
+          debitos.push({
+            id: `mensalidade-${mes}`,
+            tipo: 'mensalidade',
+            referencia: `Mensalidade de ${mes.split('-').reverse().join('/')}`,
+            dataOrigem: `${mes}-01`,
+            mesRef: mes,
+            valor: valorMensalidade,
+            status: 'pendente'
+          });
+        }
       } else if (pag.status !== 'pago' && pag.status !== 'cancelado') {
         debitos.push({
           id: pag.id,
