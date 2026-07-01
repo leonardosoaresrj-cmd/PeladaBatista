@@ -180,7 +180,7 @@ export default function ControlePagamentos({
 
   // Obter o registro do pagamento atual do jogador para o mês selecionado
   const obterPagamentoDoJogador = (mes: string) => {
-    return pagamentos.find(p => p.jogadorId === jogadorAtual.id && p.mesRef === mes);
+    return pagamentos.find(p => p.jogadorId === jogadorAtual.id && p.mesRef === mes && !p.partidaId);
   };
 
   const pagAtual = obterPagamentoDoJogador(mesSelecionado);

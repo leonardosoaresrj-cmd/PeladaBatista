@@ -329,7 +329,7 @@ export function obterDebitosDoJogador(
       }
       const valorMensalidade = count === 5 ? valor5Sabados : valor4Sabados;
 
-      const pag = pagamentos.find(p => p.jogadorId === jogadorId && p.mesRef === mes);
+      const pag = pagamentos.find(p => p.jogadorId === jogadorId && p.mesRef === mes && !p.partidaId);
       if (!pag) {
         debitos.push({
           id: `mensalidade-${mes}`,

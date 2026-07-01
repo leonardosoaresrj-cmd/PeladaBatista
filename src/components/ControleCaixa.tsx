@@ -776,12 +776,12 @@ export default function ControleCaixa({
 
     // Calcular receita gerada ou arrecadada no jogo:
     const receitaEstProjDiaristas = diaristasConfirmados.reduce((sum, d) => {
-      const pag = pagamentos.find(p => p.jogadorId === d.id && p.mesRef === mesPartida && p.status === 'pago');
+      const pag = pagamentos.find(p => p.jogadorId === d.id && p.partidaId === partidaAtiva.id && p.status === 'pago');
       return sum + (pag ? pag.valor : 0);
     }, 0);
 
     const receitaEstProjMensalistasFraction = mensalistasConfirmados.reduce((sum, m) => {
-      const pag = pagamentos.find(p => p.jogadorId === m.id && p.mesRef === mesPartida && p.status === 'pago');
+      const pag = pagamentos.find(p => p.jogadorId === m.id && p.mesRef === mesPartida && !p.partidaId && p.status === 'pago');
       if (pag) {
         return sum + (pag.valor / (numSabadosPartida || 4));
       }
@@ -1032,12 +1032,12 @@ export default function ControleCaixa({
         const mensalistas = atletasDoJogo.filter(j => j.membroStatus === 'mensalista');
         
         const recDiaristas = diaristas.reduce((sum, d) => {
-          const pag = pagamentos.find(p => p.jogadorId === d.id && p.mesRef === mesPartida && p.status === 'pago');
+          const pag = pagamentos.find(p => p.jogadorId === d.id && p.partidaId === game.id && p.status === 'pago');
           return sum + (pag ? pag.valor : 0);
         }, 0);
         
         const recMensalistas = mensalistas.reduce((sum, m) => {
-          const pag = pagamentos.find(p => p.jogadorId === m.id && p.mesRef === mesPartida && p.status === 'pago');
+          const pag = pagamentos.find(p => p.jogadorId === m.id && p.mesRef === mesPartida && !p.partidaId && p.status === 'pago');
           if (pag) {
             return sum + (pag.valor / (numSabados || 4));
           }
@@ -2472,7 +2472,9 @@ export default function ControleCaixa({
                   <div className="max-h-72 overflow-y-auto pr-1 space-y-1 font-sans">
                     {analiseJogoDetalhes.listaAtletas.map((atl, index) => {
                       const avatar = AVATAR_PRESETS.find(p => p.id === atl.foto) || AVATAR_PRESETS[0];
-                      const statusPg = pagamentos.find(p => p.jogadorId === atl.id && p.mesRef === analiseJogoDetalhes.mesPartida);
+                      const statusPg = atl.membroStatus === 'mensalista'
+                        ? pagamentos.find(p => p.jogadorId === atl.id && p.mesRef === analiseJogoDetalhes.mesPartida && !p.partidaId)
+                        : pagamentos.find(p => p.jogadorId === atl.id && p.partidaId === analiseJogoDetalhes.id);
                       const isPaid = statusPg?.status === 'pago';
                       const isGoleiro = atl.posicao === 'Goleiro';
 

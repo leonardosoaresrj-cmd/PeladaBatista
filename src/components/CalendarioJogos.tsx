@@ -147,10 +147,10 @@ export default function CalendarioJogos({
       .filter((j): j is Jogador => !!j);
 
     const detilhados = confirmados.map((jogador) => {
-      // Procurar pagamento do jogador para o mês daquela partida
-      const pagamento = pagamentos.find(
-        (p) => p.jogadorId === jogador.id && p.mesRef === mesReferencia
-      );
+      // Procurar pagamento do jogador para o mês ou partida correspondente
+      const pagamento = jogador.membroStatus === 'mensalista'
+        ? pagamentos.find((p) => p.jogadorId === jogador.id && p.mesRef === mesReferencia && !p.partidaId)
+        : pagamentos.find((p) => p.jogadorId === jogador.id && p.partidaId === partida.id);
 
       return {
         jogador,
@@ -702,6 +702,7 @@ export default function CalendarioJogos({
                         const jaPagoMensalidade = pagamentos.some(
                           p => p.jogadorId === jogadorAtual.id && 
                                p.mesRef === matchMesRef && 
+                               !p.partidaId &&
                                p.status === 'pago'
                         );
 
@@ -714,6 +715,7 @@ export default function CalendarioJogos({
                         const jaInformouMensalidade = pagamentos.some(
                           p => p.jogadorId === jogadorAtual.id && 
                                p.mesRef === matchMesRef && 
+                               !p.partidaId &&
                                p.status === 'pendente_confirmacao'
                         );
 

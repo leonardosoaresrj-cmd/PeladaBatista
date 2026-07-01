@@ -268,6 +268,7 @@ export default function ConfirmacaoPresenca({
       const jaPagoMensalidade = pagamentos.some(
         p => p.jogadorId === id && 
              p.mesRef === matchMesRef && 
+             !p.partidaId &&
              p.status === 'pago'
       );
 
@@ -280,6 +281,7 @@ export default function ConfirmacaoPresenca({
       const jaInformouMensalidade = pagamentos.some(
         p => p.jogadorId === id && 
              p.mesRef === matchMesRef && 
+             !p.partidaId &&
              p.status === 'pendente_confirmacao'
       );
 
