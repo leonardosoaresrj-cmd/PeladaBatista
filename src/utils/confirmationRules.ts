@@ -273,19 +273,25 @@ export function obterDebitosDoJogador(
     partidas.forEach(p => {
       if (p.data && p.data.length >= 7) {
         const m = p.data.substring(0, 7);
-        if (m <= mesLimit) {
-          mesSet.add(m);
-        }
+        mesSet.add(m);
       }
     });
 
     pagamentos.forEach(p => {
       if (p.mesRef && p.mesRef.length >= 7) {
-        if (p.mesRef <= mesLimit) {
-          mesSet.add(p.mesRef);
-        }
+        mesSet.add(p.mesRef);
       }
     });
+
+    // Atualizar o mesLimit para ser o maior mês presente em mesSet
+    mesSet.forEach(m => {
+      if (m > mesLimit) {
+        mesLimit = m;
+      }
+    });
+
+    // Garantir que mesLimit está em mesSet
+    mesSet.add(mesLimit);
 
     const listaMeses = Array.from(mesSet).sort();
     let meses: string[] = [];

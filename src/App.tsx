@@ -71,7 +71,28 @@ export default function App() {
   const [partidasDeletadas, setPartidasDeletadas] = useState<string[]>([]);
   const partidasMescladas = useMemo(() => {
     const list = mesclarPartidasAutomáticas(partidas);
-    return list.filter(p => !partidasDeletadas.includes(p.id));
+    const filtradas = list.filter(p => !partidasDeletadas.includes(p.id));
+    
+    // Deduplicar partidas pela data para evitar repetições no calendário e contagens do mês
+    const porData = new Map<string, Partida>();
+    filtradas.forEach(p => {
+      const existente = porData.get(p.data);
+      if (!existente) {
+        porData.set(p.data, p);
+      } else {
+        const existenteAuto = existente.criadoPor === 'sistema' || existente.id.startsWith('sat-');
+        const novaAuto = p.criadoPor === 'sistema' || p.id.startsWith('sat-');
+        if (existenteAuto && !novaAuto) {
+          porData.set(p.data, p);
+        } else if (!existenteAuto && !novaAuto) {
+          if (existente.cancelada && !p.cancelada) {
+            porData.set(p.data, p);
+          }
+        }
+      }
+    });
+    
+    return Array.from(porData.values()).sort((a, b) => a.data.localeCompare(b.data));
   }, [partidas, partidasDeletadas]);
 
   const proximaPartida = useMemo(() => {
@@ -2185,7 +2206,7 @@ export default function App() {
                   valor5Sabados={valor5Sabados}
                   whatsappAutomacaoAtiva={whatsappAutomacaoAtiva}
                   onRegistrarLogAutomacao={handleRegistrarLogAutomacao}
-                  partidas={partidas}
+                  partidas={partidasMescladas}
                 />
               )}
 

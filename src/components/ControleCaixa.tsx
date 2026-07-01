@@ -797,6 +797,8 @@ export default function ControleCaixa({
       .reduce((sum, l) => sum + l.valor, 0);
 
     return {
+      id: partidaAtiva.id,
+      mesPartida: mesPartida,
       totalConfirmados: confirmadosAtletas.length,
       mensalistas: mensalistasConfirmados.length,
       diaristas: diaristasConfirmados.length,
