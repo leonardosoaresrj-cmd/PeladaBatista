@@ -81,6 +81,9 @@ export default function ConfirmacaoPresenca({
   // Confirmation state for canceling game
   const [showCancelConfirm, setShowCancelConfirm] = useState(false);
 
+  // Modal para confirmação de remoção de presença
+  const [remocaoPresencaModal, setRemocaoPresencaModal] = useState<{jogadorId: string, nome: string} | null>(null);
+
   const handlePlayerClick = (j: Jogador) => {
     setJogadorSelecionadoModal(j);
     setEditNome(j.nome);
@@ -525,9 +528,7 @@ export default function ConfirmacaoPresenca({
                         type="button"
                         onClick={(e) => {
                           e.stopPropagation();
-                          if (confirm(`Remover confirmação de presença de ${j.nome} ${j.sobrenome} nesta partida?`)) {
-                            onActualizarPresenca(idPartidaCorrente || '', j.id, null);
-                          }
+                          setRemocaoPresencaModal({ jogadorId: j.id, nome: `${j.nome} ${j.sobrenome}` });
                         }}
                         className="text-[10px] font-bold text-rose-400 hover:text-rose-300 hover:bg-rose-950/40 border border-rose-500/20 px-2 py-0.5 rounded transition-colors cursor-pointer uppercase font-mono tracking-wider shrink-0"
                         title="Remover Confirmação"
@@ -940,9 +941,7 @@ export default function ConfirmacaoPresenca({
                                   type="button"
                                   onClick={(e) => {
                                     e.stopPropagation();
-                                    if (confirm(`Remover confirmação de presença de ${j.nome} ${j.sobrenome} nesta partida?`)) {
-                                      onActualizarPresenca(idPartidaCorrente || '', j.id, null);
-                                    }
+                                    setRemocaoPresencaModal({ jogadorId: j.id, nome: `${j.nome} ${j.sobrenome}` });
                                   }}
                                   className="text-[10px] font-bold text-rose-400 hover:text-rose-300 hover:bg-rose-950/40 border border-rose-500/20 px-2 py-0.5 rounded transition-colors cursor-pointer uppercase font-mono tracking-wider shrink-0"
                                   title="Remover Confirmação"
@@ -1031,9 +1030,7 @@ export default function ConfirmacaoPresenca({
                                   type="button"
                                   onClick={(e) => {
                                     e.stopPropagation();
-                                    if (confirm(`Remover confirmação de presença de ${j.nome} ${j.sobrenome} nesta partida?`)) {
-                                      onActualizarPresenca(idPartidaCorrente || '', j.id, null);
-                                    }
+                                    setRemocaoPresencaModal({ jogadorId: j.id, nome: `${j.nome} ${j.sobrenome}` });
                                   }}
                                   className="text-[10px] font-bold text-rose-400 hover:text-rose-300 hover:bg-rose-950/40 border border-rose-500/20 px-2 py-0.5 rounded transition-colors cursor-pointer uppercase font-mono tracking-wider shrink-0"
                                   title="Remover Confirmação"
@@ -1122,9 +1119,7 @@ export default function ConfirmacaoPresenca({
                                   type="button"
                                   onClick={(e) => {
                                     e.stopPropagation();
-                                    if (confirm(`Remover confirmação de presença de ${j.nome} ${j.sobrenome} nesta partida?`)) {
-                                      onActualizarPresenca(idPartidaCorrente || '', j.id, null);
-                                    }
+                                    setRemocaoPresencaModal({ jogadorId: j.id, nome: `${j.nome} ${j.sobrenome}` });
                                   }}
                                   className="text-[10px] font-bold text-rose-400 hover:text-rose-300 hover:bg-rose-950/40 border border-rose-500/20 px-2 py-0.5 rounded transition-colors cursor-pointer uppercase font-mono tracking-wider shrink-0"
                                   title="Remover Confirmação"
@@ -1213,9 +1208,7 @@ export default function ConfirmacaoPresenca({
                               type="button"
                               onClick={(e) => {
                                 e.stopPropagation();
-                                if (confirm(`Remover ${j.nome} ${j.sobrenome} da lista de espera?`)) {
-                                  onActualizarPresenca(idPartidaCorrente || '', j.id, null);
-                                }
+                                setRemocaoPresencaModal({ jogadorId: j.id, nome: `${j.nome} ${j.sobrenome}`, isEspera: true });
                               }}
                               className="text-[10px] font-bold text-rose-400 hover:text-rose-300 hover:bg-rose-950/40 border border-rose-500/20 px-2 py-0.5 rounded transition-colors cursor-pointer uppercase font-mono tracking-wider shrink-0"
                               title="Remover da Lista de Espera"
@@ -1891,6 +1884,40 @@ export default function ConfirmacaoPresenca({
                 className="flex-1 py-3 px-4 rounded-xl border border-white/10 hover:bg-white/5 text-emerald-300 hover:text-white transition-all text-xs cursor-pointer font-bold uppercase tracking-wider"
               >
                 Voltar
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {/* MODAL DE CONFIRMAÇÃO DE REMOÇÃO DE PRESENÇA */}
+      {remocaoPresencaModal && (
+        <div className="fixed inset-0 bg-black/85 backdrop-blur-sm flex items-center justify-center p-4 z-50 overflow-y-auto animate-fade-in">
+          <div className="bg-emerald-950 border border-rose-500/30 rounded-2xl w-full max-w-sm p-6 shadow-2xl relative text-center">
+            <div className="w-12 h-12 bg-rose-500/10 border border-rose-500/30 text-rose-400 rounded-full flex items-center justify-center mx-auto mb-4">
+              <ShieldAlert className="w-6 h-6" />
+            </div>
+            <h3 className="font-display font-black text-lg uppercase tracking-wide text-white mb-2">Remover Presença</h3>
+            <p className="text-xs text-emerald-200 leading-relaxed font-sans mb-6">
+              Você tem certeza que deseja remover {remocaoPresencaModal.nome} da {remocaoPresencaModal.isEspera ? 'lista de espera' : 'lista de confirmados'}?
+            </p>
+            <div className="flex gap-3">
+              <button
+                type="button"
+                onClick={() => {
+                  onActualizarPresenca(idPartidaCorrente || '', remocaoPresencaModal.jogadorId, null);
+                  setRemocaoPresencaModal(null);
+                }}
+                className="flex-1 bg-rose-500 hover:bg-rose-400 text-white font-extrabold py-3 rounded-xl transition-all shadow-md active:scale-97 text-xs flex items-center justify-center gap-1.5 cursor-pointer uppercase tracking-wider"
+              >
+                Remover
+              </button>
+              <button
+                type="button"
+                onClick={() => setRemocaoPresencaModal(null)}
+                className="flex-1 py-3 px-4 rounded-xl border border-white/10 hover:bg-white/5 text-emerald-300 hover:text-white transition-all text-xs cursor-pointer font-bold uppercase tracking-wider"
+              >
+                Cancelar
               </button>
             </div>
           </div>

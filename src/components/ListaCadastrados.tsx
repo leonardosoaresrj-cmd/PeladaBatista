@@ -340,11 +340,11 @@ export default function ListaCadastrados({
               <img src={j.foto} className="w-full h-full object-cover rounded-full" alt="Avatar" referrerPolicy="no-referrer" />
             ) : (
               <span className="text-xl font-bold font-display" style={{ color: jersey.text === '⚪' ? '#fff' : '#000' }}>
-                {j.posicao === 'Goleiro' ? '🧤' : j.posicao === 'Defesa' ? '🛡️' : j.posicao === 'Meio' ? '🧠' : '🚀'}
+                {j.posicao === 'Goleiro' || j.posicao === 'Goleiro Aluguel' ? '🧤' : j.posicao === 'Defesa' ? '🛡️' : j.posicao === 'Meio' ? '🧠' : '🚀'}
               </span>
             )}
             <span className="text-[8px] text-white font-extrabold bg-emerald-955/90 px-1.5 py-0.5 border border-white/10 rounded absolute -bottom-1 uppercase font-mono tracking-wider whitespace-nowrap">
-              {j.posicao === 'Goleiro' ? '🧤 GOL' : j.posicao === 'Defesa' ? '🛡️ DEF' : j.posicao === 'Meio' ? '🧠 MEI' : '🚀 ATA'}
+              {j.posicao === 'Goleiro' || j.posicao === 'Goleiro Aluguel' ? '🧤 GOL' : j.posicao === 'Defesa' ? '🛡️ DEF' : j.posicao === 'Meio' ? '🧠 MEI' : '🚀 ATA'}
             </span>
           </div>
 
@@ -454,7 +454,7 @@ export default function ListaCadastrados({
                     <Shield className="w-3.5 h-3.5 text-amber-400 shrink-0" title="Administrador Geral" />
                   )}
                 </h3>
-                <p className="text-xs text-emerald-300 truncate">{j.email}</p>
+                <p className="text-xs text-emerald-300 truncate">{j.posicao === 'Goleiro Aluguel' ? '-' : j.email}</p>
                 
                 {/* Tags */}
                 <div className="flex flex-wrap items-center gap-1.5 mt-2">
@@ -464,12 +464,12 @@ export default function ListaCadastrados({
                     </span>
                   )}
                   <span className={`text-[9px] px-1.5 py-0.5 rounded font-extrabold uppercase font-mono border ${
-                    j.posicao === 'Goleiro' ? 'bg-amber-955/50 border-amber-500/20 text-amber-400' :
+                    j.posicao === 'Goleiro' || j.posicao === 'Goleiro Aluguel' ? 'bg-amber-955/50 border-amber-500/20 text-amber-400' :
                     j.posicao === 'Defesa' ? 'bg-blue-955/50 border-blue-500/20 text-blue-400' :
                     j.posicao === 'Meio' ? 'bg-purple-955/50 border-purple-500/20 text-purple-400' :
                     'bg-red-955/50 border-red-500/20 text-red-400'
                   }`}>
-                    {j.posicao === 'Goleiro' ? '🧤 Goleiro' : j.posicao === 'Defesa' ? '🛡️ Defesa' : j.posicao === 'Meio' ? '🧠 Meio' : '🚀 Ataque'}
+                    {j.posicao === 'Goleiro' || j.posicao === 'Goleiro Aluguel' ? '🧤 Goleiro' : j.posicao === 'Defesa' ? '🛡️ Defesa' : j.posicao === 'Meio' ? '🧠 Meio' : '🚀 Ataque'}
                   </span>
                   <span className={`text-[9px] px-1.5 py-0.5 rounded font-extrabold uppercase font-mono border ${
                     j.membroStatus === 'isento'
@@ -478,7 +478,7 @@ export default function ListaCadastrados({
                       ? 'bg-teal-950/60 border-teal-500/25 text-teal-400' 
                       : 'bg-amber-950/60 border-amber-500/25 text-amber-400'
                   }`}>
-                    {j.membroStatus}
+                    {j.posicao === 'Goleiro Aluguel' ? 'Aluguel' : j.membroStatus}
                   </span>
                   {j.status === 'suspenso' && (
                     <span className="text-[9px] px-1.5 py-0.5 rounded font-black uppercase font-mono border bg-rose-950/80 border-rose-500/40 text-rose-400 flex items-center gap-0.5 shadow-sm">
@@ -496,7 +496,7 @@ export default function ListaCadastrados({
         <div className="px-4 py-2.5 bg-emerald-950/60 flex flex-wrap items-center justify-between text-[10px] text-emerald-300 border-t border-b border-white/10 font-mono">
           <span className="flex items-center gap-1">
             <Calendar className="w-3.5 h-3.5 text-emerald-400" />
-            Nasc: {j.dataNascimento ? j.dataNascimento.split('-').reverse().join('/') : '-'} ({calcularIdade(j.dataNascimento)} anos)
+            Nasc: {j.posicao === 'Goleiro Aluguel' ? '-' : (j.dataNascimento ? `${j.dataNascimento.split('-').reverse().join('/')} (${calcularIdade(j.dataNascimento)} anos)` : '-')}
           </span>
         </div>
 
@@ -1310,7 +1310,7 @@ export default function ListaCadastrados({
               </div>
 
               {newPosicao !== 'Goleiro Aluguel' && (
-                <div className="grid grid-cols-2 gap-2">
+                <div className="space-y-2">
                   <div className="min-w-0">
                     <label className="block text-[9px] font-bold uppercase text-emerald-400 tracking-wider mb-1 truncate">Nascimento</label>
                     <input
@@ -1318,35 +1318,36 @@ export default function ListaCadastrados({
                       required
                       value={newDataNascimento}
                       onChange={(e) => setNewDataNascimento(e.target.value)}
-                      className="w-full bg-emerald-950/40 border border-white/10 text-white rounded-lg px-2 py-1.5 text-xs focus:outline-none focus:border-white transition-all font-sans [&::-webkit-calendar-picker-indicator]:hidden [&::-webkit-calendar-picker-indicator]:m-0 [&::-webkit-calendar-picker-indicator]:p-0"
-                    />
-                  </div>
-                  <div className="min-w-0">
-                    <label className="block text-[9px] font-bold uppercase text-emerald-400 tracking-wider mb-1 truncate">Senha (PIN)</label>
-                    <input
-                      type="text"
-                      required
-                      value={newPin}
-                      onChange={(e) => setNewPin(e.target.value)}
-                      placeholder="Ex: 1234"
-                      maxLength={4}
                       className="w-full bg-emerald-950/40 border border-white/10 text-white rounded-lg px-2 py-1.5 text-xs focus:outline-none focus:border-white transition-all font-sans"
                     />
                   </div>
-                </div>
-              )}
-
-              {newPosicao !== 'Goleiro Aluguel' && (
-                <div>
-                  <label className="block text-[9px] font-bold uppercase text-emerald-400 tracking-wider mb-1 truncate">Email</label>
-                  <input
-                    type="email"
-                    required
-                    value={newEmail}
-                    onChange={(e) => setNewEmail(e.target.value)}
-                    placeholder="email@exemplo.com"
-                    className="w-full bg-emerald-950/40 border border-white/10 text-white rounded-lg px-2 py-1.5 text-xs focus:outline-none focus:border-white transition-all font-sans"
-                  />
+                  
+                  <div className="grid grid-cols-2 gap-2">
+                    <div className="min-w-0">
+                      <label className="block text-[9px] font-bold uppercase text-emerald-400 tracking-wider mb-1 truncate">Email</label>
+                      <input
+                        type="email"
+                        required
+                        value={newEmail}
+                        onChange={(e) => setNewEmail(e.target.value)}
+                        placeholder="email@exemplo.com"
+                        className="w-full bg-emerald-950/40 border border-white/10 text-white rounded-lg px-2 py-1.5 text-xs focus:outline-none focus:border-white transition-all font-sans"
+                      />
+                    </div>
+                    
+                    <div className="min-w-0">
+                      <label className="block text-[9px] font-bold uppercase text-emerald-400 tracking-wider mb-1 truncate">Senha (PIN)</label>
+                      <input
+                        type="text"
+                        required
+                        value={newPin}
+                        onChange={(e) => setNewPin(e.target.value)}
+                        placeholder="Ex: 1234"
+                        maxLength={4}
+                        className="w-full bg-emerald-950/40 border border-white/10 text-white rounded-lg px-2 py-1.5 text-xs focus:outline-none focus:border-white transition-all font-sans"
+                      />
+                    </div>
+                  </div>
                 </div>
               )}
 
