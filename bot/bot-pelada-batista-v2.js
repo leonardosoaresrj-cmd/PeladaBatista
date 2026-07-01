@@ -78,6 +78,8 @@ let cronInterval      = null;
 let saveDebounceTimer = null;   // debounce do salvarSessao
 
 const jidCache = new Map();
+let sessaoCorrompidaDetectada = false; // true quando MessageCounterError detectado após reconexão
+let limpandoSessao = false;           // mutex para evitar double-limpeza em race condition
 
 // ─── Express ──────────────────────────────────────────────────────────────────
 const app = express();
@@ -302,7 +304,7 @@ app.post('/teste', async (req, res) => {
 
   try {
     const jid = await resolverJID(grupoAlvo);
-    await sock.sendMessage(jid, { text: mensagem });
+    await sendComTimeout(jid, { text: mensagem });
     console.log(`📤 [/teste] → ${jid} | ${mensagem.substring(0, 60).replace(/\n/g, ' ')}`);
     await supabase.from('bot_logs').insert({
       evento: 'DIRETO', tabela: 'frontend',
@@ -311,6 +313,17 @@ app.post('/teste', async (req, res) => {
     res.json({ success: true, jid });
   } catch (err) {
     console.error('❌ /teste:', err.message);
+    if (ehErroCriptografia(err) && !limpandoSessao) {
+      limpandoSessao = true;
+      isConnected = false;
+      limparSessao()
+        .then(() => setTimeout(() => { limpandoSessao = false; conectarWhatsApp(); }, 2000))
+        .catch(() => setTimeout(() => { limpandoSessao = false; conectarWhatsApp(); }, 2000));
+      return res.status(503).json({
+        error: 'Sessão WhatsApp corrompida — limpando e reconectando. Tente novamente em 15s.',
+        reconnecting: true,
+      });
+    }
     res.status(500).json({ error: err.message });
   }
 });
@@ -489,19 +502,26 @@ async function limparSessao() {
     fs.rmSync(CONFIG.SESSION_LOCAL_PATH, { recursive: true, force: true });
   jidCache.clear();
 
-  // Limpa tabela bot_session
+  // Limpa tabela bot_session (todos os registros, não só 'main')
   try {
-    await supabase.from('bot_session').delete().eq('id', 'main');
-  } catch {}
+    await supabase.from('bot_session').delete().neq('id', '___never___');
+    console.log('🗑️  bot_session limpa');
+  } catch (e) { console.warn('⚠️  Erro limpando bot_session:', e.message); }
 
-  // Limpa Storage
+  // Limpa Storage — pagina para garantir que apaga todos os arquivos
   try {
-    const { data: arqs } = await supabase.storage
-      .from(CONFIG.SUPABASE_BUCKET).list('session/', { limit: 200 });
-    if (arqs?.length)
+    let pagina = 0;
+    while (true) {
+      const { data: arqs } = await supabase.storage
+        .from(CONFIG.SUPABASE_BUCKET).list('session/', { limit: 200, offset: pagina * 200 });
+      if (!arqs?.length) break;
       await supabase.storage.from(CONFIG.SUPABASE_BUCKET)
         .remove(arqs.map(f => `session/${f.name}`));
-  } catch {}
+      if (arqs.length < 200) break;
+      pagina++;
+    }
+    console.log('🗑️  Storage limpo');
+  } catch (e) { console.warn('⚠️  Erro limpando Storage:', e.message); }
 
   console.log('🗑️  Sessão limpa');
 }
@@ -594,9 +614,7 @@ async function dispararAberturaMensalidade(hoje) {
   }
 }
 
-// ─────────────────────────────────────────────────────────────────────────────
-// WEBHOOK — processador de eventos
-// ─────────────────────────────────────────────────────────────────────────────
+// ─── Webhook Process ──────────────────────────────────────────────────────────
 async function processarEventoWebhook(tipo, tabela, rec, recAntigo) {
   let mensagem = null;
 
@@ -690,7 +708,7 @@ async function processarEventoWebhook(tipo, tabela, rec, recAntigo) {
     setTimeout(async () => {
       try {
         const jidAdmin = await resolverJID('admin');
-        await sock.sendMessage(jidAdmin, { text: msgCadastroAdmin });
+        await sendComTimeout(jidAdmin, { text: msgCadastroAdmin });
         await supabase.from('bot_logs').insert({
           evento: 'PENDENTE_APROVACAO_ADMIN', tabela: 'jogadores',
           mensagem: msgCadastroAdmin.substring(0, 500), enviado_em: new Date().toISOString(),
@@ -723,7 +741,7 @@ async function processarEventoWebhook(tipo, tabela, rec, recAntigo) {
                      `👉 Acesse o portal para conferir o comprovante e aprovar:\nhttps://peladabatista.onrender.com`;
                      
           const jidAdmin = await resolverJID('admin');
-          await sock.sendMessage(jidAdmin, { text: msgPagamentoAdmin });
+          await sendComTimeout(jidAdmin, { text: msgPagamentoAdmin });
           await supabase.from('bot_logs').insert({
             evento: 'PAGAMENTO_DECLARADO_ADMIN', tabela: 'pagamentos',
             mensagem: msgPagamentoAdmin.substring(0, 500), enviado_em: new Date().toISOString(),
@@ -745,10 +763,7 @@ async function processarEventoWebhook(tipo, tabela, rec, recAntigo) {
   }
 }
 
-// ─────────────────────────────────────────────────────────────────────────────
-// TEMPLATES DE MENSAGEM
-// ─────────────────────────────────────────────────────────────────────────────
-
+// ─── Message Templates ────────────────────────────────────────────────────────
 function formatarDataJogo(dataStr, horario) {
   const d = new Date(`${dataStr}T12:00:00`);
   const sem = d.toLocaleDateString('pt-BR', { weekday: 'long' });
@@ -824,6 +839,7 @@ function msgPartidaCancelada(p) {
   );
 }
 
+// ─── Partida Reativada ────────────────────────────────────────────────────────
 function msgPartidaReativada(p) {
   return (
     `⚽ *PELADA BATISTA SÁBADO* ⚽\n` +
@@ -954,9 +970,7 @@ async function gerarListaCompletaPartida(partidaId) {
   }
 }
 
-// ─────────────────────────────────────────────────────────────────────────────
-// JID
-// ─────────────────────────────────────────────────────────────────────────────
+// ─── JID Resolution ───────────────────────────────────────────────────────────
 async function resolverJID(grupoId) {
   if (!grupoId) throw new Error('grupo_id vazio');
   if (grupoId === 'admin') {
@@ -978,24 +992,58 @@ async function resolverJID(grupoId) {
   } else if (grupoId.includes('@g.us')) {
     jid = grupoId;
   } else {
-    jid = `${grupoId.replace(/\D/g, '')}@g.us`;
+    // Preserva o hífen do ID do grupo (ex: 5521996134821-1396914476)
+    const idLimpo = grupoId.replace(/[^0-9\-]/g, '').replace(/-+/g, '-').replace(/^-|-$/g, '');
+    jid = `${idLimpo}@g.us`;
   }
   jidCache.set(grupoId, jid);
   console.log(`✅ JID: ${grupoId} → ${jid}`);
   return jid;
 }
 
+// Wrapper com timeout para evitar que sendMessage fique preso
+async function sendComTimeout(jid, payload, timeoutMs = 15000) {
+  return Promise.race([
+    sock.sendMessage(jid, payload),
+    new Promise((_, reject) =>
+      setTimeout(() => reject(new Error('Timed Out')), timeoutMs)
+    ),
+  ]);
+}
+
+// Detecta se o erro é de criptografia Signal
+function ehErroCriptografia(err) {
+  const msg = err?.message || '';
+  return (
+    msg.includes('Timed Out') ||
+    msg.includes('Bad MAC') ||
+    msg.includes('MessageCounterError') ||
+    msg.includes('Key used already') ||
+    msg.includes('Failed to decrypt')
+  );
+}
+
 async function enviarParaGrupo(texto) {
   if (!sock || !isConnected) throw new Error('WhatsApp não conectado');
   if (!CONFIG.DEFAULT_GROUP_ID) throw new Error('WHATSAPP_GROUP_ID não configurado');
   const jid = await resolverJID(CONFIG.DEFAULT_GROUP_ID);
-  await sock.sendMessage(jid, { text: texto });
-  console.log(`📤 → ${jid}`);
+  try {
+    await sendComTimeout(jid, { text: texto });
+    console.log(`📤 → ${jid}`);
+  } catch (err) {
+    if (ehErroCriptografia(err) && !limpandoSessao) {
+      limpandoSessao = true;
+      console.warn('⚠️  Erro de criptografia em enviarParaGrupo — limpando sessão e reconectando...');
+      isConnected = false;
+      limparSessao()
+        .then(() => setTimeout(() => { limpandoSessao = false; conectarWhatsApp(); }, 2000))
+        .catch(() => setTimeout(() => { limpandoSessao = false; conectarWhatsApp(); }, 2000));
+    }
+    throw err;
+  }
 }
 
-// ─────────────────────────────────────────────────────────────────────────────
-// SELF-PING
-// ─────────────────────────────────────────────────────────────────────────────
+// ─── Self Ping ────────────────────────────────────────────────────────────────
 function iniciarSelfPing() {
   if (pingInterval) clearInterval(pingInterval);
   pingInterval = setInterval(async () => {
@@ -1008,15 +1056,8 @@ function iniciarSelfPing() {
   console.log(`🏓 Self-ping ativo (a cada ${CONFIG.PING_INTERVAL_MS / 1000}s)`);
 }
 
-// ─────────────────────────────────────────────────────────────────────────────
-// BAILEYS
-// ─────────────────────────────────────────────────────────────────────────────
+// ─── Baileys Connection ───────────────────────────────────────────────────────
 async function conectarWhatsApp() {
-  // ── FIX MEMÓRIA: destrói o socket anterior antes de criar um novo ──────
-  // Sem isso, cada reconexão deixa o socket antigo (com seus listeners,
-  // WebSocket e cache de mensagens) preso na memória, pois o GC do Node
-  // não libera objetos com listeners pendentes. Em instâncias instáveis
-  // com reconexões frequentes, isso causa crescimento de memória até OOM.
   if (sock) {
     try {
       sock.ev.removeAllListeners();
@@ -1026,7 +1067,7 @@ async function conectarWhatsApp() {
     }
     sock = null;
   }
-  if (global.gc) global.gc(); // libera memória imediatamente se --expose-gc estiver ativo
+  if (global.gc) global.gc();
 
   if (!fs.existsSync(CONFIG.SESSION_LOCAL_PATH))
     fs.mkdirSync(CONFIG.SESSION_LOCAL_PATH, { recursive: true });
@@ -1040,21 +1081,31 @@ async function conectarWhatsApp() {
     printQRInTerminal: false, markOnlineOnConnect: false,
     connectTimeoutMs: 60000, defaultQueryTimeoutMs: 60000,
     keepAliveIntervalMs: 30000, retryRequestDelayMs: 3000,
-    // ── FIX MEMÓRIA: bot não usa histórico de mensagens (só envia avisos) ──
-    // Sem isso, o Baileys baixa e processa TODO o histórico de TODOS os
-    // chats/grupos na primeira conexão — maior consumidor de RAM conhecido
-    // em bots Baileys, e causa direta de OOM em instâncias de 512MB.
     syncFullHistory: false,
     shouldSyncHistoryMessage: () => false,
-    // Evita cache ilimitado de metadados de grupo (cresce a cada grupo visto)
     cachedGroupMetadata: async () => undefined,
   });
 
-  // FIX: usa agendarSalvarSessao (debounced) em vez de salvarSessao direto
   sock.ev.on('creds.update', async () => {
     await saveCreds();
     agendarSalvarSessao();
   });
+
+  const origConsoleError = console.error.bind(console);
+  const tempErrorHandler = (...args) => {
+    const msg = args.join(' ');
+    if (
+      msg.includes('MessageCounterError') ||
+      msg.includes('Bad MAC') ||
+      msg.includes('Key used already') ||
+      msg.includes('Failed to decrypt')
+    ) {
+      sessaoCorrompidaDetectada = true;
+    }
+    origConsoleError(...args);
+  };
+  console.error = tempErrorHandler;
+  setTimeout(() => { console.error = origConsoleError; }, 5000);
 
   sock.ev.on('connection.update', async ({ connection, lastDisconnect, qr }) => {
     if (qr) { currentQR = qr; console.log(`\n🔗 QR: ${CONFIG.SELF_URL}/qr\n`); }
@@ -1062,7 +1113,17 @@ async function conectarWhatsApp() {
     if (connection === 'open') {
       isConnected = true; currentQR = null; reconnectAttempts = 0;
       console.log('✅ WhatsApp conectado!');
-      // Salva sessão após conectar (sem debounce — é um evento único)
+
+      await new Promise(r => setTimeout(r, 3000));
+
+      if (sessaoCorrompidaDetectada) {
+        sessaoCorrompidaDetectada = false;
+        console.warn('🔑 Sessão corrompida detectada logo após conectar — limpando...');
+        await limparSessao();
+        setTimeout(conectarWhatsApp, 2000);
+        return;
+      }
+
       await salvarSessao();
       iniciarSelfPing();
       iniciarCronDiario();
@@ -1071,7 +1132,13 @@ async function conectarWhatsApp() {
     if (connection === 'close') {
       isConnected = false;
       const code = lastDisconnect?.error?.output?.statusCode;
+      const errMsg = lastDisconnect?.error?.message || '';
       console.warn(`⚠️  Conexão encerrada — código: ${code}`);
+
+      if (errMsg.includes('Bad MAC') || errMsg.includes('MessageCounterError') || errMsg.includes('Key used already')) {
+        console.warn('🔑 Bad MAC detectado — limpando sessão completa (local + Supabase)...');
+        await limparSessao();
+      }
 
       if (code === DisconnectReason.loggedOut) {
         console.error('🚪 Logout! Limpando sessão...');
@@ -1090,9 +1157,7 @@ async function conectarWhatsApp() {
   });
 }
 
-// ─────────────────────────────────────────────────────────────────────────────
-// BOOT
-// ─────────────────────────────────────────────────────────────────────────────
+// ─── Boot ────────────────────────────────────────────────────────────────────
 async function iniciar() {
   console.log('🚀 Robô Pelada Batista v2.2 — iniciando...');
   console.log(`📡 URL: ${CONFIG.SELF_URL}`);

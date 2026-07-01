@@ -462,7 +462,7 @@ export default function MensalistasMes({
       {/* Agrupamento por Posições */}
       <div className="space-y-8">
         {posicoesOrdem.map((pos) => {
-          const jogadoresDaPosicao = mensalistasFiltrados.filter(j => j.posicao === pos.key);
+          const jogadoresDaPosicao = mensalistasFiltrados.filter(j => j.posicao.includes(pos.key));
           
           if (jogadoresDaPosicao.length === 0 && filtroPesquisa !== '') return null;
 

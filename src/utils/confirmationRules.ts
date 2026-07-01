@@ -459,9 +459,9 @@ export function obterTextoListaCompletaPartida(
   }
 
   // Filtrar grupos conforme requisitado
-  const mensalistasConfirmados = finalConfirmed.filter(j => j.posicao !== 'Goleiro' && j.membroStatus === 'mensalista');
-  const diaristasConfirmados = finalConfirmed.filter(j => j.posicao !== 'Goleiro' && j.membroStatus === 'diarista');
-  const goleirosConfirmados = finalConfirmed.filter(j => j.posicao === 'Goleiro');
+  const mensalistasConfirmados = finalConfirmed.filter(j => !j.posicao.includes('Goleiro') && j.membroStatus === 'mensalista');
+  const diaristasConfirmados = finalConfirmed.filter(j => !j.posicao.includes('Goleiro') && j.membroStatus === 'diarista');
+  const goleirosConfirmados = finalConfirmed.filter(j => j.posicao.includes('Goleiro'));
 
   const formatarLinha = (j: Jogador, index: number) => {
     const goldSuffix = j.isGold ? ' 🏅' : '';
@@ -551,7 +551,7 @@ https://peladabatista.onrender.com`;
  * Retorna o status de membro efetivo do jogador (tratando mensalistas inadimplentes como diaristas)
  */
 export function obterStatusMembroEfetivo(jogador: Jogador, pagamentos: Pagamento[]): 'mensalista' | 'diarista' | 'isento' {
-  if (jogador.posicao === 'Goleiro') return 'isento';
+  if (jogador.posicao.includes('Goleiro')) return 'isento';
   
   const statusOriginal = (jogador.membroStatus || 'diarista') as 'mensalista' | 'diarista' | 'isento';
   

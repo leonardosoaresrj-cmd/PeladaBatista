@@ -6,7 +6,7 @@
 import React, { useState } from 'react';
 import { Jogador, PosicaoJogador, MembroStatus, Partida, Pagamento, RoleUsuario } from '../types';
 import { AVATAR_PRESETS } from '../data';
-import { Users, Trash2, Shield, Calendar, Edit2, Check, X, ShieldAlert, Award, Share2, Send, Copy, History, DollarSign, ArrowLeftRight } from 'lucide-react';
+import { Users, Trash2, Shield, Calendar, Edit2, Check, X, ShieldAlert, Award, Share2, Send, Copy, History, DollarSign, ArrowLeftRight, UserPlus } from 'lucide-react';
 import { obterTextoListaCompletaPartida, gerarLinkCompartilhamento, obterJanelaRenovacaoParaMesRef, isFechamentoMensalistas, obterDebitosDoJogador } from '../utils/confirmationRules';
 
 interface ListaCadastradosProps {
@@ -19,6 +19,7 @@ interface ListaCadastradosProps {
   proximaPartida?: Partida | null;
   onActualizarPresenca?: (partidaId: string, jogadorId: string, confirmado: boolean | null) => void;
   whatsappAutomacaoAtiva?: boolean;
+  onCriarJogador?: (novo: Omit<Jogador, 'id' | 'status' | 'role' | 'createdAt'>) => void;
 }
 
 export default function ListaCadastrados({
@@ -31,14 +32,15 @@ export default function ListaCadastrados({
   proximaPartida,
   onActualizarPresenca,
   whatsappAutomacaoAtiva = true,
+  onCriarJogador,
 }: ListaCadastradosProps) {
   // Filtrar apenas jogadores "Ativo" (e "Suspenso" se for admin) para a área pública de cadastrados
   const jogadoresAtivos = jogadores.filter(j => j.status === 'ativo' || (jogadorAtual.role === 'admin' && j.status === 'suspenso'));
 
   // Separar e contar ativos para goleiros, mensalistas e diaristas
-  const goleirosAtivos = jogadoresAtivos.filter(j => j.posicao === 'Goleiro');
-  const mensalistasAtivos = jogadoresAtivos.filter(j => j.posicao !== 'Goleiro' && j.membroStatus === 'mensalista');
-  const diaristasAtivos = jogadoresAtivos.filter(j => j.posicao !== 'Goleiro' && j.membroStatus === 'diarista');
+  const goleirosAtivos = jogadoresAtivos.filter(j => j.posicao.includes('Goleiro') && j.membroStatus !== 'mensalista');
+  const mensalistasAtivos = jogadoresAtivos.filter(j => j.membroStatus === 'mensalista');
+  const diaristasAtivos = jogadoresAtivos.filter(j => !j.posicao.includes('Goleiro') && j.membroStatus === 'diarista');
 
   // Controle de Edição Administrativa e Pessoal
   const [jogadorEditandoId, setJogadorEditandoId] = useState<string | null>(null);
@@ -53,6 +55,16 @@ export default function ListaCadastrados({
   const [editRole, setEditRole] = useState<RoleUsuario>('jogador');
   const [showConfirmacaoCadastrados, setShowConfirmacaoCadastrados] = useState(false);
 
+  // Estados para modal de criação de jogador (Admin)
+  const [showCriarJogadorModal, setShowCriarJogadorModal] = useState(false);
+  const [newNome, setNewNome] = useState('');
+  const [newSobrenome, setNewSobrenome] = useState('');
+  const [newPosicao, setNewPosicao] = useState<PosicaoJogador>('Meio');
+  const [newMembro, setNewMembro] = useState<MembroStatus>('mensalista');
+  const [newDataNascimento, setNewDataNascimento] = useState('');
+  const [newEmail, setNewEmail] = useState('');
+  const [newPin, setNewPin] = useState('');
+
   // Estados para Whatsapp e Compartilhamento Manual (Automação de Admin)
   const [showShareModal, setShowShareModal] = useState(false);
   const [shareText, setShareText] = useState('');
@@ -61,18 +73,32 @@ export default function ListaCadastrados({
   const [autoToastMsg, setAutoToastMsg] = useState('');
   const [jogadorHistoricoSelecionado, setJogadorHistoricoSelecionado] = useState<Jogador | null>(null);
   const [jogadorExclusaoModal, setJogadorExclusaoModal] = useState<Jogador | null>(null);
-  const [anoHistorico, setAnoHistorico] = useState<string>('2026');
+  const [anoHistorico, setAnoHistorico] = useState<string>(() => new Date().getFullYear().toString());
 
   // Computa o histórico detalhado mês a mês do jogador
   const obterHistoricoMensalDoJogador = (j: Jogador, ano: string) => {
-    // Meses de referência da temporada
-    const mesesCobranca = [`${ano}-05`, `${ano}-06`, `${ano}-07`, `${ano}-08`];
-    const mesesNomes: Record<string, string> = {
-      [`${ano}-05`]: `Maio / ${ano}`,
-      [`${ano}-06`]: `Junho / ${ano}`,
-      [`${ano}-07`]: `Julho / ${ano}`,
-      [`${ano}-08`]: `Agosto / ${ano}`
+    const startupMonth = localStorage.getItem('futebol_startup_month') || '2026-06';
+    const d = new Date();
+    const currentMonthStr = `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, '0')}`;
+
+    // Gera todas as competências de Janeiro a Dezembro para o ano selecionado
+    const mesesDoAno = Array.from({ length: 12 }, (_, i) => `${ano}-${String(i + 1).padStart(2, '0')}`);
+
+    // Filtra as competências para começar no primeiro mês do sistema e não exibir meses futuros
+    const mesesCobranca = mesesDoAno.filter(m => m >= startupMonth && m <= currentMonthStr);
+
+    const nomesMesesIndex: Record<string, string> = {
+      '01': 'Janeiro', '02': 'Fevereiro', '03': 'Março', '04': 'Abril',
+      '05': 'Maio', '06': 'Junho', '07': 'Julho', '08': 'Agosto',
+      '09': 'Setembro', '10': 'Outubro', '11': 'Novembro', '12': 'Dezembro'
     };
+
+    const mesesNomes: Record<string, string> = {};
+    mesesCobranca.forEach((m) => {
+      const monthPart = m.split('-')[1];
+      const nomeMes = nomesMesesIndex[monthPart] || monthPart;
+      mesesNomes[m] = `${nomeMes} / ${ano}`;
+    });
 
     return mesesCobranca.map((mes) => {
       const isGoleiro = j.posicao === 'Goleiro';
@@ -350,16 +376,14 @@ export default function ListaCadastrados({
                     onChange={(e) => {
                       const newPos = e.target.value as PosicaoJogador;
                       setEditPosicao(newPos);
-                      if (newPos === 'Goleiro') {
-                        setEditMembro('isento');
-                      } else if (editMembro === 'isento') {
-                        setEditMembro('mensalista');
-                      }
                     }}
                     disabled={jogadorAtual.role !== 'admin'}
                     className="bg-emerald-950 border border-white/10 text-white text-[11px] rounded px-1.5 py-1 focus:outline-none disabled:opacity-50 disabled:cursor-not-allowed"
                   >
                     <option className="bg-emerald-950 text-white" value="Goleiro">Goleiro</option>
+                    {jogadorAtual.role === 'admin' && (
+                      <option className="bg-emerald-950 text-white" value="Goleiro Aluguel">Goleiro Aluguel</option>
+                    )}
                     <option className="bg-emerald-950 text-white" value="Defesa">Defesa</option>
                     <option className="bg-emerald-950 text-white" value="Meio">Meio</option>
                     <option className="bg-emerald-950 text-white" value="Ataque">Ataque</option>
@@ -372,31 +396,22 @@ export default function ListaCadastrados({
                     disabled={
                       jogadorAtual.role !== 'admin' && 
                       (
-                        editPosicao === 'Goleiro' || 
-                        (
-                          !janelaInfo.estaAberta || 
-                          pagamentos.some(p => p.jogadorId === j.id && p.mesRef === `${new Date().getFullYear()}-${String(new Date().getMonth() + 1).padStart(2, '0')}` && !p.partidaId && p.status === 'pago')
-                        )
+                        !janelaInfo.estaAberta || 
+                        pagamentos.some(p => p.jogadorId === j.id && p.mesRef === `${new Date().getFullYear()}-${String(new Date().getMonth() + 1).padStart(2, '0')}` && !p.partidaId && p.status === 'pago')
                       )
                     }
                     className="bg-emerald-950 border border-white/10 text-white text-[11px] rounded px-1.5 py-1 focus:outline-none disabled:opacity-50 disabled:cursor-not-allowed"
                   >
-                    {editPosicao === 'Goleiro' && jogadorAtual.role !== 'admin' ? (
-                      <option className="bg-emerald-950 text-white" value="isento">Isento</option>
-                    ) : (
-                      <>
-                        <option className="bg-emerald-950 text-white" value="mensalista">Mensalista</option>
-                        <option className="bg-emerald-950 text-white" value="diarista">Diarista</option>
-                        <option className="bg-emerald-950 text-white" value="isento">Isento</option>
-                      </>
-                    )}
+                    <option className="bg-emerald-950 text-white" value="mensalista">Mensalista</option>
+                    <option className="bg-emerald-950 text-white" value="diarista">Diarista</option>
+                    <option className="bg-emerald-950 text-white" value="isento">Isento</option>
                   </select>
                 </div>
 
                 {jogadorAtual.role !== 'admin' && (
                   !janelaInfo.estaAberta ||
                   pagamentos.some(p => p.jogadorId === j.id && p.mesRef === `${new Date().getFullYear()}-${String(new Date().getMonth() + 1).padStart(2, '0')}` && !p.partidaId && p.status === 'pago')
-                ) && editPosicao !== 'Goleiro' && (
+                ) && (
                   <p className="text-[9px] text-rose-400 font-medium leading-tight">
                     * Alteração de plano indisponível fora do período de renovação ou mensalidade já paga.
                   </p>
@@ -678,9 +693,20 @@ export default function ListaCadastrados({
           <p className="text-xs text-emerald-300/80 font-sans mt-0.5">Elenco oficial de atletas com cadastro ativo e aprovado no portal.</p>
         </div>
         
-        <div className="flex items-center gap-3 self-start sm:self-center font-mono text-xs bg-emerald-950/40 px-3.5 py-1.5 rounded-lg border border-white/10">
-          <span className="text-emerald-300">Total no Elenco:</span>
-          <span className="text-white font-bold">{jogadoresAtivos.length} Ativos</span>
+        <div className="flex flex-wrap items-center gap-3 self-start sm:self-center font-mono text-xs">
+          <div className="flex items-center gap-2 bg-emerald-950/40 px-3.5 py-1.5 rounded-lg border border-white/10">
+            <span className="text-emerald-300">Total no Elenco:</span>
+            <span className="text-white font-bold">{jogadoresAtivos.length} Ativos</span>
+          </div>
+          {jogadorAtual.role === 'admin' && (
+            <button
+              onClick={() => setShowCriarJogadorModal(true)}
+              className="bg-emerald-600 hover:bg-emerald-500 text-white font-bold py-1.5 px-3 rounded-lg flex items-center gap-1 transition-colors border border-emerald-500/50 uppercase tracking-wide text-[10px]"
+            >
+              <UserPlus className="w-4 h-4" />
+              Criar Jogador
+            </button>
+          )}
         </div>
       </div>
 
@@ -924,92 +950,108 @@ export default function ListaCadastrados({
                       onChange={(e) => setAnoHistorico(e.target.value)}
                       className="bg-emerald-950 text-white border border-emerald-500/30 text-[10px] font-bold py-1 px-1.5 rounded focus:outline-none focus:border-emerald-500 cursor-pointer"
                     >
-                      <option value="2025">2025</option>
-                      <option value="2026">2026</option>
-                      <option value="2027">2027</option>
+                      {(() => {
+                        const startYear = parseInt((localStorage.getItem('futebol_startup_month') || '2026-06').split('-')[0], 10);
+                        const endYear = new Date().getFullYear();
+                        const years = [];
+                        for (let y = startYear; y <= endYear; y++) {
+                          years.push(y);
+                        }
+                        if (years.length === 0) years.push(2026);
+                        return years.map(y => (
+                          <option key={y} value={y.toString()}>{y}</option>
+                        ));
+                      })()}
                     </select>
                   </div>
                 </div>
 
                 <div className="space-y-3">
-                  {historico.map((m) => {
-                    return (
-                      <div key={m.mesValue} className="p-3.5 bg-emerald-900/10 border border-white/5 rounded-2xl space-y-3 flex flex-col justify-between hover:bg-emerald-900/20 transition-all">
-                        <div className="flex justify-between items-start gap-3">
-                          <div className="space-y-0.5">
-                            <span className="text-xs font-black text-white block">{m.mesLabel}</span>
-                            <div className="flex items-center gap-1.5 mt-1">
-                              {/* Situação badge */}
-                              <span className={`px-2 py-0.5 rounded text-[8.5px] font-black uppercase tracking-wider ${
-                                m.situacao === 'Isento'
-                                  ? 'bg-purple-900/60 text-purple-200 border border-purple-500/25'
-                                  : m.rebaixadoTemporario
-                                  ? 'bg-amber-950/80 text-amber-300 border border-amber-500/20'
-                                  : m.situacao === 'Mensalista'
-                                  ? 'bg-emerald-900/60 text-emerald-400 border border-emerald-500/25'
-                                  : 'bg-blue-900/60 text-blue-200 border border-blue-500/25'
-                              }`}>
-                                {m.rebaixadoTemporario ? '⚠️ DIARISTA (PENDÊNCIA)' : m.situacao}
-                              </span>
+                  {historico.length === 0 ? (
+                    <div className="p-8 text-center bg-emerald-900/10 border border-white/5 rounded-2xl">
+                      <p className="text-xs text-emerald-400 font-semibold">Nenhum histórico disponível para este ano.</p>
+                      <p className="text-[10px] text-emerald-500/80 mt-1">O histórico do sistema inicia na competência de funcionamento e não exibe meses futuros.</p>
+                    </div>
+                  ) : (
+                    historico.map((m) => {
+                      return (
+                        <div key={m.mesValue} className="p-3.5 bg-emerald-900/10 border border-white/5 rounded-2xl space-y-3 flex flex-col justify-between hover:bg-emerald-900/20 transition-all">
+                          <div className="flex justify-between items-start gap-3">
+                            <div className="space-y-0.5">
+                              <span className="text-xs font-black text-white block">{m.mesLabel}</span>
+                              <div className="flex items-center gap-1.5 mt-1">
+                                {/* Situação badge */}
+                                <span className={`px-2 py-0.5 rounded text-[8.5px] font-black uppercase tracking-wider ${
+                                  m.situacao === 'Isento'
+                                    ? 'bg-purple-900/60 text-purple-200 border border-purple-500/25'
+                                    : m.rebaixadoTemporario
+                                    ? 'bg-amber-950/80 text-amber-300 border border-amber-500/20'
+                                    : m.situacao === 'Mensalista'
+                                    ? 'bg-emerald-900/60 text-emerald-400 border border-emerald-500/25'
+                                    : 'bg-blue-900/60 text-blue-200 border border-blue-500/25'
+                                }`}>
+                                  {m.rebaixadoTemporario ? '⚠️ DIARISTA (PENDÊNCIA)' : m.situacao}
+                                </span>
 
-                              {/* Quitado status badge */}
-                              <span className={`px-2 py-0.5 rounded text-[8.5px] font-black uppercase tracking-wider ${
-                                m.quitado
-                                  ? 'bg-teal-900/60 text-teal-400 border border-teal-500/25'
-                                  : 'bg-rose-950/80 text-rose-455 border border-rose-500/20'
-                              }`}>
-                                {m.quitado ? 'Quitado' : 'Débito'}
-                              </span>
+                                {/* Quitado status badge */}
+                                <span className={`px-2 py-0.5 rounded text-[8.5px] font-black uppercase tracking-wider ${
+                                  m.quitado
+                                    ? 'bg-teal-900/60 text-teal-400 border border-teal-500/25'
+                                    : 'bg-rose-955/80 text-rose-455 border border-rose-500/20'
+                                }`}>
+                                  {m.quitado ? 'Quitado' : 'Débito'}
+                                </span>
+                              </div>
+                            </div>
+
+                            <div className="text-right space-y-0.5 shrink-0">
+                              <span className="text-[9.5px] uppercase tracking-wider text-emerald-400 font-mono block">Pago no Mês</span>
+                              <span className="text-sm font-extrabold text-white font-mono block">R$ {m.totalPago.toFixed(2)}</span>
                             </div>
                           </div>
 
-                          <div className="text-right space-y-0.5 shrink-0">
-                            <span className="text-[9.5px] uppercase tracking-wider text-emerald-400 font-mono block">Pago no Mês</span>
-                            <span className="text-sm font-extrabold text-white font-mono block">R$ {m.totalPago.toFixed(2)}</span>
-                          </div>
-                        </div>
+                          {/* Detalhes de Pagamento associados no mês (Peladas ou Mensalidades) */}
+                          {m.pagamentos.length > 0 ? (
+                            <div className="bg-black/20 p-2.5 rounded-xl border border-white/5 space-y-1.5">
+                              <span className="text-[8.5px] text-emerald-400 font-bold uppercase tracking-widest block border-b border-white/5 pb-1">Registros Vinculados:</span>
+                              {m.pagamentos.map((pag) => {
+                                // Se tem partidaId, busca título
+                                const matchedPartida = partidas.find(pt => pt.id === pag.partidaId);
+                                const detailsLabel = matchedPartida
+                                  ? `⚽ Diária: ${matchedPartida.titulo}`
+                                  : `🛡️ Mensalidade de ${m.mesLabel}`;
 
-                        {/* Detalhes de Pagamento associados no mês (Peladas ou Mensalidades) */}
-                        {m.pagamentos.length > 0 ? (
-                          <div className="bg-black/20 p-2.5 rounded-xl border border-white/5 space-y-1.5">
-                            <span className="text-[8.5px] text-emerald-400 font-bold uppercase tracking-widest block border-b border-white/5 pb-1">Registros Vinculados:</span>
-                            {m.pagamentos.map((pag) => {
-                              // Se tem partidaId, busca título
-                              const matchedPartida = partidas.find(pt => pt.id === pag.partidaId);
-                              const detailsLabel = matchedPartida
-                                ? `⚽ Diária: ${matchedPartida.titulo}`
-                                : `🛡️ Mensalidade de ${m.mesLabel}`;
-
-                              return (
-                                <div key={pag.id} className="flex justify-between items-center text-[10px] text-emerald-200 tracking-wide font-mono">
-                                  <span className="truncate max-w-[200px]">{detailsLabel}</span>
-                                  <div className="flex items-center gap-1.5 shrink-0">
-                                    {pag.status === 'pago' && pag.dataPagamento && (
-                                      <span className="text-[9px] font-mono text-emerald-400 bg-emerald-950/40 px-1 rounded border border-emerald-500/15">
-                                        Data: {pag.dataPagamento.split('-').reverse().join('/')}
+                                return (
+                                  <div key={pag.id} className="flex justify-between items-center text-[10px] text-emerald-200 tracking-wide font-mono">
+                                    <span className="truncate max-w-[200px]">{detailsLabel}</span>
+                                    <div className="flex items-center gap-1.5 shrink-0">
+                                      {pag.status === 'pago' && pag.dataPagamento && (
+                                        <span className="text-[9px] font-mono text-emerald-400 bg-emerald-950/40 px-1 rounded border border-emerald-500/15">
+                                          Data: {pag.dataPagamento.split('-').reverse().join('/')}
+                                        </span>
+                                      )}
+                                      <span className={`text-[8px] font-bold px-1 rounded ${
+                                        pag.status === 'pago'
+                                          ? 'bg-teal-950/20 text-teal-400'
+                                          : 'bg-rose-955/20 text-rose-455'
+                                      }`}>
+                                        {pag.status === 'pago' ? 'PG' : 'PENDENTE'}
                                       </span>
-                                    )}
-                                    <span className={`text-[8px] font-bold px-1 rounded ${
-                                      pag.status === 'pago'
-                                        ? 'bg-teal-950/20 text-teal-400'
-                                        : 'bg-rose-955/20 text-rose-455'
-                                    }`}>
-                                      {pag.status === 'pago' ? 'PG' : 'PENDENTE'}
-                                    </span>
-                                    <span className="font-bold text-white">R$ {pag.valor.toFixed(2)}</span>
+                                      <span className="font-bold text-white">R$ {pag.valor.toFixed(2)}</span>
+                                    </div>
                                   </div>
-                                </div>
-                              );
-                            })}
-                          </div>
-                        ) : (
-                          <div className="text-[10px] text-emerald-500/70 font-mono italic pl-1">
-                            {m.situacao === 'Isento' ? 'Jogador com isenção ativa nesta temporada.' : 'Nenhum lançamento ou registro de pagamento para este mês.'}
-                          </div>
-                        )}
-                      </div>
-                    );
-                  })}
+                                );
+                              })}
+                            </div>
+                          ) : (
+                            <div className="text-[10px] text-emerald-500/70 font-mono italic pl-1">
+                              {m.situacao === 'Isento' ? 'Jogador com isenção ativa nesta temporada.' : 'Nenhum lançamento ou registro de pagamento para este mês.'}
+                            </div>
+                          )}
+                        </div>
+                      );
+                    })
+                  )}
                 </div>
               </div>
 
@@ -1174,6 +1216,146 @@ export default function ListaCadastrados({
           </div>
         );
       })()}
+
+      {/* MODAL DE CRIAÇÃO DE JOGADOR (ADMIN) */}
+      {showCriarJogadorModal && (
+        <div className="fixed inset-0 bg-black/85 backdrop-blur-md z-50 flex items-center justify-center p-4 overflow-y-auto">
+          <div className="bg-emerald-900 border border-emerald-500/30 w-full max-w-md rounded-2xl overflow-hidden shadow-2xl animate-in fade-in zoom-in duration-200">
+            <div className="p-4 bg-emerald-950/60 border-b border-emerald-500/20 flex items-center justify-between">
+              <h3 className="font-display font-semibold text-sm text-emerald-100 uppercase tracking-wider flex items-center gap-2">
+                <UserPlus className="w-4 h-4 text-emerald-400" />
+                Criar Jogador Oficial
+              </h3>
+              <button
+                type="button"
+                onClick={() => setShowCriarJogadorModal(false)}
+                className="p-1 text-emerald-400/60 hover:text-white rounded-lg hover:bg-emerald-500/20 transition-colors"
+              >
+                <X className="w-5 h-5" />
+              </button>
+            </div>
+            <form onSubmit={(e) => {
+              e.preventDefault();
+              if (onCriarJogador) {
+                onCriarJogador({
+                  nome: newNome.trim(),
+                  sobrenome: newSobrenome.trim(),
+                  posicao: newPosicao,
+                  dataNascimento: newDataNascimento,
+                  foto: '',
+                  membroStatus: newMembro,
+                  email: newEmail.toLowerCase().trim() || `${newNome.trim().toLowerCase()}.${Date.now()}@pelada.com`,
+                  senha: newPin || '1234',
+                  isGold: false,
+                });
+                setShowCriarJogadorModal(false);
+                setNewNome('');
+                setNewSobrenome('');
+                setNewEmail('');
+                setNewPin('');
+                alert('Jogador criado com sucesso!');
+              }
+            }} className="p-5 space-y-4">
+              <div className="grid grid-cols-2 gap-3">
+                <div>
+                  <label className="block text-[10px] font-bold uppercase text-emerald-400 tracking-wider mb-1">Nome</label>
+                  <input
+                    type="text"
+                    required
+                    value={newNome}
+                    onChange={(e) => setNewNome(e.target.value)}
+                    className="w-full bg-emerald-950/40 border border-white/10 text-white rounded-lg px-3 py-1.5 text-sm focus:outline-none focus:border-white transition-all font-sans"
+                  />
+                </div>
+                <div>
+                  <label className="block text-[10px] font-bold uppercase text-emerald-400 tracking-wider mb-1">Sobrenome</label>
+                  <input
+                    type="text"
+                    required
+                    value={newSobrenome}
+                    onChange={(e) => setNewSobrenome(e.target.value)}
+                    className="w-full bg-emerald-950/40 border border-white/10 text-white rounded-lg px-3 py-1.5 text-sm focus:outline-none focus:border-white transition-all font-sans"
+                  />
+                </div>
+              </div>
+
+              <div className="grid grid-cols-2 gap-3">
+                <div>
+                  <label className="block text-[10px] font-bold uppercase text-emerald-400 tracking-wider mb-1">Posição</label>
+                  <select
+                    value={newPosicao}
+                    onChange={(e) => setNewPosicao(e.target.value as PosicaoJogador)}
+                    className="w-full bg-emerald-950 border border-white/10 text-white rounded-lg px-2.5 py-1.5 text-sm focus:outline-none focus:border-white transition-all font-sans"
+                  >
+                    <option className="bg-emerald-950 text-white" value="Goleiro">🧤 Goleiro Oficial</option>
+                    <option className="bg-emerald-950 text-white" value="Goleiro Aluguel">🛑 Goleiro Aluguel</option>
+                    <option className="bg-emerald-950 text-white" value="Defesa">🛡️ Defesa</option>
+                    <option className="bg-emerald-950 text-white" value="Meio">🎯 Meio-Campo</option>
+                    <option className="bg-emerald-950 text-white" value="Ataque">⚡ Ataque</option>
+                  </select>
+                </div>
+                <div>
+                  <label className="block text-[10px] font-bold uppercase text-emerald-400 tracking-wider mb-1">Plano</label>
+                  <select
+                    value={newMembro}
+                    onChange={(e) => setNewMembro(e.target.value as MembroStatus)}
+                    className="w-full bg-emerald-950 border border-white/10 text-white rounded-lg px-2.5 py-1.5 text-sm focus:outline-none focus:border-white transition-all font-sans"
+                  >
+                    <option className="bg-emerald-950 text-white" value="mensalista">📅 Mensalista</option>
+                    <option className="bg-emerald-950 text-white" value="diarista">⚽ Diarista</option>
+                    <option className="bg-emerald-950 text-white" value="isento">Isento</option>
+                  </select>
+                </div>
+              </div>
+
+              <div className="grid grid-cols-2 gap-3">
+                <div>
+                  <label className="block text-[10px] font-bold uppercase text-emerald-400 tracking-wider mb-1">Data Nascimento</label>
+                  <input
+                    type="date"
+                    required
+                    value={newDataNascimento}
+                    onChange={(e) => setNewDataNascimento(e.target.value)}
+                    className="w-full bg-emerald-950/40 border border-white/10 text-white rounded-lg px-3 py-1.5 text-sm focus:outline-none focus:border-white transition-all font-sans"
+                  />
+                </div>
+                <div>
+                  <label className="block text-[10px] font-bold uppercase text-emerald-400 tracking-wider mb-1">Senha (PIN)</label>
+                  <input
+                    type="text"
+                    value={newPin}
+                    onChange={(e) => setNewPin(e.target.value)}
+                    placeholder="1234"
+                    maxLength={4}
+                    className="w-full bg-emerald-950/40 border border-white/10 text-white rounded-lg px-3 py-1.5 text-sm focus:outline-none focus:border-white transition-all font-sans"
+                  />
+                </div>
+              </div>
+
+              <div>
+                <label className="block text-[10px] font-bold uppercase text-emerald-400 tracking-wider mb-1">Email (Opcional)</label>
+                <input
+                  type="email"
+                  value={newEmail}
+                  onChange={(e) => setNewEmail(e.target.value)}
+                  placeholder="Deixe em branco p/ gerar auto"
+                  className="w-full bg-emerald-950/40 border border-white/10 text-white rounded-lg px-3 py-1.5 text-sm focus:outline-none focus:border-white transition-all font-sans"
+                />
+              </div>
+
+              <div className="pt-3">
+                <button
+                  type="submit"
+                  className="w-full bg-emerald-500 hover:bg-emerald-400 text-emerald-950 font-black tracking-widest uppercase text-xs py-3 rounded-xl transition-all shadow-[0_0_20px_rgba(16,185,129,0.3)] hover:shadow-[0_0_30px_rgba(16,185,129,0.5)] border border-emerald-300 flex items-center justify-center gap-2"
+                >
+                  <Check className="w-4 h-4" />
+                  Criar Imediatamente
+                </button>
+              </div>
+            </form>
+          </div>
+        </div>
+      )}
 
       {/* AUTO TOAST NOTIFICATION FOR ROBOT/AUTOMATION STATUS */}
       {showAutoToast && (

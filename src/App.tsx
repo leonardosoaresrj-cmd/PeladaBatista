@@ -119,6 +119,10 @@ export default function App() {
     const saved = localStorage.getItem('racha_valor_diaria');
     return saved ? parseFloat(saved) : 30;
   });
+  const [diariaGoleiroAluguel, setDiariaGoleiroAluguel] = useState<number>(() => {
+    const saved = localStorage.getItem('racha_valor_diaria_goleiro');
+    return saved ? parseFloat(saved) : 90;
+  });
 
   // Configurações do Bot de WhatsApp
   const [whatsappGrupoLink, setWhatsappGrupoLink] = useState<string>(() => {
@@ -499,16 +503,19 @@ export default function App() {
     );
   };
 
-  const handleUpdateValoresConfig = (v4: number, v5: number, vDiaria: number) => {
+  const handleUpdateValoresConfig = (v4: number, v5: number, vDiaria: number, dGoleiro: number) => {
     setValor4Sabados(v4);
     setValor5Sabados(v5);
     setValorDiaria(vDiaria);
+    setDiariaGoleiroAluguel(dGoleiro);
     localStorage.setItem('racha_valor_4s', v4.toString());
     localStorage.setItem('racha_valor_5s', v5.toString());
     localStorage.setItem('racha_valor_diaria', vDiaria.toString());
+    localStorage.setItem('racha_valor_diaria_goleiro', dGoleiro.toString());
     salvarConfiguracaoNoSupabase('racha_valor_4s',     v4.toString());
     salvarConfiguracaoNoSupabase('racha_valor_5s',     v5.toString());
     salvarConfiguracaoNoSupabase('racha_valor_diaria', vDiaria.toString());
+    salvarConfiguracaoNoSupabase('racha_valor_diaria_goleiro', dGoleiro.toString());
   };
 
   // Estados para Modal de Edição de Perfil
@@ -907,6 +914,24 @@ export default function App() {
   // ----- OPERAÇÕES DE TABELAS (MUTANTES DE ESTADO COM PERSISTÊNCIA) -----
 
   // 1. Cadastro Solicitado por jogador (status 'pendente_aprovacao')
+  const handleAdminCriarJogador = async (novo: Omit<Jogador, 'id' | 'status' | 'role' | 'createdAt'>) => {
+    const novoJogador: Jogador = {
+      ...novo,
+      id: `jog-${Date.now()}`,
+      status: 'ativo',
+      role: 'jogador',
+      createdAt: new Date().toISOString(),
+      membroStatusDb: novo.membroStatus,
+      isGoldDb: novo.isGold,
+    };
+    
+    const atualizados = [...jogadores, novoJogador];
+    setJogadores(atualizados);
+    saveJogadores(atualizados);
+
+    await salvarJogadorNoSupabase(novoJogador);
+  };
+
   const handleRegistrarJogador = async (novo: Omit<Jogador, 'id' | 'status' | 'role' | 'createdAt'>) => {
     const novoJogador: Jogador = {
       ...novo,
@@ -2158,6 +2183,7 @@ export default function App() {
                   proximaPartida={proximaPartida}
                   onActualizarPresenca={handleActualizarPresenca}
                   whatsappAutomacaoAtiva={whatsappAutomacaoAtiva}
+                  onCriarJogador={handleAdminCriarJogador}
                 />
               )}
 
@@ -2171,7 +2197,6 @@ export default function App() {
                   valor4Sabados={valor4Sabados}
                   valor5Sabados={valor5Sabados}
                   valorDiaria={valorDiaria}
-                  onUpdateValoresConfig={handleUpdateValoresConfig}
                   partidas={partidasMescladas}
                 />
               )}
@@ -2188,6 +2213,7 @@ export default function App() {
                   aluguelCampoBase={aluguelCampoBase}
                   onUpdateAluguelCampoBase={handleUpdateAluguelCampoBase}
                   valorDiaria={valorDiaria}
+                  diariaGoleiroAluguel={diariaGoleiroAluguel}
                   valor4Sabados={valor4Sabados}
                   valor5Sabados={valor5Sabados}
                   onRegistrarPagamento={handleRegistrarPagamento}
@@ -2245,6 +2271,7 @@ export default function App() {
                   valor4Sabados={valor4Sabados}
                   valor5Sabados={valor5Sabados}
                   valorDiaria={valorDiaria}
+                  diariaGoleiroAluguel={diariaGoleiroAluguel}
                   onUpdateValoresConfig={handleUpdateValoresConfig}
                   onResetDatabase={handleResetDatabase}
                   partidas={partidasMescladas}

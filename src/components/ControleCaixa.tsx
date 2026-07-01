@@ -58,6 +58,7 @@ interface ControleCaixaProps {
   aluguelCampoBase: number;
   onUpdateAluguelCampoBase: (valor: number) => void;
   valorDiaria: number;
+  diariaGoleiroAluguel?: number;
   valor4Sabados: number;
   valor5Sabados: number;
   onRegistrarPagamento?: (jogadorId: string, mesRef: string, status: 'pago' | 'pendente' | 'pendente_confirmacao' | 'cancelado', dataPagamento: string | null, valor: number, partidaId?: string) => void;
@@ -76,6 +77,7 @@ export default function ControleCaixa({
   aluguelCampoBase,
   onUpdateAluguelCampoBase,
   valorDiaria,
+  diariaGoleiroAluguel = 90,
   valor4Sabados,
   valor5Sabados,
   onRegistrarPagamento,
@@ -352,8 +354,16 @@ export default function ControleCaixa({
 
   // 2. Despesas Automáticas do Mês
   const despesaAluguelAutomatico = useMemo(() => {
-    return partidasDoMes.length * getAluguelDoMes(mesSelecionado);
-  }, [partidasDoMes, mesSelecionado, aluguelCampoBase]);
+    let custoGoleiros = 0;
+    partidasDoMes.forEach(p => {
+      const confirmadosAtletas = p.confirmados
+        .map(id => jogadores.find(j => j.id === id))
+        .filter(Boolean) as Jogador[];
+      const count = confirmadosAtletas.filter(j => j.posicao === 'Goleiro Aluguel').length;
+      custoGoleiros += count * (diariaGoleiroAluguel || 90);
+    });
+    return (partidasDoMes.length * getAluguelDoMes(mesSelecionado)) + custoGoleiros;
+  }, [partidasDoMes, mesSelecionado, aluguelCampoBase, jogadores, diariaGoleiroAluguel]);
 
   // Despesas Avulsas do Mês
   const despesaAvulsaTotal = useMemo(() => {
@@ -446,7 +456,16 @@ export default function ControleCaixa({
 
       const receitaTotalM = recMensalistasM + recDiaristasM + recAvulsaM;
 
-      const despesaAluguelM = partidasM.length * getAluguelDoMes(mesRef);
+      let goleirosAluguelMesCount = 0;
+      partidasM.forEach(p => {
+        const confirmadosAtletas = p.confirmados
+          .map(id => jogadores.find(j => j.id === id))
+          .filter(Boolean) as Jogador[];
+        goleirosAluguelMesCount += confirmadosAtletas.filter(j => j.posicao === 'Goleiro Aluguel').length;
+      });
+      const custoGoleirosAluguelM = goleirosAluguelMesCount * (diariaGoleiroAluguel || 90);
+
+      const despesaAluguelM = (partidasM.length * getAluguelDoMes(mesRef)) + custoGoleirosAluguelM;
       const despesaAvulsaM = lancamentos
         .filter(l => l.tipo === 'despesa' && l.data && l.data.startsWith(mesRef))
         .reduce((sum, l) => sum + l.valor, 0);
@@ -535,10 +554,23 @@ export default function ControleCaixa({
 
   const despesaAluguelConsolidado = useMemo(() => {
     const mesLimit = obterMesAtual();
-    return partidas
-      .filter(p => !p.cancelada && p.data && p.data.substring(0, 7) >= startupMonth && p.data.substring(0, 7) <= mesLimit)
+    const partidasValidas = partidas
+      .filter(p => !p.cancelada && p.data && p.data.substring(0, 7) >= startupMonth && p.data.substring(0, 7) <= mesLimit);
+    
+    let custoGoleirosTotal = 0;
+    partidasValidas.forEach(p => {
+      const confirmadosAtletas = p.confirmados
+        .map(id => jogadores.find(j => j.id === id))
+        .filter(Boolean) as Jogador[];
+      const count = confirmadosAtletas.filter(j => j.posicao === 'Goleiro Aluguel').length;
+      custoGoleirosTotal += count * (diariaGoleiroAluguel || 90);
+    });
+
+    const despesaAluguelTotal = partidasValidas
       .reduce((sum, p) => sum + getAluguelDoMes(p.data.substring(0, 7)), 0);
-  }, [partidas, aluguelCampoBase, startupMonth]);
+
+    return despesaAluguelTotal + custoGoleirosTotal;
+  }, [partidas, aluguelCampoBase, startupMonth, jogadores, diariaGoleiroAluguel]);
 
   const despesaAvulsaConsolidado = useMemo(() => {
     const mesLimit = obterMesAtual();
@@ -668,7 +700,16 @@ export default function ControleCaixa({
 
       const receitaTotalM = recMensalistasM + recDiaristasM + recAvulsaM;
 
-      const despesaAluguelM = partidasM.length * getAluguelDoMes(mesRef);
+      let goleirosAluguelMesCount = 0;
+      partidasM.forEach(p => {
+        const confirmadosAtletas = p.confirmados
+          .map(id => jogadores.find(j => j.id === id))
+          .filter(Boolean) as Jogador[];
+        goleirosAluguelMesCount += confirmadosAtletas.filter(j => j.posicao === 'Goleiro Aluguel').length;
+      });
+      const custoGoleirosAluguelM = goleirosAluguelMesCount * (diariaGoleiroAluguel || 90);
+
+      const despesaAluguelM = (partidasM.length * getAluguelDoMes(mesRef)) + custoGoleirosAluguelM;
       const despesaAvulsaM = lancamentos
         .filter(l => l.tipo === 'despesa' && l.data.startsWith(mesRef))
         .reduce((sum, l) => sum + l.valor, 0);
@@ -790,7 +831,9 @@ export default function ControleCaixa({
     const diaristasConfirmados = confirmadosAtletas.filter(j => j.membroStatus === 'diarista');
 
     // Goleiros são gratuitos e não pagam
-    const goleirosConfirmadosCount = confirmadosAtletas.filter(j => j.posicao === 'Goleiro').length;
+    const goleirosConfirmadosCount = confirmadosAtletas.filter(j => j.posicao.includes('Goleiro')).length;
+    const goleirosAluguelCount = confirmadosAtletas.filter(j => j.posicao === 'Goleiro Aluguel').length;
+    const custoGoleirosAluguelJogo = goleirosAluguelCount * diariaGoleiroAluguel;
 
     // Calcular receita gerada ou arrecadada no jogo:
     const receitaEstProjDiaristas = diaristasConfirmados.reduce((sum, d) => {
@@ -821,14 +864,16 @@ export default function ControleCaixa({
       mensalistas: mensalistasConfirmados.length,
       diaristas: diaristasConfirmados.length,
       goleiros: goleirosConfirmadosCount,
+      goleirosAluguel: goleirosAluguelCount,
+      custoGoleirosAluguel: custoGoleirosAluguelJogo,
       receitaEstimada: receitaJogoTotal,
       despesaAluguel: despesaAluguelJogo,
       despesaAdicionais: despesasAdicionaisJogo,
-      despesaTotal: despesaAluguelJogo + despesasAdicionaisJogo,
-      saldoJogo: receitaJogoTotal - (despesaAluguelJogo + despesasAdicionaisJogo),
+      despesaTotal: despesaAluguelJogo + despesasAdicionaisJogo + custoGoleirosAluguelJogo,
+      saldoJogo: receitaJogoTotal - (despesaAluguelJogo + despesasAdicionaisJogo + custoGoleirosAluguelJogo),
       listaAtletas: confirmadosAtletas
     };
-  }, [partidaAtiva, jogadores, pagamentos, numSabadosPartida, aluguelCampoBase, lancamentos]);
+  }, [partidaAtiva, jogadores, pagamentos, numSabadosPartida, aluguelCampoBase, lancamentos, diariaGoleiroAluguel]);
 
   // --- CÁLCULO E DETALHES DO POPUP DO MÊS ---
   const ativosM = useMemo(() => {
@@ -838,7 +883,7 @@ export default function ControleCaixa({
 
     // 1. Mensalistas ativos (Goleiros não pagam mensalidade mas participam)
     jogadores.forEach(j => {
-      if (j.membroStatus === 'mensalista' && j.posicao !== 'Goleiro') {
+      if (j.membroStatus === 'mensalista' && !j.posicao.includes('Goleiro')) {
         if (!setAtivos.has(j.id)) {
           setAtivos.add(j.id);
           list.push(j);
@@ -908,7 +953,16 @@ export default function ControleCaixa({
 
     const receitaTotal = recMensalistas + recDiaristas + recAvulsa;
 
-    const despesaAluguel = partidasM.length * getAluguelDoMes(detalhesMesModal);
+    let goleirosAluguelMesCount = 0;
+    partidasM.forEach(p => {
+      const confirmadosAtletas = p.confirmados
+        .map(id => jogadores.find(j => j.id === id))
+        .filter(Boolean) as Jogador[];
+      goleirosAluguelMesCount += confirmadosAtletas.filter(j => j.posicao === 'Goleiro Aluguel').length;
+    });
+    const custoGoleirosAluguelM = goleirosAluguelMesCount * (diariaGoleiroAluguel || 90);
+
+    const despesaAluguel = (partidasM.length * getAluguelDoMes(detalhesMesModal)) + custoGoleirosAluguelM;
     const despesaAvulsa = lancamentosM
       .filter(l => l.tipo === 'despesa')
       .reduce((sum, l) => sum + l.valor, 0);
@@ -943,7 +997,7 @@ export default function ControleCaixa({
       ativosCount: ativosM.length,
       pagantesCount: pagantesM.length,
     };
-  }, [detalhesMesModal, partidas, lancamentos, pagamentos, jogadores, aluguelCampoBase, todosDebitosPendentes, ativosM]);
+  }, [detalhesMesModal, partidas, lancamentos, pagamentos, jogadores, aluguelCampoBase, todosDebitosPendentes, ativosM, diariaGoleiroAluguel]);
 
   const handleSalvarLancamentoAvulso = (e: React.FormEvent) => {
     e.preventDefault();
@@ -2202,9 +2256,11 @@ export default function ControleCaixa({
                 const confirmadosAtletas = p.confirmados
                   .map(id => jogadores.find(j => j.id === id))
                   .filter(Boolean) as Jogador[];
-                const mensalistasCount = confirmadosAtletas.filter(j => j.membroStatus === 'mensalista' && j.posicao !== 'Goleiro').length;
-                const diaristasCount = confirmadosAtletas.filter(j => j.membroStatus === 'diarista' && j.posicao !== 'Goleiro').length;
-                const goleirosCount = confirmadosAtletas.filter(j => j.posicao === 'Goleiro').length;
+                const mensalistasCount = confirmadosAtletas.filter(j => j.membroStatus === 'mensalista' && !j.posicao.includes('Goleiro')).length;
+                const diaristasCount = confirmadosAtletas.filter(j => j.membroStatus === 'diarista' && !j.posicao.includes('Goleiro')).length;
+                const goleirosCount = confirmadosAtletas.filter(j => j.posicao.includes('Goleiro')).length;
+                const goleirosAluguelCount = confirmadosAtletas.filter(j => j.posicao === 'Goleiro Aluguel').length;
+                const custoGoleirosAluguelJogo = goleirosAluguelCount * diariaGoleiroAluguel;
 
                 // Receita calculada
                 const recDiaristasJogo = pagamentos
@@ -2212,7 +2268,7 @@ export default function ControleCaixa({
                   .reduce((sum, pay) => sum + pay.valor, 0);
 
                 const recMensalistasJogo = confirmadosAtletas
-                  .filter(j => j.membroStatus === 'mensalista' && j.posicao !== 'Goleiro')
+                  .filter(j => j.membroStatus === 'mensalista' && !j.posicao.includes('Goleiro'))
                   .reduce((sum, j) => {
                     const pagMes = pagamentos.find(pay => pay.jogadorId === j.id && pay.mesRef === mesSelecionado && !pay.partidaId && pay.status === 'pago');
                     if (pagMes) {
@@ -2232,7 +2288,7 @@ export default function ControleCaixa({
                   .filter(l => l.partidaId === p.id && l.tipo === 'despesa')
                   .reduce((sum, l) => sum + l.valor, 0);
 
-                const despesaTotalJogo = aluguelCampoBase + despesasAvulsasJogo;
+                const despesaTotalJogo = aluguelCampoBase + despesasAvulsasJogo + custoGoleirosAluguelJogo;
                 const saldoJogo = receitaTotalJogo - despesaTotalJogo;
                 const isPositive = saldoJogo >= 0;
 
@@ -2312,6 +2368,12 @@ export default function ControleCaixa({
                           <span className="text-emerald-350">Aluguel do Campo:</span>
                           <strong className="text-white font-mono">R$ {aluguelCampoBase.toFixed(2)}</strong>
                         </div>
+                        {custoGoleirosAluguelJogo > 0 && (
+                          <div className="flex justify-between text-[10px] text-rose-300">
+                            <span>Goleiros Aluguel ({goleirosAluguelCount}x):</span>
+                            <strong className="text-rose-350 font-mono">R$ {custoGoleirosAluguelJogo.toFixed(2)}</strong>
+                          </div>
+                        )}
                         <div className="flex justify-between text-[10px]">
                           <span className="text-emerald-350">DIVERSAS / EXTRA:</span>
                           <strong className="text-white font-mono">R$ {despesasAvulsasJogo.toFixed(2)}</strong>

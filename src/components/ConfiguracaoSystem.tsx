@@ -24,7 +24,8 @@ interface ConfiguracaoSystemProps {
   valor4Sabados: number;
   valor5Sabados: number;
   valorDiaria: number;
-  onUpdateValoresConfig: (v4: number, v5: number, vD: number) => void;
+  diariaGoleiroAluguel: number;
+  onUpdateValoresConfig: (v4: number, v5: number, vD: number, dGA: number) => void;
   onResetDatabase?: (startingMonth: string) => void;
   partidas?: Partida[];
   jogadores?: Jogador[];
@@ -46,6 +47,7 @@ export default function ConfiguracaoSystem({
   valor4Sabados,
   valor5Sabados,
   valorDiaria,
+  diariaGoleiroAluguel,
   onUpdateValoresConfig,
   onResetDatabase,
   partidas = [],
@@ -81,6 +83,7 @@ export default function ConfiguracaoSystem({
   const [localV4, setLocalV4] = useState(valor4Sabados);
   const [localV5, setLocalV5] = useState(valor5Sabados);
   const [localVD, setLocalVD] = useState(valorDiaria);
+  const [localDGA, setLocalDGA] = useState(diariaGoleiroAluguel);
   const [successTarifasMsg, setSuccessTarifasMsg] = useState('');
   const [manualSuccessMsg, setManualSuccessMsg] = useState('');
 
@@ -249,7 +252,7 @@ export default function ConfiguracaoSystem({
 
   const handleSalvarTarifas = (e: React.FormEvent) => {
     e.preventDefault();
-    onUpdateValoresConfig(localV4, localV5, localVD);
+    onUpdateValoresConfig(localV4, localV5, localVD, localDGA);
     setSuccessTarifasMsg('✓ Tarifas atualizadas com sucesso! Novos registros de pagamento e futuros fechamentos usarão estes valores.');
     setTimeout(() => setSuccessTarifasMsg(''), 4000);
   };
@@ -868,6 +871,23 @@ https://peladabatista.onrender.com`}
                     type="number"
                     value={localVD}
                     onChange={(e) => setLocalVD(parseFloat(e.target.value) || 0)}
+                    className="w-full bg-emerald-950 border border-white/10 text-white text-xs font-mono rounded-lg pl-9 pr-3 py-2.5 focus:outline-none focus:border-white transition-all"
+                    min="0"
+                    step="0.01"
+                    required
+                  />
+                </div>
+              </div>
+
+              <div>
+                <label className="block text-[10px] font-bold text-emerald-300 uppercase tracking-widest mb-1.5 font-sans">DIÁRIA GOLEIRO ALUGUEL</label>
+                <div className="relative">
+                  <span className="absolute left-3.5 top-1/2 -translate-y-1/2 text-xs text-emerald-500 font-sans font-bold">R$</span>
+                  <input
+                    id="input-valor-diaria-goleiro-config"
+                    type="number"
+                    value={localDGA}
+                    onChange={(e) => setLocalDGA(parseFloat(e.target.value) || 0)}
                     className="w-full bg-emerald-950 border border-white/10 text-white text-xs font-mono rounded-lg pl-9 pr-3 py-2.5 focus:outline-none focus:border-white transition-all"
                     min="0"
                     step="0.01"

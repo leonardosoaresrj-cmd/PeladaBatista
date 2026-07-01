@@ -3,7 +3,7 @@
  * SPDX-License-Identifier: Apache-2.0
  */
 
-export type PosicaoJogador = 'Goleiro' | 'Defesa' | 'Meio' | 'Ataque';
+export type PosicaoJogador = 'Goleiro' | 'Goleiro Aluguel' | 'Defesa' | 'Meio' | 'Ataque';
 export type StatusJogador = 'pendente_aprovacao' | 'ativo' | 'suspenso' | 'solicitou_exclusao';
 export type MembroStatus = 'mensalista' | 'diarista' | 'isento';
 export type RoleUsuario = 'admin' | 'jogador';

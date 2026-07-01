@@ -32,7 +32,6 @@ interface ControlePagamentosProps {
   valor4Sabados: number;
   valor5Sabados: number;
   valorDiaria: number;
-  onUpdateValoresConfig: (v4: number, v5: number, vD: number) => void;
   partidas: Partida[];
 }
 
@@ -186,7 +185,7 @@ export default function ControlePagamentos({
   const pagAtual = obterPagamentoDoJogador(mesSelecionado);
 
   const valorCobradoMes = useMemo(() => {
-    if (jogadorAtual.posicao === 'Goleiro') return 0;
+    if (jogadorAtual.posicao.includes('Goleiro')) return 0;
     if (jogadorAtual.membroStatus === 'mensalista') return valorMensalidadeMes;
     return valorDiariaMes;
   }, [jogadorAtual, valorMensalidadeMes, valorDiariaMes]);
@@ -311,7 +310,7 @@ export default function ControlePagamentos({
       </div>
 
       {/* DETALHAMENTO DE EXENÇÃO DO GOLEIRO OU BANNER DE FECHAMENTO */}
-      {jogadorAtual.posicao === 'Goleiro' ? (
+      {jogadorAtual.posicao.includes('Goleiro') ? (
         <div className="bg-gradient-to-r from-teal-950/60 to-emerald-950/30 border border-teal-500/20 p-4.5 rounded-2xl flex flex-col sm:flex-row sm:items-center sm:justify-between gap-3 text-emerald-100">
           <div className="flex items-start gap-2.5 text-left">
             <Sparkles className="w-5 h-5 mt-0.5 shrink-0 text-teal-400 animate-pulse" />
@@ -364,7 +363,7 @@ export default function ControlePagamentos({
         
         {/* INFORMAÇÃO INDIVIDUAL CARDS */}
         {(() => {
-          const isGoleiro = jogadorAtual.posicao === 'Goleiro';
+          const isGoleiro = jogadorAtual.posicao.includes('Goleiro');
           const totalConsolidado = isGoleiro ? 0 : debitosPessoais.reduce((sum, d) => sum + d.valor, 0);
           const totalAberto = isGoleiro ? 0 : debitosPessoais.filter(d => d.status === 'pendente').reduce((sum, d) => sum + d.valor, 0);
           const hasUnpaid = debitosPessoais.some(d => d.status === 'pendente');
@@ -672,7 +671,7 @@ export default function ControlePagamentos({
 
           <div className="bg-black/25 rounded-2xl overflow-hidden border border-white/5 divide-y divide-white/5 font-sans">
             {competencasDisponiveis.map((comp) => {
-              const isGoleiro = jogadorAtual.posicao === 'Goleiro';
+              const isGoleiro = jogadorAtual.posicao.includes('Goleiro');
               const isDiarista = jogadorAtual.membroStatus === 'diarista';
               
               if (isDiarista) {
