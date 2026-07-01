@@ -266,6 +266,7 @@ export default function ControleCaixa({
 
     for (const jogador of jogadores) {
       if (jogador.posicao === 'Goleiro') continue;
+      if (jogador.status !== 'ativo') continue;
       
       const debits = obterDebitosDoJogador(
         jogador.id,
@@ -276,7 +277,8 @@ export default function ControleCaixa({
         valorDiaria,
         valor4Sabados,
         valor5Sabados,
-        jogador.createdAt
+        jogador.createdAt,
+        mesSelecionado
       );
 
       for (const deb of debits) {
@@ -301,7 +303,23 @@ export default function ControleCaixa({
     }
 
     return list;
-  }, [jogadores, partidas, pagamentos, valorDiaria, valor4Sabados, valor5Sabados]);
+  }, [jogadores, partidas, pagamentos, valorDiaria, valor4Sabados, valor5Sabados, mesSelecionado]);
+
+  // Filtrar débitos pendentes com base no escopo e mês filtrado para evitar pendências de meses futuros
+  const debitosPendentesFiltrados = useMemo(() => {
+    return todosDebitosPendentes.filter(deb => {
+      if (visaoEscopo === 'mensal') {
+        // Apenas as pendências de não pagamento do mês filtrado (ciclo mensal)
+        return deb.mesRef === mesSelecionado;
+      } else if (visaoEscopo === 'anual') {
+        // No mês filtrado e meses anteriores no ano corrente (ciclo anual)
+        return deb.mesRef <= mesSelecionado && deb.mesRef.startsWith(anoSelecionado);
+      } else {
+        // No mês filtrado e meses anteriores desde o início do sistema (consolidado)
+        return deb.mesRef <= mesSelecionado;
+      }
+    });
+  }, [todosDebitosPendentes, visaoEscopo, mesSelecionado, anoSelecionado]);
 
   // Separar receita de mensalistas e diaristas do Mês
   const receitaMensalistas = useMemo(() => {
@@ -2759,21 +2777,21 @@ export default function ControleCaixa({
           </div>
           <div className="flex flex-wrap items-center gap-1.5 sm:gap-2">
             <span className="text-[10px] sm:text-xs font-mono font-bold bg-rose-500/10 border border-rose-500/20 text-rose-300 px-2.5 py-0.5 sm:px-3 sm:py-1 rounded-full whitespace-nowrap">
-              {todosDebitosPendentes.length} Pendências Ativas
+              {debitosPendentesFiltrados.length} Pendências Ativas
             </span>
             <span className="text-[10px] sm:text-xs font-mono font-bold bg-white/5 border border-white/10 text-white px-2.5 py-0.5 sm:px-3 sm:py-1 rounded-full whitespace-nowrap">
-              Total Devido: R$ {todosDebitosPendentes.reduce((sum, d) => sum + d.valor, 0).toFixed(2)}
+              Total Devido: R$ {debitosPendentesFiltrados.reduce((sum, d) => sum + d.valor, 0).toFixed(2)}
             </span>
           </div>
         </div>
 
-        {todosDebitosPendentes.length === 0 ? (
+        {debitosPendentesFiltrados.length === 0 ? (
           <div className="text-center py-8 bg-emerald-950/10 border border-dashed border-white/5 rounded-2xl">
             <p className="text-xs font-sans italic text-emerald-500/50">Excelente! Não há nenhum débito pendente registrado para os jogadores ativos.</p>
           </div>
         ) : (
           <div className="space-y-3 font-sans">
-            {todosDebitosPendentes.map((deb, index) => {
+            {debitosPendentesFiltrados.map((deb, index) => {
               const avatar = AVATAR_PRESETS.find(p => p.id === deb.jogadorFoto) || AVATAR_PRESETS[0];
               const isPendenteConfirmacao = deb.status === 'pendente_confirmacao';
               

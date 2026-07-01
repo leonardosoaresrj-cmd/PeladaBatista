@@ -235,7 +235,8 @@ export function obterDebitosDoJogador(
   valorDiaria: number,
   valor4Sabados: number,
   valor5Sabados: number,
-  jogadorCadastroData?: string
+  jogadorCadastroData?: string,
+  mesSelecionado?: string
 ) {
   if (posicao === 'Goleiro') return [];
 
@@ -262,10 +263,12 @@ export function obterDebitosDoJogador(
       return `${y}-${m}`;
     };
 
-    let mesLimit = obterMesAtual(); // ex: '2026-06'
-    const mesRenovacao = obterMesReferenciaParaRenovacao(partidas);
-    if (mesRenovacao > mesLimit) {
-      mesLimit = mesRenovacao;
+    let mesLimit = mesSelecionado || obterMesAtual(); // ex: '2026-06'
+    if (!mesSelecionado) {
+      const mesRenovacao = obterMesReferenciaParaRenovacao(partidas);
+      if (mesRenovacao > mesLimit) {
+        mesLimit = mesRenovacao;
+      }
     }
     const mesSet = new Set<string>();
     mesSet.add(mesLimit);
@@ -273,13 +276,18 @@ export function obterDebitosDoJogador(
     partidas.forEach(p => {
       if (p.data && p.data.length >= 7) {
         const m = p.data.substring(0, 7);
-        mesSet.add(m);
+        if (!mesSelecionado || m <= mesLimit) {
+          mesSet.add(m);
+        }
       }
     });
 
     pagamentos.forEach(p => {
       if (p.mesRef && p.mesRef.length >= 7) {
-        mesSet.add(p.mesRef);
+        const m = p.mesRef;
+        if (!mesSelecionado || m <= mesLimit) {
+          mesSet.add(m);
+        }
       }
     });
 
