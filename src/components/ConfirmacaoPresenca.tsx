@@ -347,7 +347,7 @@ export default function ConfirmacaoPresenca({
         finalConfirmed.push(jogador);
       } else {
         // Jogadores de linha estão sujeitos ao limite de 25
-        const linePlayersConfirmed = finalConfirmed.filter(j => j.posicao !== 'Goleiro');
+        const linePlayersConfirmed = finalConfirmed.filter(j => !j.posicao.includes('Goleiro'));
 
         if (linePlayersConfirmed.length < 25) {
           finalConfirmed.push(jogador);
@@ -355,7 +355,7 @@ export default function ConfirmacaoPresenca({
           // A lista de 25 jogadores de linha está cheia
           if (jogador.membroStatus === 'mensalista') {
             // Procurar por um diarista (de linha) entre os confirmados para enviar para a lista de espera
-            const lastDiaristaLinhaIndex = finalConfirmed.map(j => j.posicao !== 'Goleiro' && j.membroStatus === 'diarista').lastIndexOf(true);
+            const lastDiaristaLinhaIndex = finalConfirmed.map(j => !j.posicao.includes('Goleiro') && j.membroStatus === 'diarista').lastIndexOf(true);
             
             if (lastDiaristaLinhaIndex !== -1) {
               const diaristaParaSair = finalConfirmed[lastDiaristaLinhaIndex];
@@ -405,14 +405,14 @@ export default function ConfirmacaoPresenca({
   });
 
   // Agrupamento por posição dos confirmados filtrados
-  const goleirosConfirmados = filteredConfirmados.filter((j) => j.posicao === 'Goleiro');
+  const goleirosConfirmados = filteredConfirmados.filter((j) => j.posicao.includes('Goleiro'));
   const defesasConfirmados = filteredConfirmados.filter((j) => j.posicao === 'Defesa');
   const meiosConfirmados = filteredConfirmados.filter((j) => j.posicao === 'Meio');
   const ataquesConfirmados = filteredConfirmados.filter((j) => j.posicao === 'Ataque');
 
-  const goleirosNaOrdem = filteredConfirmados.filter((j) => j.posicao === 'Goleiro');
-  const mensalistasNaOrdem = filteredConfirmados.filter((j) => j.posicao !== 'Goleiro' && j.membroStatus === 'mensalista');
-  const diaristasNaOrdem = filteredConfirmados.filter((j) => j.posicao !== 'Goleiro' && j.membroStatus === 'diarista');
+  const goleirosNaOrdem = filteredConfirmados.filter((j) => j.posicao.includes('Goleiro'));
+  const mensalistasNaOrdem = filteredConfirmados.filter((j) => !j.posicao.includes('Goleiro') && j.membroStatus === 'mensalista');
+  const diaristasNaOrdem = filteredConfirmados.filter((j) => !j.posicao.includes('Goleiro') && j.membroStatus === 'diarista');
 
   const getOrdemDeConfirmacaoCount = (jogador: Jogador) => {
     const idx = filteredConfirmados.findIndex((j) => j.id === jogador.id);
@@ -484,7 +484,7 @@ export default function ConfirmacaoPresenca({
                       {j.foto && (j.foto.startsWith('http') || j.foto.startsWith('data:')) ? (
                         <img src={j.foto} className="w-full h-full object-cover rounded-full" alt="" referrerPolicy="no-referrer" />
                       ) : (
-                        j.posicao === 'Goleiro' ? '🧤' : j.posicao === 'Defesa' ? '🛡️' : j.posicao === 'Meio' ? '🧠' : '🚀'
+                        j.posicao.includes('Goleiro') ? '🧤' : j.posicao === 'Defesa' ? '🛡️' : j.posicao === 'Meio' ? '🧠' : '🚀'
                       )}
                     </div>
                     <div className="overflow-hidden min-w-0 text-left">
@@ -498,7 +498,7 @@ export default function ConfirmacaoPresenca({
                       </p>
                       <div className="flex flex-wrap items-center gap-x-1 py-0.5 text-[9px] text-emerald-300 font-sans mt-1 leading-none">
                         <span className="bg-emerald-900/60 px-1.5 py-0.2 rounded text-[8px] font-semibold text-white font-mono uppercase">
-                          {j.posicao === 'Goleiro' ? 'Goleiro' : j.posicao === 'Defesa' ? 'Defesa' : j.posicao === 'Meio' ? 'Meio' : 'Ataque'}
+                          {j.posicao.includes('Goleiro') ? 'Goleiro' : j.posicao === 'Defesa' ? 'Defesa' : j.posicao === 'Meio' ? 'Meio' : 'Ataque'}
                         </span>
                         <span className="text-white/20 select-none">•</span>
                         <span className="truncate max-w-[100px]">{j.email}</span>
@@ -765,7 +765,7 @@ export default function ConfirmacaoPresenca({
             <div className="flex flex-col sm:flex-row sm:items-center justify-between border-b border-white/10 pb-4 gap-3">
               <div>
                 <h4 className="text-xs sm:text-sm font-bold uppercase text-white tracking-wide flex items-center gap-1.5">
-                  🛡️ Elenco Confirmado ({todosConfirmados.filter(j => j.posicao !== 'Goleiro').length}/25 Linha + {todosConfirmados.filter(j => j.posicao === 'Goleiro').length} Goleiros)
+                  🛡️ Elenco Confirmado ({todosConfirmados.filter(j => !j.posicao.includes('Goleiro')).length}/25 Linha + {todosConfirmados.filter(j => j.posicao.includes('Goleiro')).length} Goleiros)
                 </h4>
                 <p className="text-[10px] text-emerald-400 mt-0.5 font-sans">
                   Mensalistas: <b className="text-white">{todosConfirmados.filter(j => j.membroStatus === 'mensalista').length}</b> • Diaristas: <b className="text-white">{todosConfirmados.filter(j => j.membroStatus === 'diarista').length}</b>
@@ -1189,7 +1189,7 @@ export default function ConfirmacaoPresenca({
                               {j.isGold && <span className="text-xs select-none" title="Jogador Gold">🏅</span>}
                             </p>
                             <p className="text-[9px] text-emerald-400 truncate">
-                              {j.posicao === 'Goleiro' ? '🧤 Goleiro' : j.posicao === 'Defesa' ? '🛡️ Defesa' : j.posicao === 'Meio' ? '🧠 Meio' : '🚀 Ataque'}
+                              {j.posicao.includes('Goleiro') ? '🧤 Goleiro' : j.posicao === 'Defesa' ? '🛡️ Defesa' : j.posicao === 'Meio' ? '🧠 Meio' : '🚀 Ataque'}
                             </p>
                           </div>
                         </div>
@@ -1278,7 +1278,7 @@ export default function ConfirmacaoPresenca({
                             {j.foto && (j.foto.startsWith('http') || j.foto.startsWith('data:')) ? (
                               <img src={j.foto} className="w-full h-full object-cover rounded-full" alt="" referrerPolicy="no-referrer" />
                             ) : (
-                              j.posicao === 'Goleiro' ? '🧤' : j.posicao === 'Defesa' ? '🛡️' : j.posicao === 'Meio' ? '🧠' : '🚀'
+                              j.posicao.includes('Goleiro') ? '🧤' : j.posicao === 'Defesa' ? '🛡️' : j.posicao === 'Meio' ? '🧠' : '🚀'
                             )}
                           </div>
                           <div className="overflow-hidden min-w-0">
@@ -1291,7 +1291,7 @@ export default function ConfirmacaoPresenca({
                               {j.isGold && <span className="text-xs select-none no-underline inline-block" title="Jogador Gold">🏅</span>}
                             </p>
                             <p className="text-[9px] text-rose-300 font-medium truncate flex items-center gap-1 leading-normal">
-                              <span>{j.posicao === 'Goleiro' ? '🧤 Goleiro' : j.posicao === 'Defesa' ? '🛡️ Defesa' : j.posicao === 'Meio' ? '🧠 Meio' : '🚀 Ataque'}</span>
+                              <span>{j.posicao.includes('Goleiro') ? '🧤 Goleiro' : j.posicao === 'Defesa' ? '🛡️ Defesa' : j.posicao === 'Meio' ? '🧠 Meio' : '🚀 Ataque'}</span>
                             </p>
                           </div>
                         </div>
@@ -1509,11 +1509,6 @@ export default function ConfirmacaoPresenca({
                     onChange={(e) => {
                       const newPos = e.target.value as PosicaoJogador;
                       setEditPosicao(newPos);
-                      if (newPos === 'Goleiro') {
-                        setEditMembro('isento');
-                      } else if (editMembro === 'isento') {
-                        setEditMembro('mensalista');
-                      }
                     }}
                     className="w-full bg-neutral-900 border border-white/10 rounded-xl p-2.5 text-xs text-white focus:outline-none focus:border-emerald-500 disabled:opacity-50"
                   >
@@ -1542,15 +1537,8 @@ export default function ConfirmacaoPresenca({
                     onChange={(e) => setEditMembro(e.target.value as MembroStatus)}
                     className="w-full bg-neutral-900 border border-white/10 rounded-xl p-2.5 text-xs text-white focus:outline-none focus:border-emerald-500 disabled:opacity-50"
                   >
-                    {editPosicao === 'Goleiro' && jogadorAtual.role !== 'admin' ? (
-                      <option value="isento">Isento</option>
-                    ) : (
-                      <>
-                        <option value="mensalista">Mensalista</option>
-                        <option value="diarista">Diarista</option>
-                        <option value="isento">Isento</option>
-                      </>
-                    )}
+                    <option value="mensalista">Mensalista</option>
+                    <option value="diarista">Diarista</option>
                   </select>
                 </div>
               </div>

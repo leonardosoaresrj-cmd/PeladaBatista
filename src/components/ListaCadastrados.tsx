@@ -38,9 +38,9 @@ export default function ListaCadastrados({
   const jogadoresAtivos = jogadores.filter(j => j.status === 'ativo' || (jogadorAtual.role === 'admin' && j.status === 'suspenso'));
 
   // Separar e contar ativos para goleiros, mensalistas e diaristas
-  const goleirosAtivos = jogadoresAtivos.filter(j => j.posicao.includes('Goleiro') && j.membroStatus !== 'mensalista');
-  const mensalistasAtivos = jogadoresAtivos.filter(j => j.membroStatus === 'mensalista');
-  const diaristasAtivos = jogadoresAtivos.filter(j => !j.posicao.includes('Goleiro') && j.membroStatus === 'diarista');
+  const goleirosAtivos = jogadoresAtivos.filter(j => j.posicao.includes('Goleiro'));
+  const mensalistasAtivos = jogadoresAtivos.filter(j => j.membroStatus === 'mensalista' && !j.posicao.includes('Goleiro'));
+  const diaristasAtivos = jogadoresAtivos.filter(j => j.membroStatus === 'diarista' && !j.posicao.includes('Goleiro'));
 
   // Controle de Edição Administrativa e Pessoal
   const [jogadorEditandoId, setJogadorEditandoId] = useState<string | null>(null);
@@ -404,7 +404,6 @@ export default function ListaCadastrados({
                   >
                     <option className="bg-emerald-950 text-white" value="mensalista">Mensalista</option>
                     <option className="bg-emerald-950 text-white" value="diarista">Diarista</option>
-                    <option className="bg-emerald-950 text-white" value="isento">Isento</option>
                   </select>
                 </div>
 
@@ -1241,11 +1240,11 @@ export default function ListaCadastrados({
                   nome: newNome.trim(),
                   sobrenome: newSobrenome.trim(),
                   posicao: newPosicao,
-                  dataNascimento: newDataNascimento,
+                  dataNascimento: newPosicao === 'Goleiro Aluguel' ? '2000-01-01' : newDataNascimento,
                   foto: '',
-                  membroStatus: newMembro,
-                  email: newEmail.toLowerCase().trim() || `${newNome.trim().toLowerCase()}.${Date.now()}@pelada.com`,
-                  senha: newPin || '1234',
+                  membroStatus: newPosicao === 'Goleiro Aluguel' ? 'diarista' : newMembro,
+                  email: newPosicao === 'Goleiro Aluguel' ? `${newNome.trim().toLowerCase().replace(/\s+/g, '')}.${Date.now()}@pelada.com` : newEmail.toLowerCase().trim(),
+                  senha: newPosicao === 'Goleiro Aluguel' ? '1234' : newPin,
                   isGold: false,
                 });
                 setShowCriarJogadorModal(false);
@@ -1253,39 +1252,40 @@ export default function ListaCadastrados({
                 setNewSobrenome('');
                 setNewEmail('');
                 setNewPin('');
+                setNewDataNascimento('');
                 alert('Jogador criado com sucesso!');
               }
-            }} className="p-5 space-y-4">
-              <div className="grid grid-cols-2 gap-3">
+            }} className="p-4 space-y-3">
+              <div className="grid grid-cols-2 gap-2">
                 <div>
-                  <label className="block text-[10px] font-bold uppercase text-emerald-400 tracking-wider mb-1">Nome</label>
+                  <label className="block text-[9px] font-bold uppercase text-emerald-400 tracking-wider mb-1 truncate">Nome</label>
                   <input
                     type="text"
                     required
                     value={newNome}
                     onChange={(e) => setNewNome(e.target.value)}
-                    className="w-full bg-emerald-950/40 border border-white/10 text-white rounded-lg px-3 py-1.5 text-sm focus:outline-none focus:border-white transition-all font-sans"
+                    className="w-full bg-emerald-950/40 border border-white/10 text-white rounded-lg px-2 py-1.5 text-xs focus:outline-none focus:border-white transition-all font-sans"
                   />
                 </div>
                 <div>
-                  <label className="block text-[10px] font-bold uppercase text-emerald-400 tracking-wider mb-1">Sobrenome</label>
+                  <label className="block text-[9px] font-bold uppercase text-emerald-400 tracking-wider mb-1 truncate">Sobrenome</label>
                   <input
                     type="text"
                     required
                     value={newSobrenome}
                     onChange={(e) => setNewSobrenome(e.target.value)}
-                    className="w-full bg-emerald-950/40 border border-white/10 text-white rounded-lg px-3 py-1.5 text-sm focus:outline-none focus:border-white transition-all font-sans"
+                    className="w-full bg-emerald-950/40 border border-white/10 text-white rounded-lg px-2 py-1.5 text-xs focus:outline-none focus:border-white transition-all font-sans"
                   />
                 </div>
               </div>
 
-              <div className="grid grid-cols-2 gap-3">
-                <div>
-                  <label className="block text-[10px] font-bold uppercase text-emerald-400 tracking-wider mb-1">Posição</label>
+              <div className="grid grid-cols-2 gap-2">
+                <div className={newPosicao === 'Goleiro Aluguel' ? 'col-span-2' : ''}>
+                  <label className="block text-[9px] font-bold uppercase text-emerald-400 tracking-wider mb-1 truncate">Posição</label>
                   <select
                     value={newPosicao}
                     onChange={(e) => setNewPosicao(e.target.value as PosicaoJogador)}
-                    className="w-full bg-emerald-950 border border-white/10 text-white rounded-lg px-2.5 py-1.5 text-sm focus:outline-none focus:border-white transition-all font-sans"
+                    className="w-full bg-emerald-950 border border-white/10 text-white rounded-lg px-2 py-1.5 text-xs focus:outline-none focus:border-white transition-all font-sans"
                   >
                     <option className="bg-emerald-950 text-white" value="Goleiro">🧤 Goleiro Oficial</option>
                     <option className="bg-emerald-950 text-white" value="Goleiro Aluguel">🛑 Goleiro Aluguel</option>
@@ -1294,59 +1294,66 @@ export default function ListaCadastrados({
                     <option className="bg-emerald-950 text-white" value="Ataque">⚡ Ataque</option>
                   </select>
                 </div>
-                <div>
-                  <label className="block text-[10px] font-bold uppercase text-emerald-400 tracking-wider mb-1">Plano</label>
-                  <select
-                    value={newMembro}
-                    onChange={(e) => setNewMembro(e.target.value as MembroStatus)}
-                    className="w-full bg-emerald-950 border border-white/10 text-white rounded-lg px-2.5 py-1.5 text-sm focus:outline-none focus:border-white transition-all font-sans"
-                  >
-                    <option className="bg-emerald-950 text-white" value="mensalista">📅 Mensalista</option>
-                    <option className="bg-emerald-950 text-white" value="diarista">⚽ Diarista</option>
-                    <option className="bg-emerald-950 text-white" value="isento">Isento</option>
-                  </select>
-                </div>
+                {newPosicao !== 'Goleiro Aluguel' && (
+                  <div>
+                    <label className="block text-[9px] font-bold uppercase text-emerald-400 tracking-wider mb-1 truncate">Plano</label>
+                    <select
+                      value={newMembro}
+                      onChange={(e) => setNewMembro(e.target.value as MembroStatus)}
+                      className="w-full bg-emerald-950 border border-white/10 text-white rounded-lg px-2 py-1.5 text-xs focus:outline-none focus:border-white transition-all font-sans"
+                    >
+                      <option className="bg-emerald-950 text-white" value="mensalista">📅 Mensal.</option>
+                      <option className="bg-emerald-950 text-white" value="diarista">⚽ Diarista</option>
+                    </select>
+                  </div>
+                )}
               </div>
 
-              <div className="grid grid-cols-2 gap-3">
+              {newPosicao !== 'Goleiro Aluguel' && (
+                <div className="grid grid-cols-2 gap-2">
+                  <div className="min-w-0">
+                    <label className="block text-[9px] font-bold uppercase text-emerald-400 tracking-wider mb-1 truncate">Nascimento</label>
+                    <input
+                      type="date"
+                      required
+                      value={newDataNascimento}
+                      onChange={(e) => setNewDataNascimento(e.target.value)}
+                      className="w-full bg-emerald-950/40 border border-white/10 text-white rounded-lg px-2 py-1.5 text-xs focus:outline-none focus:border-white transition-all font-sans [&::-webkit-calendar-picker-indicator]:hidden [&::-webkit-calendar-picker-indicator]:m-0 [&::-webkit-calendar-picker-indicator]:p-0"
+                    />
+                  </div>
+                  <div className="min-w-0">
+                    <label className="block text-[9px] font-bold uppercase text-emerald-400 tracking-wider mb-1 truncate">Senha (PIN)</label>
+                    <input
+                      type="text"
+                      required
+                      value={newPin}
+                      onChange={(e) => setNewPin(e.target.value)}
+                      placeholder="Ex: 1234"
+                      maxLength={4}
+                      className="w-full bg-emerald-950/40 border border-white/10 text-white rounded-lg px-2 py-1.5 text-xs focus:outline-none focus:border-white transition-all font-sans"
+                    />
+                  </div>
+                </div>
+              )}
+
+              {newPosicao !== 'Goleiro Aluguel' && (
                 <div>
-                  <label className="block text-[10px] font-bold uppercase text-emerald-400 tracking-wider mb-1">Data Nascimento</label>
+                  <label className="block text-[9px] font-bold uppercase text-emerald-400 tracking-wider mb-1 truncate">Email</label>
                   <input
-                    type="date"
+                    type="email"
                     required
-                    value={newDataNascimento}
-                    onChange={(e) => setNewDataNascimento(e.target.value)}
-                    className="w-full bg-emerald-950/40 border border-white/10 text-white rounded-lg px-3 py-1.5 text-sm focus:outline-none focus:border-white transition-all font-sans"
+                    value={newEmail}
+                    onChange={(e) => setNewEmail(e.target.value)}
+                    placeholder="email@exemplo.com"
+                    className="w-full bg-emerald-950/40 border border-white/10 text-white rounded-lg px-2 py-1.5 text-xs focus:outline-none focus:border-white transition-all font-sans"
                   />
                 </div>
-                <div>
-                  <label className="block text-[10px] font-bold uppercase text-emerald-400 tracking-wider mb-1">Senha (PIN)</label>
-                  <input
-                    type="text"
-                    value={newPin}
-                    onChange={(e) => setNewPin(e.target.value)}
-                    placeholder="1234"
-                    maxLength={4}
-                    className="w-full bg-emerald-950/40 border border-white/10 text-white rounded-lg px-3 py-1.5 text-sm focus:outline-none focus:border-white transition-all font-sans"
-                  />
-                </div>
-              </div>
+              )}
 
-              <div>
-                <label className="block text-[10px] font-bold uppercase text-emerald-400 tracking-wider mb-1">Email (Opcional)</label>
-                <input
-                  type="email"
-                  value={newEmail}
-                  onChange={(e) => setNewEmail(e.target.value)}
-                  placeholder="Deixe em branco p/ gerar auto"
-                  className="w-full bg-emerald-950/40 border border-white/10 text-white rounded-lg px-3 py-1.5 text-sm focus:outline-none focus:border-white transition-all font-sans"
-                />
-              </div>
-
-              <div className="pt-3">
+              <div className="pt-2">
                 <button
                   type="submit"
-                  className="w-full bg-emerald-500 hover:bg-emerald-400 text-emerald-950 font-black tracking-widest uppercase text-xs py-3 rounded-xl transition-all shadow-[0_0_20px_rgba(16,185,129,0.3)] hover:shadow-[0_0_30px_rgba(16,185,129,0.5)] border border-emerald-300 flex items-center justify-center gap-2"
+                  className="w-full bg-emerald-500 hover:bg-emerald-400 text-emerald-950 font-black tracking-widest uppercase text-[11px] py-2.5 rounded-xl transition-all shadow-[0_0_20px_rgba(16,185,129,0.3)] hover:shadow-[0_0_30px_rgba(16,185,129,0.5)] border border-emerald-300 flex items-center justify-center gap-2"
                 >
                   <Check className="w-4 h-4" />
                   Criar Imediatamente

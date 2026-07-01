@@ -177,7 +177,7 @@ export function obterTextoListaRenovacao(
     .map(p => p.jogadorId);
 
   const novosMensalistas = jogadores.filter(
-    j => j.membroStatus !== 'mensalista' && j.posicao !== 'Goleiro' && pagantesDesteMesIds.includes(j.id)
+    j => j.membroStatus !== 'mensalista' && !j.posicao.includes('Goleiro') && pagantesDesteMesIds.includes(j.id)
   );
 
   const formatarLinhaAtual = (j: Jogador, index: number) => {
@@ -434,14 +434,14 @@ export function obterTextoListaCompletaPartida(
     if (jogador.posicao === 'Goleiro') {
       finalConfirmed.push(jogador);
     } else {
-      const linePlayersConfirmed = finalConfirmed.filter(j => j.posicao !== 'Goleiro');
+      const linePlayersConfirmed = finalConfirmed.filter(j => !j.posicao.includes('Goleiro'));
 
       if (linePlayersConfirmed.length < 25) {
         finalConfirmed.push(jogador);
       } else {
         if (jogador.membroStatus === 'mensalista') {
           // Procurar o último diarista de linha nos confirmados para rebaixar para a fila de espera
-          const lastDiaristaLinhaIndex = finalConfirmed.map(j => j.posicao !== 'Goleiro' && j.membroStatus === 'diarista').lastIndexOf(true);
+          const lastDiaristaLinhaIndex = finalConfirmed.map(j => !j.posicao.includes('Goleiro') && j.membroStatus === 'diarista').lastIndexOf(true);
           
           if (lastDiaristaLinhaIndex !== -1) {
             const diaristaParaSair = finalConfirmed[lastDiaristaLinhaIndex];
@@ -551,8 +551,6 @@ https://peladabatista.onrender.com`;
  * Retorna o status de membro efetivo do jogador (tratando mensalistas inadimplentes como diaristas)
  */
 export function obterStatusMembroEfetivo(jogador: Jogador, pagamentos: Pagamento[]): 'mensalista' | 'diarista' | 'isento' {
-  if (jogador.posicao.includes('Goleiro')) return 'isento';
-  
   const statusOriginal = (jogador.membroStatus || 'diarista') as 'mensalista' | 'diarista' | 'isento';
   
   if (statusOriginal === 'mensalista') {
