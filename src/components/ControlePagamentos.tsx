@@ -688,14 +688,36 @@ export default function ControlePagamentos({
                 }
               }
               
+              if (!mesCadastro) {
+                let earliestMonth = obterMesAtual();
+                pagamentos.forEach(p => {
+                  if (p.jogadorId === jogadorAtual.id && p.mesRef && p.mesRef < earliestMonth) {
+                    earliestMonth = p.mesRef;
+                  }
+                });
+                partidas.forEach(p => {
+                  if (p.confirmados.includes(jogadorAtual.id) && p.data && p.data.substring(0, 7) < earliestMonth) {
+                    earliestMonth = p.data.substring(0, 7);
+                  }
+                });
+                mesCadastro = earliestMonth;
+              }
+              
               const checkPgGeral = obterPagamentoDoJogador(comp.value);
               const pagamentosDiaristaMes = pagamentos.filter(p => p.jogadorId === jogadorAtual.id && p.mesRef === comp.value && p.status !== 'cancelado' && p.partidaId);
               
-              if (mesCadastro && comp.value < mesCadastro && !checkPgGeral && pagamentosDiaristaMes.length === 0) {
+              // Only hide the month if it is BEFORE their mesCadastro AND they don't have any payments or active debts for it
+              if (mesCadastro && comp.value < mesCadastro && !checkPgGeral && pagamentosDiaristaMes.length === 0 && !debitosPessoais.some(d => d.mesRef === comp.value)) {
                 return null;
               }
               
-              if (isDiarista) {
+              // For Mensalistas, if they have no payment, no diarista matches, AND the debt engine didn't generate a debt for this month 
+              // (e.g. because there were no games in that month), we should not falsely show it as PENDENTE.
+              if (!isDiarista && !isGoleiro && !checkPgGeral && pagamentosDiaristaMes.length === 0 && !debitosPessoais.some(d => d.mesRef === comp.value)) {
+                return null;
+              }
+              
+              if (isDiarista || (!checkPgGeral && pagamentosDiaristaMes.length > 0)) {
                 const pagamentosMes = pagamentosDiaristaMes;
                 const valorTotalNoMes = pagamentosMes.reduce((sum, p) => sum + p.valor, 0);
                 const isAllPaid = pagamentosMes.length > 0 && pagamentosMes.every(p => p.status === 'pago');
